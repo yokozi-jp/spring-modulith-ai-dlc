@@ -11,6 +11,6 @@ import type { ValidationError } from './validationError.ts';
 export type ValidationProblem = ProblemDetail & {
   /** 入力検証の誤り。type が /problems/validation-error のときだけ必ず含む */
   errors?: ValidationError[];
-  /** 入力検証エラーなら /problems/validation-error。それ以外の 400 は about:blank */
+  /** 入力検証エラーなら /problems/validation-error。Idempotency-Key の誤りなら /problems/idempotency-key- で始まる type。それ以外の 400 は about:blank */
   type?: string;
 };

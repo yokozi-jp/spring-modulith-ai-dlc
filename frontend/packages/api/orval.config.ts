@@ -21,6 +21,8 @@ export default defineConfig({
       mode: "tags-split",
       client: "react-query",
       httpClient: "fetch",
+      // 既定の false では、必須の Idempotency-Key ヘッダー（ADR-126）が生成した関数の引数に出ない。
+      headers: true,
       clean: true,
       mock: {
         path: "./src/generated/mocks",

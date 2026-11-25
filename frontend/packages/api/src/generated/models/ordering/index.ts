@@ -3,9 +3,13 @@
  * Demo API
  */
 
+export * from './cancelOrderHeaders.ts';
 export * from './cancelOrderRequest.ts';
+export * from './changeOrderLinesHeaders.ts';
 export * from './changeOrderLinesRequest.ts';
+export * from './confirmOrderHeaders.ts';
 export * from './confirmOrderRequest.ts';
+export * from './draftOrderHeaders.ts';
 export * from './draftOrderRequest.ts';
 export * from './listOrdersParams.ts';
 export * from './orderDetailsResponse.ts';

@@ -1,7 +1,9 @@
+/* oxlint-disable import/max-dependencies -- 明細の変更は、生成 API、form、通知、409 の扱い、Idempotency-Key をこの Hook でつなぐ。 */
 import {
   getFindOrderByIdQueryKey,
   useChangeOrderLines,
 } from "@frontend/api/endpoints/ordering/ordering";
+import { idempotencyKeyHeaders } from "@frontend/api/idempotency-key";
 import type { OrderDetailsResponse, OrderLineRequest } from "@frontend/api/models";
 import { useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
@@ -81,7 +83,7 @@ export function useOrderLinesEditor(
     setNotice(undefined);
     setFeedback({ conflict: false, serverErrors: noServerErrors });
     mutation.mutate(
-      { orderId, data: { lines, lockNo } },
+      { orderId, data: { lines, lockNo }, headers: idempotencyKeyHeaders() },
       {
         // mutate の callback は全 query の再取得の後に呼ばれるので、cache の詳細は最新である（docs/frontend/routing-and-state.md）。
         onSuccess: () => {
