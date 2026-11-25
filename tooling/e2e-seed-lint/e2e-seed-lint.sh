@@ -7,7 +7,16 @@ set -u
 
 root="${1:?usage: e2e-seed-lint.sh <root>}"
 dir="$root/frontend/apps/web/e2e"
-found="$(grep -rnI --exclude-dir=.auth -- 'SEED-' "$dir" || true)"
+if [ ! -d "$dir" ]; then
+  echo "✗ $dir がありません。E2E のディレクトリを移したら、この検査の対象も直してください。" >&2
+  exit 1
+fi
+# ponytail: 文字列の grep なので、"SEE" + "D-C03" のように組み立てた名指しは検出できない。そうした書き方が出たら、TypeScript の AST で定数畳み込みをして調べる。
+found="$(grep -rnI --exclude-dir=.auth -- 'SEED-' "$dir")"
+if [ $? -gt 1 ]; then
+  echo "✗ $dir を grep で読めませんでした。" >&2
+  exit 1
+fi
 if [ -n "$found" ]; then
   printf '%s\n' "$found" >&2
   echo "✗ E2E のコードが、開発用のシーダーの代表データ（SEED-）を名指ししています。" >&2
