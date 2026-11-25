@@ -35,12 +35,14 @@ xUnit Test Patterns の分類では、用途の違う者が共有する General 
   `fullyParallel` と 4 workers の `task e2e` は、3 回とも 34 件すべてが通った。
 - **画面、公開 API、WireMock で作れない状態は商品だけである**：決済済みは確定、拒否と再投入待ちは確定の前の `failChargesFor`、取消済みは詳細の画面の「取り消す」で作れる。
   ADR-073 が代表の注文で確かめていた決済済み、拒否、再投入待ちの詳細は、既存の「作成して確定」「拒否」「5xx」と「タイムアウト」のテストが同じ表示を確かめている。
-- **シーダーと共有できる範囲**：環境の確認（目印が `local` か `test` で、`DB_HOST` が loopback）と接続は `LocalDatabase` にまとめ、シーダーと fixture サーバーが使う。
+- **シーダーと共有できる範囲**：環境の確認（目印が `local` か `test` で、`DB_HOST` が loopback）、接続、jOOQ の設定は `LocalDatabase` にまとめ、シーダーと fixture サーバーが使う。
   テナントと所属の投入（`TenancySeeds.insert`）、商品の行の登録（`TestProducts.insert`）、モジュールのロールとテナントの設定（`AsModule`）は、既存の補助をそのまま使う。
   シーダーの「空」の判定、reset、1 つのトランザクションでの投入は、シーダーだけに残す。
 - **Node から DB へ直接入れる案（下の選択肢 2）は要らない**：上の 4 点が成り立ったため、試作以上には検討していない。
 
-`task e2e-up` は以前から migration にホストの Java を使っており、fixture サーバーでホストの要件は増えない。
+試作の後に、fixture サーバーの境界（`Host` の検査、`Content-Type` と本文の大きさの上限、想定外の失敗の 500）を固め、HTTP の契約を `E2eFixtureServerTest` で確かめるようにした。
+`task e2e-up` は以前から migration にホストの Gradle を使っている。
+fixture サーバーは PATH の java ではなく、Gradle がテストに使う toolchain の Java 25 で起動するので、ホストに要る Java は migration と同じである。
 
 ## Decision
 
@@ -53,10 +55,14 @@ E2E は開発用のシーダーを使わない。
 - fixture サーバー（`E2eFixtureServer`）は backend のテストのソースに置き、bootJar と `runtimeClasspath` に入れない。
   Spring を起動せず、JDK の `HttpServer` を `127.0.0.1` にだけ開き、環境の目印がローカルかテストでなければ DB に触れずに止まる。
   起動時にテナントと所属を入れてから listen するので、`GET /health` が応答すれば共有のデータが揃っている。
+  ブラウザの別のサイトからの要求を通さないよう、`Host` が loopback の名前と自分の port でない要求を 403 にし、`POST /products` は `application/json` の本文だけを受ける。
+  本文の `tenant` は、今の spec では常に同じテナントだが、複数のテナントにまたがる E2E を書く余地として残す。
 - fixture サーバーは Playwright の `webServer` の 2 つ目として `tooling/e2e-fixture/serve.sh` から起動し、Playwright が止める。
-  `task e2e-up` は Gradle の `writeE2eFixtureArgs` で java の引数ファイルを書くだけにし、`task be-seed` を実行しない。
+  `task e2e-up` は Gradle の `writeE2eFixtureArgs` で、テストと同じ toolchain の java のパスと引数ファイルを書くだけにし、`task be-seed` を実行しない。
   port は slot が `E2E_FIXTURE_PORT`（slot 0 は 8083）で決める。
-- fixture サーバーに足すのは、画面、公開 API、WireMock で作れない状態が必要になったときだけにする。
+- fixture サーバーに足すのは、画面、公開 API、WireMock で作れず、spec が必要とする状態だけにする。
+  足すときは、契約（パス、本文、応答）を同じ変更で [E2E テストの方針と書き方](../e2e/testing-strategy.md) に書く。
+  ADR を起こすのは、本番の経路を迂回する状態（業務の不変条件を破る行など）を作るときだけにする。
 - `task lint-e2e-seed` が、`frontend/apps/web/e2e/` の `SEED-` の文字列を失敗にする。
 - 開発用の代表データを読む検証スキル（verify-demo）は、`stack.sh up` で `task be-seed` を実行し、代表データを読む補助を自分で持つ。
 

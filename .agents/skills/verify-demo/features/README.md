@@ -9,8 +9,11 @@
 
 - `stack.sh up` で起動した検証スタック（`http://localhost:<web のポート>`、slot 0 は 5173）だけを操作する。
 - journey の前に `stack.sh doctor` を実行し、すべて OK であることを確かめる。
-- 代表データと、journey が作るデータの扱いは `docs/e2e/testing-strategy.md` の「テストデータ」に従う。
-  客先注文番号は `orders.uniqueCode("VERIFY")` で作る。
+- journey は、`stack.sh up` が `task be-seed` で入れる開発用の代表データ（テナントと所属、商品、`SEED-C01` から `SEED-C06` の注文）を読む。
+  代表データを読む補助は `scripts/seeded.mjs` にある。
+  E2E は代表データを使わない（`docs/e2e/testing-strategy.md` の「テストデータ」）。
+- journey は代表データを変更しない。
+  journey が作る注文の客先注文番号は `orders.uniqueCode("VERIFY")` で作る。
 
 ## 操作の決まり
 

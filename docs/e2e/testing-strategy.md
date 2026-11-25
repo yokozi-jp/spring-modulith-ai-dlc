@@ -74,16 +74,21 @@ E2E は開発用のシーダー（`LocalDataSeeder`）を使わない（[ADR-129
 - テストの実行順や、他のテストが作ったデータに依存しない。
 - spec に `SEED-` の文字列を書かない。`task fe-check` の `lint-e2e-seed` が失敗にする。
 - 画面、公開 API、WireMock で作れない状態が必要になったら、fixture サーバーに入口を足す。
-  足す前に、その状態が本当に画面と公開 API で作れないことを確かめる。
+  足すのは、spec が必要とする状態だけにする。
+  足す前に、その状態が本当に画面、公開 API、WireMock で作れないことを確かめる。
+  足すときは、同じ変更で下の入口の表に契約（パス、本文、応答）を書く。
+  本番の経路を迂回する状態（業務の不変条件を破る行など）を作る入口は、足す前に ADR で判断する。
 
 fixture サーバー（backend の `src/test` の `E2eFixtureServer`）は、Spring を起動せず、JDK の `HttpServer` を `127.0.0.1` にだけ開く。
 環境の目印（`OTEL_DEPLOYMENT_ENVIRONMENT_NAME`）が `local` か `test` で、`DB_HOST` が loopback のときだけ起動する。
+どの入口も、`Host` が `127.0.0.1:<port>` か `localhost:<port>` でなければ 403 を返す。
+想定外の失敗は 500 を返し、標準エラーのログに出す。
 入口は次のとおりである。
 
-| 入口             | 応答                                                                                                                                                                                                                                                             |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /health`    | 200。起動時のテナントと所属の投入の後に listen するので、応答すれば共有のデータが揃っている                                                                                                                                                                      |
-| `POST /products` | 本文 `{"tenant":"サンプル商事","onSale":true,"unitPrice":1200}` で商品を作り、201 で `productId`、`productCode`、`productName`、`unitPrice`、`onSale` を返す。未知のテナント、`onSale` の欠落、1 から 9999999999 の整数でない `unitPrice`、JSON でない本文は 400 |
+| 入口             | 応答                                                                                                                                                                                                                                                                                                                                             |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /health`    | 200。起動時のテナントと所属の投入の後に listen するので、応答すれば共有のデータが揃っている                                                                                                                                                                                                                                                      |
+| `POST /products` | 本文 `{"tenant":"サンプル商事","onSale":true,"unitPrice":1200}` で商品を作り、201 で `productId`、`productCode`、`productName`、`unitPrice`、`onSale` を返す。未知のテナント、`onSale` の欠落、1 から 9999999999 の整数でない `unitPrice`、JSON でない本文は 400。Content-Type が `application/json` でなければ 415、本文が 8 KiB を超えれば 413 |
 
 ## 外部システムの偽物
 
@@ -179,11 +184,13 @@ slot 0 の port は次のとおりである。
 2. `task e2e-up` を実行する。
    slot の web と backend の port（slot 0 は 5173 と 8080）が空いていることを確かめ、frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
-3. PostgreSQL、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用し、backend の Gradle の `writeE2eFixtureArgs` で fixture サーバーの java の引数ファイル（`backend/build/e2e-fixture/java-args.txt`）を書く。
+3. PostgreSQL、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用する。
+   backend の Gradle の `writeE2eFixtureArgs` が、fixture サーバーを起動する java のパス（テストと同じ toolchain の Java 25）と引数ファイルを `backend/build/e2e-fixture/` に書く。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview と fixture サーバー（`tooling/e2e-fixture/serve.sh`）を起動し、終了時に止める。
    fixture サーバーは slot の env ファイル（`TEST_ENV_FILE`、無ければ `.env.test`）から DB の接続先を読む。
+   fixture サーバーのログは標準エラーに出て、Playwright の出力に並ぶ。
 6. 成否にかかわらず、`task e2e-collect-logs` で backend のログを `frontend/apps/web/test-results/backend.log` に書き、slot の project のコンテナと volume を削除して slot を返す。
    ログに `.env.test` の `OIDC_CLIENT_SECRET` か `E2E_PASSWORD` の値が入っていれば、テストが成功していても失敗にする。
    値の一致で見つからない秘密として、`__Host-APP_SESSION=` に続く Cookie の値と、`eyJ` で始まる 3 つの base64url をつないだ JWT の形の文字列も失敗にする。
