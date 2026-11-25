@@ -214,6 +214,20 @@ pre-commit:
         task test-slot-test
       fail_text: "test-slot の自己検査に失敗しました。task test-slot-test で再実行してください。"
 
+    # 本番の Java、DB の SQL と YAML、検査にステージ済み変更があるとき、本番のコードの SQL を検査する（task lint-session-sql、task lint-db-clock）。
+    # Gradle を使わず、be-lint の glob には db の SQL と YAML が入らないため、be-lint とは別に pre-commit で流す。
+    - name: lint-backend-sql
+      glob:
+        - "backend/src/main/java/**"
+        - "backend/src/main/resources/db/**"
+        - "tooling/session-sql-lint/**"
+        - "tooling/db-clock-lint/**"
+      run: |
+        echo "{staged_files}" >/dev/null
+        task lint-session-sql
+        task lint-db-clock
+      fail_text: "本番のコードの SQL の検査に失敗しました。task lint-session-sql と task lint-db-clock で再実行してください。"
+
     # check.sh か自己検査にステージ済み変更があるとき、一時の git リポジトリで自己検査する（task test-weakening-test）。
     - name: test-weakening-test
       glob:
