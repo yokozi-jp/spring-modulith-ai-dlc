@@ -71,6 +71,16 @@ public class PgmCdAspect {
             "pgm_cd is not bound: call from a *CommandHandler.handle or a *Listener method"));
   }
 
+  /**
+   * 呼び出し中のユースケースのモジュールの名前（{@code *_pgm_cd} の {@code .} より前）を返す。
+   *
+   * @throws IllegalStateException CommandHandler と Listener の外で呼ばれた場合
+   */
+  /* package */ static String currentModule() {
+    final String pgmCd = current();
+    return pgmCd.substring(0, pgmCd.indexOf('.'));
+  }
+
   /** ユースケースのクラスから {@code *_pgm_cd} を求める。 */
   /* package */ static String pgmCd(final Class<?> useCase) {
     final String relative = useCase.getName().substring(BASE_PACKAGE.length());

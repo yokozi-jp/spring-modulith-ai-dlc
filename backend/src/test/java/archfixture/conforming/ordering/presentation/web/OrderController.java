@@ -6,6 +6,10 @@ import archfixture.conforming.ordering.OrderSummary;
 import archfixture.conforming.ordering.application.PlaceOrderCommandHandler;
 import archfixture.conforming.ordering.application.PlaceOrderResult;
 import archfixture.conforming.shared.failure.NotFoundException;
+import archfixture.conforming.shared.idempotency.IdempotencyKey;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.extensions.Extension;
+import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
 import jakarta.validation.Valid;
 import java.net.URI;
 import java.util.List;
@@ -38,9 +42,19 @@ class OrderController {
 
   /** 注文を受け付け、作成した注文の URI を返す。 */
   @PostMapping
-  /* package */ ResponseEntity<Void> place(@Valid @RequestBody final PlaceOrderRequest request) {
-    final PlaceOrderResult result = placeOrder.handle(request.toCommand());
+  /* package */ ResponseEntity<Void> place(
+      final IdempotencyKey idempotencyKey, @Valid @RequestBody final PlaceOrderRequest request) {
+    final PlaceOrderResult result = placeOrder.handle(request.toCommand(idempotencyKey));
     return ResponseEntity.created(URI.create("/api/orders/" + result.orderId())).build();
+  }
+
+  /** キーを求めない印を付けた操作。Idempotency-Key の規則の対象にならない。 */
+  @Operation(
+      extensions =
+          @Extension(properties = @ExtensionProperty(name = "x-idempotency-key", value = "none")))
+  @PostMapping("/selection")
+  /* package */ ResponseEntity<Void> select() {
+    return ResponseEntity.noContent().build();
   }
 
   /** 注文の詳細を返す。 */

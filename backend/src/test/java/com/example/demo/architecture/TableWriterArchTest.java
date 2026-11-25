@@ -11,6 +11,7 @@ import com.tngtech.archunit.core.domain.AccessTarget;
 import com.tngtech.archunit.core.domain.JavaAccess;
 import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.domain.JavaMethod;
+import com.tngtech.archunit.core.domain.JavaMethodCall;
 import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.junit.AnalyzeClasses;
 import com.tngtech.archunit.junit.ArchTest;
@@ -64,7 +65,7 @@ import org.junit.jupiter.api.Test;
  *   <li>R3 {@code expectedLockNoIsCreatedOnlyByRequests}：{@code ExpectedLockNo} は {@code
  *       presentation.web} の Request だけが作る。
  *   <li>R4 {@code commandHandlersEnsureScreenLockNo}：{@code VersionedCommand} を受け取る CommandHandler
- *       の {@code handle} は、その中で直接 {@code ensureLockNo(ExpectedLockNo)} を呼ぶ。
+ *       の {@code handle} は、その中か、そこから呼ぶ private メソッドの中で直接 {@code ensureLockNo(ExpectedLockNo)} を呼ぶ。
  * </ul>
  *
  * <p>ponytail: 値の流れは追わない。{@code ensureLockNo} を別の集約のインスタンスに呼ぶ実装、業務の検査や外部の呼び出しの後に呼ぶ実装、 {@code
@@ -200,7 +201,8 @@ class TableWriterArchTest {
   private static final String REVIEWED_JOOQ_VERSION = "3.21.9";
 
   /**
-   * 業務テーブルの INSERT、UPDATE、DELETE は、TableWriter とその子の行の書き込み（ChildWriter）だけが組み立てて実行する（H1）。
+   * 業務テーブルの INSERT、UPDATE、DELETE は、TableWriter とその子の行の書き込み（ChildWriter）、{@code Idempotency-Key}
+   * の行の書き込み（IdempotencyKeyWriter）だけが組み立てて実行する（H1）。
    *
    * <p>トランザクションの初めにモジュールのロールとテナントを設定する ModuleRoleTransactionManager は、業務テーブルに触れず、設定の名前を固定した 1 つの
    * {@code set_config} の文だけを実行するため対象にしない（ADR-094、ADR-107）。
@@ -225,8 +227,8 @@ class TableWriterArchTest {
       repositoryWritesTakeVersionedAggregatesRule();
 
   /**
-   * {@code VersionedCommand} を受け取る CommandHandler の {@code handle} は、その中で直接 {@code
-   * ensureLockNo(ExpectedLockNo)} を呼ぶ（R4、旧 H4）。
+   * {@code VersionedCommand} を受け取る CommandHandler の {@code handle} は、その中か、そこから呼ぶ private メソッドの中で直接
+   * {@code ensureLockNo(ExpectedLockNo)} を呼ぶ（R4、旧 H4）。
    */
   @ArchTest
   /* package */ static final ArchRule commandHandlersEnsureScreenLockNo =
@@ -262,7 +264,8 @@ class TableWriterArchTest {
   }
 
   /**
-   * H1 の規則を組み立てる。例外は基底パッケージの shared にある TableWriter、ChildWriter、ModuleRoleTransactionManager だけにする。
+   * H1 の規則を組み立てる。例外は基底パッケージの shared にある TableWriter、ChildWriter、IdempotencyKeyWriter、
+   * ModuleRoleTransactionManager だけにする。
    */
   /* package */ static ArchRule tableWritesGoThroughTableWriterRule(final String basePackage) {
     final String writerPackage = basePackage + WRITER_PACKAGE;
@@ -271,6 +274,8 @@ class TableWriterArchTest {
         .doNotHaveFullyQualifiedName(writerPackage + "TableWriter")
         .and()
         .doNotHaveFullyQualifiedName(writerPackage + "ChildWriter")
+        .and()
+        .doNotHaveFullyQualifiedName(writerPackage + "IdempotencyKeyWriter")
         .and()
         .doNotHaveFullyQualifiedName(writerPackage + "ModuleRoleTransactionManager")
         .and()
@@ -344,8 +349,9 @@ class TableWriterArchTest {
         .allowEmptyShould(true)
         .because(
             "画面の版を比べないと、別の人が先に更新した集約に対して業務の検査や外部の呼び出しを始めてしまうため。"
-                + "直し方：handle で集約を取り出した直後に、handle の中で直接、集約の ensureLockNo(command.expectedLockNo()) を呼ぶ。"
-                + "別のメソッドの中の呼び出しと、引数が long の ensureLockNo では規則を満たさない。"
+                + "直し方：handle で集約を取り出した直後に、handle か handle が呼ぶ private メソッドの中で直接、"
+                + "集約の ensureLockNo(command.expectedLockNo()) を呼ぶ。"
+                + "handle から呼ばないメソッドの中の呼び出しと、引数が long の ensureLockNo では規則を満たさない。"
                 + "規約：docs/backend/class-roles/command-handler.md、"
                 + DOCS);
   }
@@ -621,7 +627,8 @@ class TableWriterArchTest {
         "call ensureLockNo(ExpectedLockNo) on a domain.model type in handle") {
       @Override
       public void check(final JavaClass item, final ConditionEvents events) {
-        // handle 自身の呼び出しだけを見るため、別のメソッドの本体の呼び出しでは満たせない。ラムダの本体の呼び出しは handle の呼び出しとして数えられる。
+        // handle と、handle が呼ぶ同じクラスの private メソッドの呼び出しだけを見るため、handle から呼ばないメソッドでは満たせない。
+        // ラムダの本体の呼び出しは handle の呼び出しとして数えられる。
         // 引数の型まで見るため、ensureLockNo(long) のオーバーロードでも満たせない。
         item.getMethods().stream()
             .filter(method -> HANDLE.equals(method.getName()))
@@ -629,7 +636,7 @@ class TableWriterArchTest {
             .filter(
                 method -> method.getRawParameterTypes().getFirst().isAssignableTo(versionedCommand))
             .filter(method ->
-                method.getMethodCallsFromSelf().stream()
+                callsFromHandle(method)
                     .noneMatch(call ->
                         ENSURE_LOCK_NO.equals(call.getName())
                             && call.getTargetOwner().getPackageName().contains(DOMAIN_MODEL)
@@ -640,9 +647,26 @@ class TableWriterArchTest {
                     SimpleConditionEvent.violated(
                         item,
                         method.getFullName()
-                            + " が集約の ensureLockNo(ExpectedLockNo) を handle の中で直接呼んでいない。")));
+                            + " が集約の ensureLockNo(ExpectedLockNo) を、handle か handle が呼ぶ private"
+                            + " メソッドの中で直接呼んでいない。")));
       }
     };
+  }
+
+  /**
+   * {@code handle} の呼び出しと、{@code handle} が呼ぶ同じクラスの private メソッドの呼び出しを返す。
+   *
+   * <p>{@code idempotency.execute(command, Result.class, () -> confirm(command))} のように、本体を private
+   * メソッドに置いた {@code handle} の本体の呼び出しも数えるためである（ADR-126）。
+   */
+  private static Stream<JavaMethodCall> callsFromHandle(final JavaMethod handle) {
+    return Stream.concat(
+        handle.getMethodCallsFromSelf().stream(),
+        handle.getMethodCallsFromSelf().stream()
+            .filter(call -> call.getTargetOwner().equals(handle.getOwner()))
+            .flatMap(call -> call.getTarget().resolveMember().stream())
+            .filter(target -> target.getModifiers().contains(JavaModifier.PRIVATE))
+            .flatMap(target -> target.getMethodCallsFromSelf().stream()));
   }
 
   /** {@code domain.model} にあり、{@code shared.concurrency} の {@code Versioned} を実装する型かを返す。 */

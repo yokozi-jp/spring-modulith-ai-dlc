@@ -1,5 +1,7 @@
 package com.example.demo.ordering.application;
 
+import com.example.demo.shared.idempotency.IdempotencyKey;
+import com.example.demo.shared.idempotency.IdempotentCommand;
 import java.util.List;
 
 /**
@@ -7,8 +9,11 @@ import java.util.List;
  *
  * @param customerOrderCode 客先注文番号
  * @param lines 注文の明細
+ * @param idempotencyKey クライアントが作成の操作ごとに採番したキー
  */
-public record DraftOrderCommand(String customerOrderCode, List<DraftOrderCommand.Line> lines) {
+public record DraftOrderCommand(
+    String customerOrderCode, List<DraftOrderCommand.Line> lines, IdempotencyKey idempotencyKey)
+    implements IdempotentCommand {
 
   /** 明細を変更できないリストとして持つ。 */
   public DraftOrderCommand {
