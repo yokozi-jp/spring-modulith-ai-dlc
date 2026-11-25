@@ -50,13 +50,18 @@ tail sampling と Collector の振り分けの層は、必要になったプロ�
 外しても、バックエンドの trace（API から SQL まで）と、Problem Details の `traceId` での問い合わせは残る（[ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)）。
 失うのは、ブラウザから見た所要時間（通信、TLS、CDN、待ち時間を含む）と、画面からの 1 本のつながりである。
 
-CSP 違反の報告に残す属性は、#422 で止めた先までに減らした。
-`code.file.path`、`code.line.number`、`code.column.number` は捨てる。
-理由は次の 3 つである。
+CSP 違反の報告は、XSS の試みや CSP の設定の誤りに気づくための Web 標準の仕組みなので、集め続ける。
+MDN は Reporting API の `report-to` を推奨し、新しい方針は report-only で試すよう勧めている（[MDN CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP)）。
 
-- 報告そのものは集める。CSP の報告は、XSS の試みや CSP の設定の誤りに気づくための Web 標準の仕組みである。MDN は Reporting API の `report-to` を推奨し、新しい方針は report-only で試すよう勧めている（[MDN CSP](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CSP)）。
-- 止めた先は残す。CSP の報告には、ブラウザの拡張機能が起こす違反が多く混ざる。止めた先の scheme（`chrome-extension:` など）や origin がないと、攻撃や自分の設定の誤りと、拡張機能の雑音を分けられない。
-- ファイルと行と列は捨てる。インラインのスクリプトを足して壊したときに役立つが、開発時の検査でも見つけられる。残すには `documentURL` と `sourceFile` の origin を比べる処理（約 5 行の OTTL と、その検査の fixture）が要る。
+残す属性は、#422 で止めた先（`blockedURL` を縮約した `csp.blocked`）までに減らした。
+`code.file.path`、`code.line.number`、`code.column.number` は捨てる。
+
+- 止めた先は残す。
+  CSP の報告には、ブラウザの拡張機能が起こす違反が混ざることがある。
+  止めた先の scheme（`chrome-extension:` など）や origin がないと、攻撃や自分の設定の誤りと、拡張機能の雑音を分けられない。
+- ファイルと行と列は捨てる。
+  インラインのスクリプトを足して壊したときに役立つが、開発環境のブラウザのコンソールにも同じ違反が出るので、開発時に見つけられる。
+  残すには、`documentURL` と `sourceFile` の origin を比べる OTTL の 6 文と、その検査の fixture が要る。
 
 過去に Grafana Faro を採る ADR 案を ADR-009 の番号で起票したことがある。
 その案は、次の点で現在の構成と合わないので、この ADR で置き換える。
@@ -160,8 +165,8 @@ Faro の CSP の計装は無効のままにし、二重に送らない。
   authority の全体が hostname（英数字、`.`、`-`）か角括弧の IPv6 と数値の port に一致しなければ、`csp.blocked` を残さない。
   数値でない port や `@` を重ねた userinfo は、URL の解析とずれた値を host として残すためである。
 - `sourceFile`、`lineNumber`、`columnNumber` は捨てる。
-  本番の報告からは、違反した画面とコードの位置が分からなくなる。
-  調べるときは、directive と止めた先を手がかりに、開発環境で再現する。
+  本番の報告から、違反したコードの位置は分からなくなる（画面は `documentURL` を残さないので元から分からない）。
+  調べるときは、directive と止めた先を手がかりに、開発環境のブラウザで再現する。
   理由は Context に書いた。
 - `originalPolicy`、`sample`、`referrer`、`user_agent` は捨てる。
   CSP に `'report-sample'` を足さない（足すと `sample` に DOM の文字列が入る）。
@@ -240,7 +245,8 @@ Faro を更新するたびに、lockfile で `ua-parser-js` の版を確かめ�
 - `logs/frontend_csp` が使う `unroll` processor は logs で alpha で、Collector の更新で壊れうる。
   `task otel-collector-check` の CSP の fixture の件数の検査で検出する。
 - 本番の CSP の報告から、違反した画面とコードの位置が分からない。
-  directive と止めた先を手がかりに、開発環境で再現する。
+  画面は `documentURL` を残さないことで、コードの位置は #422 で分からなくなった。
+  directive と止めた先を手がかりに、開発環境のブラウザで再現する。
 - HTTP のローカル開発では CSP の報告が届かない。
 - 報告は Reporting API を実装した Chromium 系のブラウザからだけ届く。
   Firefox と Safari は `report-to` を無視するので、これらのブラウザの違反は届かない。
