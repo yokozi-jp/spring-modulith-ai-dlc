@@ -7,7 +7,6 @@ set -u
 
 root="${1:?usage: e2e-seed-lint.sh <root>}"
 dir="$root/frontend/apps/web/e2e"
-# .auth holds the saved storageState, not code.
 found="$(grep -rnI --exclude-dir=.auth -- 'SEED-' "$dir" || true)"
 if [ -n "$found" ]; then
   printf '%s\n' "$found" >&2

@@ -2,7 +2,6 @@ import type { APIRequestContext } from "@playwright/test";
 
 import { fixtureOrigin, tenantName } from "./environment.ts";
 
-// fixture サーバー（backend の E2eFixtureServer、ADR-129）が作った商品。
 export interface Product {
   productId: string;
   productCode: string;
@@ -11,7 +10,6 @@ export interface Product {
   onSale: boolean;
 }
 
-// ログインの後に選ぶテナントに、このテストだけが使う商品を作る。商品コードと商品名は呼ぶたびに一意になる。
 export async function createProduct(
   request: APIRequestContext,
   { onSale = true, unitPrice = 1200 }: { onSale?: boolean; unitPrice?: number } = {},

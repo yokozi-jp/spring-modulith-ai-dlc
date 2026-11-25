@@ -59,8 +59,6 @@ tasks.register('seedLocalData', JavaExec) {
         '-Dlogback.configurationFile=local-data-seeder-logback.xml')
 }
 
-// E2E の fixture サーバー（ADR-129）の java の引数ファイル。Playwright の webServer が tooling/e2e-fixture/serve.sh から
-// java @<このファイル> で起動する。Gradle を通さずに起動し、Playwright が java のプロセスを直接止められるようにする。
 tasks.register('writeE2eFixtureArgs') {
     group = 'application'
     description = 'E2E の fixture サーバーを java で起動する引数ファイルを build/e2e-fixture/java-args.txt に書く'

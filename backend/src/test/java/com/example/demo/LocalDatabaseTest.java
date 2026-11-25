@@ -3,6 +3,7 @@ package com.example.demo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -13,7 +14,6 @@ class LocalDatabaseTest {
 
   @Test
   @DisplayName("目印が local か test で DB_HOST が loopback のときだけ、ローカルの環境とみなす")
-  // loopback の判定を確かめるテストのデータであり、接続先の設定ではない。
   @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
   void acceptsOnlyLocalEnvironment() {
     assertThat(LocalDatabase.isLocalEnvironment(env("local", "localhost"))).isTrue();
@@ -27,6 +27,25 @@ class LocalDatabaseTest {
       assertThatThrownBy(() -> LocalDatabase.requireLocalEnvironment(rejected))
           .isInstanceOf(IllegalStateException.class);
     }
+  }
+
+  @Test
+  @DisplayName("接続先は DB_HOST と DB_PORT から決め、DB_URL を読まない")
+  @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
+  void ignoresDbUrl() {
+    final Map<String, String> env =
+        Map.of(
+            "OTEL_DEPLOYMENT_ENVIRONMENT_NAME", "test",
+            "DB_HOST", "127.0.0.1",
+            "DB_PORT", "1",
+            "DB_NAME", "demo",
+            "DB_USERNAME", "u",
+            "DB_PASSWORD", "p",
+            "DB_URL", "jdbc:postgresql://db.example.com:5432/demo");
+
+    assertThatThrownBy(() -> LocalDatabase.connect(env))
+        .isInstanceOf(SQLException.class)
+        .hasMessageContaining("127.0.0.1:1");
   }
 
   private static Map<String, String> env(final String environment, final String host) {

@@ -21,7 +21,6 @@ expect() {
   fi
 }
 
-# The ok tree holds names that contain "seed" or "SEED" without the hyphen, which must not be reported.
 expect ok 0 "e2e-seed-lint OK"
 expect detects 1 'bad.spec.ts:3:'
 expect detects 1 'orders.ts:2:'

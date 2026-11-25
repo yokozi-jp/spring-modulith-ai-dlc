@@ -41,11 +41,8 @@ import tools.jackson.databind.json.JsonMapper;
  * <p>商品には作成の公開 API が無いため、Playwright の {@code productFactory} がこのサーバーへ {@code POST /products}
  * を送る。Spring を起動せず、JDK の {@link HttpServer} を {@code 127.0.0.1} にだけ開く。起動時にテナントと所属（{@link
  * TenancySeeds}）を入れてから listen するので、{@code GET /health} が応答すれば共有のデータが揃っている。
- *
- * <p>Playwright の {@code webServer} が {@code tooling/e2e-fixture/serve.sh} から起動し、終了時に止める。
  */
 @Slf4j
-// Spring の外の HTTP サーバーで、要求ごとの仮想スレッドを JDK の HttpServer に渡す。
 @SuppressWarnings("PMD.DoNotUseThreads")
 public final class E2eFixtureServer {
 
@@ -60,6 +57,9 @@ public final class E2eFixtureServer {
 
   /** 単価の上限。商品の単価の列（numeric(12, 2)）の整数部に収める。 */
   private static final long MAX_UNIT_PRICE = 9_999_999_999L;
+
+  /** 商品の登録日時。シーダーと同じ固定の時刻で、画面にも API にも出ない。 */
+  private static final Instant REGISTERED_AT = Instant.parse("2026-10-01T00:00:00Z");
 
   /** 実行の SQL をログに出さない jOOQ の設定。 */
   private static final Settings SETTINGS = new Settings().withExecuteLogging(false);
@@ -102,13 +102,10 @@ public final class E2eFixtureServer {
                     .fetchMap(M_TENANT.TENANT_NAME, row -> new TenantId(row.value2()));
               });
     }
-    // 登録日時は画面にも API にも出ないので、シーダーと同じ固定の時刻にする。
     final E2eFixtureServer fixture =
-        new E2eFixtureServer(
-            env, tenants, Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC));
+        new E2eFixtureServer(env, tenants, Clock.fixed(REGISTERED_AT, ZoneOffset.UTC));
     final HttpServer server =
         HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), port), 0);
-    // 並列のテストの要求を待たせない。*_pgm_cd の束縛（ScopedValue）はスレッドごとなので、要求どうしで混ざらない。
     server.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
     server.createContext("/", fixture::handle);
     server.start();
@@ -170,7 +167,6 @@ public final class E2eFixtureServer {
     exchange.getResponseBody().write(body);
   }
 
-  /** 要求の本文を検査し、テナントを ID に変える。 */
   private ProductRequest parse(final InputStream input) throws IOException {
     final JsonNode body;
     try {
@@ -221,24 +217,10 @@ public final class E2eFixtureServer {
     exchange.getResponseBody().write(body);
   }
 
-  /**
-   * 検査した商品の作成の要求。
-   *
-   * @param tenant 商品を作るテナント
-   * @param onSale 販売中か
-   * @param unitPrice 単価（円）
-   */
+  /** 検査した商品の作成の要求。 */
   private record ProductRequest(TenantId tenant, boolean onSale, long unitPrice) {}
 
-  /**
-   * 作った商品。
-   *
-   * @param productId 商品 ID
-   * @param productCode 商品コード
-   * @param productName 商品名
-   * @param unitPrice 単価（円）
-   * @param onSale 販売中か
-   */
+  /** 作った商品。 */
   /* package */ record CreatedProduct(
       UUID productId, String productCode, String productName, long unitPrice, boolean onSale) {}
 

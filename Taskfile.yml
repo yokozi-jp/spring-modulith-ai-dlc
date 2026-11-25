@@ -182,7 +182,6 @@ tasks:
         compose build backend
         compose up -d --wait postgres keycloak wiremock
         task be-migrate COMPOSE_ENV_FILE="$TEST_ENV_FILE"
-        # 商品を作る fixture サーバーの起動の引数を書く。起動と停止は Playwright の webServer が行う（ADR-129）。
         (cd backend && ./gradlew writeE2eFixtureArgs)
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
@@ -739,7 +738,6 @@ tasks:
     desc: E2E のコードが開発用のシーダーの代表データ（SEED-）を名指ししていないか検査
     silent: true
     cmds:
-      # 検出の自己検査。名指しを逃すか、SEED- を含まない名前を誤検出したら失敗する。
       - bash tooling/e2e-seed-lint/test.sh
       - bash tooling/e2e-seed-lint/e2e-seed-lint.sh .
 

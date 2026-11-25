@@ -170,7 +170,6 @@ test("画面の作成は、CSRF の Cookie の値を X-XSRF-TOKEN で送って�
 
 type StatusLabel = "下書き" | "確定済み" | "取消済み";
 
-// 商品 1 つの注文を作り、詳細の画面で状態のラベルの状態にして、客先注文番号を返す。
 async function createInStatus(page: Page, product: Product, label: StatusLabel): Promise<string> {
   const code = uniqueCode("E2E-LIST");
   await createOrder(page, { code, productName: product.productName, quantity: 1 });
@@ -184,8 +183,6 @@ async function createInStatus(page: Page, product: Product, label: StatusLabel):
   return code;
 }
 
-// 一覧の状態の絞り込みのリンクを押し、状態ごとの注文（codes）のうちその状態の注文だけが並ぶことを確かめる。
-// 一覧には並列のテストの注文も並ぶので、このテストが作った注文だけを数える。
 async function expectBucket(
   page: Page,
   codes: Readonly<Record<StatusLabel, string>>,

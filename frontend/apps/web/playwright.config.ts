@@ -34,7 +34,6 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 60_000,
     },
-    // 商品を作る fixture サーバー（ADR-129）。/health は起動時のテナントと所属の投入の後に応答する。
     {
       command: "bash ../../../tooling/e2e-fixture/serve.sh",
       url: `${fixtureOrigin}/health`,

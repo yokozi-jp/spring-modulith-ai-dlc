@@ -46,9 +46,7 @@ export const paymentGatewayUrl = requireEnv("PAYMENT_GATEWAY_BASE_URL");
 // Keycloak の redirect URI と Cookie の host に合わせ、127.0.0.1 ではなく localhost を使う。
 // vite.config.ts の preview.port と同じ変数で決める。
 export const webOrigin = `http://localhost:${slotPort("E2E_WEB_PORT", "5173")}`;
-// 商品を作る fixture サーバー（backend の E2eFixtureServer）。127.0.0.1 にだけ listen する（ADR-129）。
 export const fixtureOrigin = `http://127.0.0.1:${slotPort("E2E_FIXTURE_PORT", "8083")}`;
-// ログインの後に選ぶテナント。fixture サーバーは、このテナントに商品を作る。
 export const tenantName = "サンプル商事";
 // task fe-check は .env.test なしでこのファイルを import するため、compose-test の既定の issuer の origin を既定値にする。
 export const idpOrigin = new URL(env.OIDC_ISSUER_URI ?? "http://127.0.0.1:8081").origin;
