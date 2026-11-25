@@ -2,6 +2,7 @@ package com.example.demo.shared.persistence;
 
 import com.example.demo.shared.concurrency.ConflictException;
 import java.time.Instant;
+import java.util.UUID;
 import java.util.function.Supplier;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
@@ -14,7 +15,7 @@ import org.jooq.impl.DSL;
  * IdempotencyKeyPurge} だけが使う。
  *
  * <p>共通カラムと SQLSTATE の変換は {@link TableWriter} と同じ共通処理で行う。要求の文は、テナントの列を呼び出し側が渡した値で書き、条件に入れる。RLS
- * のないスキーマの表でも、別のテナントの行に当たらないようにするためである。期限を過ぎた行を消す文だけは、テナントの条件を呼び出し側が選ぶ。
+ * のないスキーマの表でも、別のテナントの行に当たらないようにするためである。期限を過ぎた行を全テナントで消す文だけは、テナントの条件を持たない。
  */
 /* package */ final class IdempotencyKeyWriter {
 
@@ -103,16 +104,42 @@ import org.jooq.impl.DSL;
   }
 
   /**
+   * 1 つのテナントの、期限を過ぎた行を {@code limit} 行まで消す。
+   *
+   * <p>消す行の選び方は {@link #deleteExpired} と同じである。
+   *
+   * @return 消した行の数
+   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
+   */
+  /* package */ static int deleteExpiredInTenant(
+      final DSLContext dsl,
+      final IdempotencyKeyTable keys,
+      final UUID tenant,
+      final Instant now,
+      final int limit) {
+    return deleteExpired(dsl, keys, keys.tenant().eq(tenant), now, limit);
+  }
+
+  /**
+   * 全テナントの、期限を過ぎた行を {@code limit} 行まで消す。RLS の外の表だけに使う。
+   *
+   * <p>消す行の選び方は {@link #deleteExpired} と同じである。
+   *
+   * @return 消した行の数
+   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
+   */
+  /* package */ static int deleteExpiredInAllTenants(
+      final DSLContext dsl, final IdempotencyKeyTable keys, final Instant now, final int limit) {
+    return deleteExpired(dsl, keys, DSL.noCondition(), now, limit);
+  }
+
+  /**
    * 期限を過ぎた行を、{@code limit} 行まで消す。
    *
    * <p>消す行は {@code SELECT ... FOR UPDATE SKIP LOCKED} で選ぶ。{@link #claim}
    * が取り直している行はロックされているので飛ばし、取り直して commit した行は期限が延びているので選ばない。
-   *
-   * @param scope 消す行のテナントの条件。RLS の外の表で全テナントの行を消すときは {@link DSL#noCondition()}
-   * @return 消した行の数
-   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
    */
-  /* package */ static int deleteExpired(
+  private static int deleteExpired(
       final DSLContext dsl,
       final IdempotencyKeyTable keys,
       final Condition scope,

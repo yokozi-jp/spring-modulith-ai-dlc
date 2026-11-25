@@ -302,8 +302,8 @@ class ClassRoleArchTest {
    * {@code TenantContext.call} を呼ぶクラスを、{@code TenantSelectionFilter}、リスナーの Aspect、期限を過ぎたキーの掃除に限る。
    */
   @ArchTest
-  /* package */ static final ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect =
-      tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(BASE_PACKAGE);
+  /* package */ static final ArchRule tenantIsBoundOnlyByAllowedCallers =
+      tenantIsBoundOnlyByAllowedCallersRule(BASE_PACKAGE);
 
   /** {@code TenantContext.findCurrent} を呼ぶクラスを、{@code ModuleRoleTransactionManager} に限る。 */
   @ArchTest
@@ -549,8 +549,7 @@ class ClassRoleArchTest {
    * <p>{@code call} は呼び出しの間のテナントを切り替える。認証の権限だけを元にする filter、イベントのテナントだけを元にする Aspect、{@code
    * tenancy.m_tenant} のテナントを 1 つずつ束縛して期限を過ぎたキーを消すジョブ以外から呼ぶと、ほかのテナントの行へ触れる。メソッド参照も検出する。
    */
-  /* package */ static ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
-      final String basePackage) {
+  /* package */ static ArchRule tenantIsBoundOnlyByAllowedCallersRule(final String basePackage) {
     final String tenantContext = basePackage + ".shared.tenancy.TenantContext";
     final Set<String> allowedCallers =
         Set.of(
@@ -560,7 +559,7 @@ class ClassRoleArchTest {
     return noClasses()
         .that(
             DescribedPredicate.describe(
-                "are not the tenant selection filter or the listener aspect",
+                "are not the tenant selection filter, the listener aspect or the idempotency key purge",
                 (JavaClass javaClass) -> !allowedCallers.contains(javaClass.getName())))
         .should()
         .accessTargetWhere(

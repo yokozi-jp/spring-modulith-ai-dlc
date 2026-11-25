@@ -319,14 +319,12 @@ final class ClassRoleFixtureRows {
             ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(VIOLATING),
             "inventory.application.OrderPlacedWithoutTenantListener.on("),
         row(
-            "tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect",
-            ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
-                VIOLATING),
+            "tenantIsBoundOnlyByAllowedCallers",
+            ClassRoleArchTest.tenantIsBoundOnlyByAllowedCallersRule(VIOLATING),
             "ordering.application.TenantSwitchingCommandHandler"),
         row(
-            "tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect: 別のモジュールの filter のメソッド参照",
-            ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
-                VIOLATING),
+            "tenantIsBoundOnlyByAllowedCallers: 別のモジュールの filter のメソッド参照",
+            ClassRoleArchTest.tenantIsBoundOnlyByAllowedCallersRule(VIOLATING),
             "ordering.presentation.web.HeaderTenantFilter"),
         row(
             "unboundTenantIsReadOnlyByTransactionManager",

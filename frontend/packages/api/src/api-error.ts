@@ -85,6 +85,19 @@ export function isIdempotencyKeyInProgress(error: unknown): error is ApiProblemE
   );
 }
 
+/**
+ * 同じ Idempotency-Key の要求の処理中でない 409（版の競合など）なら true を返す。
+ * @public
+ */
+export function isStateConflict(error: unknown): error is ApiProblemError {
+  return (
+    error instanceof ApiProblemError && error.status === 409 && !isIdempotencyKeyInProgress(error)
+  );
+}
+
+/** 同じ要求を再試行する回数の上限。 */
+const maxRetries = 3;
+
 /** 再試行してよい 4xx（RFC 9110 §15.5.9 の 408、RFC 6585 §4 の 429）。 */
 const retryableClientErrors = new Set([408, 429]);
 
@@ -99,7 +112,7 @@ export function retryUnlessClientError(failureCount: number, error: unknown): bo
     return false;
   }
   // ponytail: 429 の Retry-After を見ず、TanStack Query の既定の間隔で再試行する。バックエンドに rate limit を入れるときに Retry-After を見る。
-  return failureCount < 3;
+  return failureCount < maxRetries;
 }
 
 /**
@@ -108,7 +121,7 @@ export function retryUnlessClientError(failureCount: number, error: unknown): bo
  * ほかの 4xx と、版の競合などほかの 409 は再試行しない。
  */
 export function retryIdempotentMutation(failureCount: number, error: unknown): boolean {
-  if (failureCount >= 3) {
+  if (failureCount >= maxRetries) {
     return false;
   }
   if (!(error instanceof ApiProblemError)) {

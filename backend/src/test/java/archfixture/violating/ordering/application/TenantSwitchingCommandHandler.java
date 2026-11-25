@@ -3,7 +3,7 @@ package archfixture.violating.ordering.application;
 import archfixture.violating.shared.tenancy.TenantContext;
 import org.springframework.stereotype.Service;
 
-/** 違反：tenantIsBoundOnlyByRequestFiltersAndListenerAspect（CommandHandler が別のテナントへ束縛を切り替える）。 */
+/** 違反：tenantIsBoundOnlyByAllowedCallers（CommandHandler が別のテナントへ束縛を切り替える）。 */
 @Service
 public class TenantSwitchingCommandHandler {
 

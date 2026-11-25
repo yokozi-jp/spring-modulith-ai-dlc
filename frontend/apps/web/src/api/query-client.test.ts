@@ -6,7 +6,9 @@ import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 
 import { createGate } from "@/testing/gate";
+import { recordKeysAndRespond } from "@/testing/idempotency-keys";
 import { server } from "@/testing/msw";
+import { problemResponse } from "@/testing/orders";
 import { createTestQueryClient } from "@/testing/query-client";
 
 // Node の fetch は相対 URL を解決しないため、絶対 URL にする。
@@ -30,26 +32,13 @@ function respondToUpdate(status: 204 | 409) {
 
 /** 送った要求の Idempotency-Key を記録し、responses を順に返す（最後の応答を繰り返す）。 */
 function serveUpdates(...responses: (() => Response)[]) {
-  const keys: (string | null)[] = [];
-  server.use(
-    http.post(itemsUrl, ({ request }) => {
-      keys.push(request.headers.get("Idempotency-Key"));
-      const respond = responses[Math.min(keys.length, responses.length) - 1];
-      if (respond === undefined) {
-        throw new Error("応答がない");
-      }
-      return respond();
-    }),
-  );
+  const { keys, resolver } = recordKeysAndRespond(...responses);
+  server.use(http.post(itemsUrl, resolver));
   return keys;
 }
 
 function problem(status: number, type: string) {
-  return () =>
-    HttpResponse.json(
-      { type, title: "problem", status },
-      { status, headers: { "Content-Type": "application/problem+json" } },
-    );
+  return () => problemResponse(status, "problem", { type });
 }
 
 /** 生成の mutation と同じく、変数の headers を送る mutation を 1 回の操作として送る。 */

@@ -59,6 +59,8 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 
 冪等性キーの表の定期のジョブは、`IDEMPOTENCY_KEY_PURGE_ENABLED`が`true`のときだけ動き、1つのDELETEで`idempotency-key.purge.batch-size`の行まで消し、消し残しは同じ回で繰り返し消す。
 ロックを取れたインスタンスだけが消し、実行の回数を`idempotency.key.purge.runs`（`outcome`は`completed`、`skipped`、`failed`）、消した行の数を`idempotency.key.purged`に数える。
+1つの表やテナントの失敗で、後ろの表とテナントの掃除を止めず、回の最後に`failed`として数える。DBとロックの既知の失敗はWARN、予期しない例外はERRORで記録する。
+`failed`が続くと期限切れの行が残るが、要求は期限を過ぎた行を新しいキーとして取り直すので、業務の結果は変わらない。
 期限を過ぎて消える前の行は、要求が新しいキーとして取り直す（[HTTPメソッドの使い分け](../web-api/http-methods.md#再試行への備え)）。
 
 [#542]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542

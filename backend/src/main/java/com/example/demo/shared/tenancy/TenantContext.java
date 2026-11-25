@@ -15,9 +15,9 @@ import org.slf4j.MDC;
  * <p>束縛の間は、同じテナントを MDC の {@value #ATTRIBUTE_KEY} にも入れ、その間のログの毎行に付ける。束縛と MDC を同じ場所で出し入れするため、このクラスが
  * SLF4J の MDC に依存するのは意図したものである（ADR-110）。
  *
- * <p>{@link #call} を呼んでよいのは、その filter と Aspect
- * だけである。ほかの層が呼ぶと、リクエストやイベントに無関係なテナントへ切り替えられるため、ArchUnit の {@code
- * tenantIsBoundOnlyByRequestFiltersAndListenerAspect} が止める。
+ * <p>{@link #call} を呼んでよいのは、その filter と Aspect、{@code tenancy.m_tenant} のテナントを 1
+ * つずつ束縛して期限を過ぎた冪等性キーを消すジョブ だけである。ほかの層が呼ぶと、リクエストやイベントに無関係なテナントへ切り替えられるため、ArchUnit の {@code
+ * tenantIsBoundOnlyByAllowedCallers} が止める。
  */
 public final class TenantContext {
 

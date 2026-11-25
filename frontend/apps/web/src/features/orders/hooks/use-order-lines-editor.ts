@@ -1,5 +1,5 @@
 /* oxlint-disable import/max-dependencies -- 明細の変更は、生成 API、form、通知、409 の扱い、Idempotency-Key をこの Hook でつなぐ。 */
-import { isIdempotencyKeyInProgress } from "@frontend/api/api-error";
+import { isStateConflict } from "@frontend/api/api-error";
 import {
   getFindOrderByIdQueryKey,
   useChangeOrderLines,
@@ -17,7 +17,6 @@ import { changeOrderLinesFormSchema } from "@/features/orders/schemas";
 import type { OrderLinesValues } from "@/features/orders/schemas";
 import { noServerErrors, withoutField } from "@/features/orders/server-errors";
 import type { ServerFieldErrors } from "@/features/orders/server-errors";
-import { problemStatus } from "@/lib/notice";
 import type { Notice } from "@/lib/notice";
 
 function linesValues(order: OrderDetailsResponse): OrderLinesValues {
@@ -103,7 +102,7 @@ export function useOrderLinesEditor(
         },
         onError: (error) => {
           // 処理中の 409 は版の競合でないので、選択肢を出さず formFailure の通知にする（ADR-126）。
-          if (problemStatus(error) === 409 && !isIdempotencyKeyInProgress(error)) {
+          if (isStateConflict(error)) {
             const outcome = linesConflictOutcome(t, error, reloadedOrder(queryClient, orderId));
             setNotice(outcome.notice);
             setFeedback({ conflict: outcome.conflict, serverErrors: noServerErrors });

@@ -8,10 +8,7 @@ import java.util.function.BiFunction;
 import java.util.function.Supplier;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/**
- * 違反：tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect（別のモジュールの filter が、メソッド参照で header
- * のテナントを束縛する）。
- */
+/** 違反：tenantIsBoundOnlyByAllowedCallers（別のモジュールの filter が、メソッド参照で header のテナントを束縛する）。 */
 final class HeaderTenantFilter extends OncePerRequestFilter {
 
   /** テナントを束縛する入口。 */

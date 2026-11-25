@@ -15,7 +15,7 @@ export function problemNotice(t: TFunction, error: unknown, description: string)
   return { heading: title ?? t("notice.generalTitle"), description };
 }
 
-export function problemStatus(error: unknown): number | undefined {
+function problemStatus(error: unknown): number | undefined {
   return error instanceof ApiProblemError ? error.status : undefined;
 }
 

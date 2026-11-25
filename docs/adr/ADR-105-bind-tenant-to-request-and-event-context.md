@@ -63,7 +63,7 @@ RLS のポリシーは、トランザクションに設定したテナントの�
 - テナントを持つイベントは、`TenantScoped` を実装し、`TenantId` の項目を持つ。イベントを発行する CommandHandler は `TenantContext.current()` を詰める。
   `@ApplicationModuleListener` の引数のイベントが `TenantScoped` を実装することを、ArchUnit の `moduleListenerEventsAreTenantScoped` で検査する。
 - `TenantContext.call` を呼んでよいのは、`tenancy` の `TenantSelectionFilter`、`TenantListenerAspect`、`tenancy.m_tenant` のテナントを 1 つずつ束縛して期限を過ぎた冪等性キーを消す `shared.persistence` の `IdempotencyKeyPurge`（[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）、業務のバッチの partition のテナントを束縛する `shared.batch` の Aspect（[ADR-115](ADR-115-build-business-batches-with-spring-batch.md)）の 4 つだけである。
-  ほかのクラスが呼ぶと、認証の権限やイベントに無関係なテナントへ切り替えられるため、ArchUnit の `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect` で検査する。
+  ほかのクラスが呼ぶと、認証の権限やイベントに無関係なテナントへ切り替えられるため、ArchUnit の `tenantIsBoundOnlyByAllowedCallers` で検査する。
   メソッド参照も検出する。filter を別のモジュールに足すときも、この規則の許可先とこの ADR を先に変える。
   `shared.batch` の Aspect を規則の許可先に足すのは、Aspect を作る [#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667) である。
 - ArchUnit の `moduleApiDoesNotExposeInternalTypes` は、モジュールルートの型が依存してよい型に、`shared.tenancy.TenantId` と `shared.tenancy.TenantScoped` の 2 つだけを足す。イベントがこの 2 つを使うためで、`TenantContext` には依存させない。

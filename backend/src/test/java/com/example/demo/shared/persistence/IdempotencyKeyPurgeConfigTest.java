@@ -13,6 +13,8 @@ import org.springframework.boot.context.properties.bind.validation.BindValidatio
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.config.FixedDelayTask;
 import org.springframework.scheduling.config.ScheduledTask;
 import org.springframework.scheduling.config.ScheduledTaskHolder;
@@ -44,7 +46,6 @@ class IdempotencyKeyPurgeConfigTest {
           assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
           assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofHours(1));
           assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofHours(1));
-          assertThat(tasks.getFirst().getRunnable().toString()).contains("purgeOnce");
           tasks.getFirst().getRunnable().run();
           Mockito.verify(context.getBean(IdempotencyKeyPurge.class)).purgeOnce();
         });
@@ -59,6 +60,15 @@ class IdempotencyKeyPurgeConfigTest {
             assertThat(context)
                 .hasNotFailed()
                 .doesNotHaveBean(IdempotencyKeyPurgeConfig.Scheduling.class));
+  }
+
+  @Test
+  @DisplayName("enabled が false なら、ほかの定期のジョブが @EnableScheduling を付けても、掃除のタスクを登録しない")
+  void disabledDoesNotRegisterPurgeWhenAnotherJobEnablesScheduling() {
+    runner
+        .withPropertyValues("idempotency-key.purge.enabled=false")
+        .withUserConfiguration(AnotherScheduledJob.class)
+        .run(context -> assertThat(fixedDelayTasks(context)).as("固定の遅延のタスク").isEmpty());
   }
 
   @Test
@@ -78,4 +88,9 @@ class IdempotencyKeyPurgeConfigTest {
         .map(FixedDelayTask.class::cast)
         .toList();
   }
+
+  /** 掃除のように、定期のタスクを持たずに {@code @EnableScheduling} だけを付ける別の定期のジョブ。 */
+  @Configuration(proxyBeanMethods = false)
+  @EnableScheduling
+  /* package */ static class AnotherScheduledJob {}
 }

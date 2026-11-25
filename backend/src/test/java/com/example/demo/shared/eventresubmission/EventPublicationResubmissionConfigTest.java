@@ -29,6 +29,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
@@ -144,7 +145,6 @@ class EventPublicationResubmissionConfigTest {
           assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
           assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofMinutes(1));
           assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofMinutes(1));
-          assertThat(tasks.getFirst().getRunnable().toString()).contains("resubmitOnce");
           tasks.getFirst().getRunnable().run();
           Mockito.verify(context.getBean(EventPublicationResubmitter.class)).resubmitOnce();
         });
@@ -212,13 +212,16 @@ class EventPublicationResubmissionConfigTest {
             .hasMessageContaining("spring.modulith.events.staleness.published, processing and"));
   }
 
-  /** 定期の実行が呼ぶジョブを mock で足した runner。初回の遅延の間にタスクは動かないため、ジョブは呼ばれない。 */
+  /** 定期の実行が呼ぶジョブを mock で足した runner。登録したタスクを動かして、mock が呼ばれることを確かめるテストに使う。 */
   private ApplicationContextRunner runnerWithResubmitter() {
     return runner.withBean(
         EventPublicationResubmitter.class, () -> Mockito.mock(EventPublicationResubmitter.class));
   }
 
-  /** 定期の実行を有効にし、定期の再投入を足した runner。初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。 */
+  /**
+   * 定期の実行を有効にし、定期の再投入を足した runner。{@code DISABLED} を重ねて無効にもできる。初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は
+   * mock で足りる。
+   */
   private ApplicationContextRunner scheduledRunner() {
     return runner
         .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
@@ -229,6 +232,18 @@ class EventPublicationResubmissionConfigTest {
             () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
         .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
         .withPropertyValues(ENABLE_SCHEDULING);
+  }
+
+  /** 期限を過ぎた冪等性キーの掃除を有効にする設定のキー。掃除の構成の条件から読み、キーを変えても、このテストが古い文字列を確かめ続けないようにする。 */
+  private static String purgeEnabledKey() {
+    try {
+      return Class.forName(
+              "com.example.demo.shared.persistence.IdempotencyKeyPurgeConfig$Scheduling")
+          .getAnnotation(ConditionalOnBooleanProperty.class)
+          .value()[0];
+    } catch (ClassNotFoundException e) {
+      throw new IllegalStateException("掃除の構成が見つからない", e);
+    }
   }
 
   private static List<FixedDelayTask> fixedDelayTasks(final ApplicationContext context) {
@@ -413,7 +428,7 @@ class EventPublicationResubmissionConfigTest {
 
     assertThat(once.getProperty("spring.main.web-application-type")).isEqualTo("none");
     assertThat(once.getProperty(ENABLED)).isEqualTo("false");
-    assertThat(once.getProperty("idempotency-key.purge.enabled")).isEqualTo("false");
+    assertThat(once.getProperty(purgeEnabledKey())).isEqualTo("false");
     assertThat(once.getProperty(AWAIT_TERMINATION)).isEqualTo("true");
     assertThat(once.getProperty(AWAIT_TERMINATION_PERIOD)).isEqualTo("20s");
     assertThat(normal.getProperty("spring.main.web-application-type")).isNull();

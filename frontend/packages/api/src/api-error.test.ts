@@ -77,6 +77,23 @@ describe("api-error", () => {
     });
   });
 
+  describe("Idempotency-Key を送らない操作", () => {
+    it("コミット済みの OpenAPI 契約では selectTenant だけである。足すときは、生成 Hook の mutation に retry: false を渡す", () => {
+      const contract = readFileSync(
+        new URL("../../../../openapi/openapi.yaml", import.meta.url),
+        "utf8",
+      );
+
+      // springdoc が operation の key を辞書順に書くので、x-idempotency-key の直前の operationId がその operation である。
+      const exempt = [...contract.matchAll(/x-idempotency-key: none/gu)].map(
+        ({ index }) =>
+          [...contract.slice(0, index).matchAll(/operationId: (?<id>\w+)/gu)].at(-1)?.groups?.id,
+      );
+
+      expect(exempt).toStrictEqual(["selectTenant"]);
+    });
+  });
+
   describe("redirectToLoginOnUnauthorized", () => {
     it("401 でログインへ 1 回だけ遷移する", () => {
       stubSessionStorage();
@@ -220,13 +237,25 @@ describe("api-error", () => {
     ])("%s は再試行しない", (_name, error) => {
       expect(api.retryIdempotentMutation(0, error())).toBeFalsy();
     });
+  });
 
+  describe("isIdempotencyKeyInProgress", () => {
     it("処理中の type でも 409 でなければ、処理中とみなさない", () => {
       expect(
         api.isIdempotencyKeyInProgress(
           new api.ApiProblemError(400, { ...inProgressProblem, status: 400 }),
         ),
       ).toBeFalsy();
+    });
+  });
+
+  describe("isStateConflict", () => {
+    it("処理中でない 409 だけを true にする", () => {
+      expect(api.isStateConflict(new api.ApiProblemError(409, versionConflictProblem))).toBe(true);
+      expect(api.isStateConflict(new api.ApiProblemError(409, undefined))).toBe(true);
+      expect(api.isStateConflict(new api.ApiProblemError(409, inProgressProblem))).toBeFalsy();
+      expect(api.isStateConflict(new api.ApiProblemError(422, undefined))).toBeFalsy();
+      expect(api.isStateConflict(new TypeError("Failed to fetch"))).toBeFalsy();
     });
   });
 });

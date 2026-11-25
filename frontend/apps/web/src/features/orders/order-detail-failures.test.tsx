@@ -6,6 +6,7 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
+import { recordKeysAndRespond } from "@/testing/idempotency-keys";
 import { server } from "@/testing/msw";
 import {
   draftOrder,
@@ -56,17 +57,8 @@ async function submitConflictingChange() {
 
 /** 確定と明細の変更の要求の Idempotency-Key を記録し、responses を順に返す（最後の応答を繰り返す）。 */
 function serveKeyed(method: "put" | "post", path: string, ...responses: (() => Response)[]) {
-  const keys: (string | null)[] = [];
-  server.use(
-    http[method](`*/api/orders/:orderId/${path}`, ({ request }) => {
-      keys.push(request.headers.get("Idempotency-Key"));
-      const respond = responses[Math.min(keys.length, responses.length) - 1];
-      if (respond === undefined) {
-        throw new Error("応答がない");
-      }
-      return respond();
-    }),
-  );
+  const { keys, resolver } = recordKeysAndRespond(...responses);
+  server.use(http[method](`*/api/orders/:orderId/${path}`, resolver));
   return keys;
 }
 

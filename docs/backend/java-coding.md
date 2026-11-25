@@ -121,7 +121,7 @@ Reactor がクラスパスにあるいまの構成では、スケジューラは
 引数のある `@Scheduled` のメソッドがあると、起動に失敗する。
 Bean が AOP のプロキシになると、`private` の `@Scheduled` のメソッドも起動に失敗し、`final` のメソッドは注入したフィールドが `null` のプロキシの上で動く。
 Spring はプロキシの Bean でも `static` の `@Scheduled` を呼べるため、`static` は禁じない。
-実行の結果はログかメトリクスに出す（`EventPublicationResubmitter.resubmitOnce`）。
+実行の結果はログかメトリクスに出す（`EventPublicationResubmitter.resubmitOnce`、`IdempotencyKeyPurge.purgeOnce`）。
 
 `@Around` などの AspectJ の advice と `@Pointcut` の式には `within(<パッケージ>..*<役割名>)` を書き、`execution` にはメソッドの名前と修飾子だけを書く。
 `execution` の宣言型だけで対象を絞ると、AspectJ がすべての Bean のすべてのメソッドで上位型をたどって照合し、Spring のコンテキストの起動が数倍遅くなる（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。
