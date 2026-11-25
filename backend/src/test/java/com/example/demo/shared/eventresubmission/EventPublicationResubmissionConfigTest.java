@@ -22,6 +22,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Answers;
 import org.mockito.Mockito;
 import org.springframework.boot.ApplicationRunner;
@@ -31,14 +32,19 @@ import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
+import org.springframework.context.ApplicationContext;
 import org.springframework.core.env.MapPropertySource;
+import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.modulith.events.config.EventPublicationAutoConfiguration;
+import org.springframework.modulith.events.core.EventPublicationRepository;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.config.FixedDelayTask;
@@ -125,28 +131,88 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("enabled が true なら resubmitOnce を interval の固定の遅延のタスクとして 1 つ登録する")
   void enabledRegistersResubmitOnceAsFixedDelayTask() {
-    runner
-        .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
-        .withUserConfiguration(EventPublicationResubmitter.class, ResubmissionPolicies.class)
-        // 初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。
-        .withBean(FailedPublicationSweep.class, () -> Mockito.mock(FailedPublicationSweep.class))
-        .withBean(
-            Clock.class,
-            () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
-        .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-        .withPropertyValues(ENABLED + "=true")
+    scheduledRunner()
         .run(context -> {
-          final List<FixedDelayTask> tasks =
-              context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()
-                  .map(ScheduledTask::getTask)
-                  .filter(FixedDelayTask.class::isInstance)
-                  .map(FixedDelayTask.class::cast)
-                  .toList();
+          final List<FixedDelayTask> tasks = fixedDelayTasks(context);
           assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
           assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofMinutes(1));
           assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofMinutes(1));
           assertThat(tasks.getFirst().getRunnable().toString()).contains("resubmitOnce");
         });
+  }
+
+  @Test
+  @DisplayName("application.yaml の設定で定期の実行を有効にしても、組み込みの Staleness Monitor の定期のタスクは登録しない")
+  void builtInStalenessMonitorIsNotScheduledWithApplicationYaml() {
+    scheduledRunner()
+        .withInitializer(new ConfigDataApplicationContextInitializer())
+        .withConfiguration(AutoConfigurations.of(EventPublicationAutoConfiguration.class))
+        .withBean(
+            EventPublicationRepository.class, () -> Mockito.mock(EventPublicationRepository.class))
+        .run(context ->
+            assertThat(fixedDelayTasks(context))
+                .as("application.yaml の設定の固定の遅延のタスク")
+                .singleElement()
+                .satisfies(
+                    task -> assertThat(task.getRunnable().toString()).contains("resubmitOnce")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"published", "processing", "resubmitted"})
+  @DisplayName("組み込みの Staleness Monitor の閾値のどれかを書くと、起動に失敗する")
+  void builtInStalenessThresholdFailsStartup(final String threshold) {
+    assertStalenessMonitorRejected(
+        runner.withPropertyValues(
+            DISABLED, "spring.modulith.events.staleness." + threshold + "=PT5M"));
+  }
+
+  @Test
+  @DisplayName("組み込みの Staleness Monitor の閾値を環境変数で渡しても起動に失敗し、check-interval だけなら起動する")
+  void builtInStalenessThresholdFromEnvironmentVariableFailsStartup() {
+    assertStalenessMonitorRejected(
+        runner
+            .withPropertyValues(DISABLED)
+            .withInitializer(context ->
+                context
+                    .getEnvironment()
+                    .getPropertySources()
+                    .addFirst(
+                        new SystemEnvironmentPropertySource(
+                            "testEnvironment",
+                            Map.of("SPRING_MODULITH_EVENTS_STALENESS_PUBLISHED", "PT5M")))));
+    runner
+        .withPropertyValues(DISABLED, "spring.modulith.events.staleness.check-interval=PT1M")
+        .run(context -> assertThat(context).hasNotFailed());
+  }
+
+  private static void assertStalenessMonitorRejected(final ApplicationContextRunner rejected) {
+    rejected.run(context ->
+        assertThat(context)
+            .getFailure()
+            .hasRootCauseInstanceOf(BindValidationException.class)
+            .rootCause()
+            .hasMessageContaining("spring.modulith.events.staleness.published, processing and"));
+  }
+
+  /** 定期の実行を有効にし、定期の再投入を足した runner。初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。 */
+  private ApplicationContextRunner scheduledRunner() {
+    return runner
+        .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
+        .withUserConfiguration(EventPublicationResubmitter.class, ResubmissionPolicies.class)
+        .withBean(FailedPublicationSweep.class, () -> Mockito.mock(FailedPublicationSweep.class))
+        .withBean(
+            Clock.class,
+            () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
+        .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
+        .withPropertyValues(ENABLED + "=true");
+  }
+
+  private static List<FixedDelayTask> fixedDelayTasks(final ApplicationContext context) {
+    return context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()
+        .map(ScheduledTask::getTask)
+        .filter(FixedDelayTask.class::isInstance)
+        .map(FixedDelayTask.class::cast)
+        .toList();
   }
 
   @Test

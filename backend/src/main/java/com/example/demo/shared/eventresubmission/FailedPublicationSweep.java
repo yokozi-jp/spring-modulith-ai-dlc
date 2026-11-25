@@ -5,7 +5,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -19,14 +18,19 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
+import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.stereotype.Component;
 
 /**
- * ロックを取り、選んだ {@code FAILED} の出版を {@code max-per-run} 件まで再投入し、{@code RESUBMITTED}
- * へ進んだ出版を返す（ADR-079）。
+ * ロックを取り、古い出版を {@code FAILED} に戻してから、選んだ {@code FAILED} の出版を {@code max-per-run} 件まで再投入し、{@code
+ * RESUBMITTED} へ進んだ出版を返す（ADR-079）。
  *
  * <p>定期の再投入（{@link EventPublicationResubmitter}）は {@link #tryOnce}、手での 1 回の再投入（{@link
  * EventPublicationResubmitOnce}）は {@link #waitUpTo} で呼ぶ。2 つは選ぶ条件、ロックの取り方、再投入のあとの扱いだけが違い、ほかはここに集める。
+ *
+ * <p>古い出版を {@code FAILED} に戻す処理（{@link
+ * EventPublicationRegistry#markStalePublicationsFailed}）は、Spring Modulith の組み込みの Staleness Monitor
+ * を使わず、ここでロックの中で呼ぶ（ADR-079）。
  *
  * <p>{@code FailedEventPublications.resubmit} は件数を返さず、{@code markResubmitted} は他の更新で偽になりうる（{@code
  * completion_date} が空で {@code RESUBMITTED} でない行だけを更新する）。そのため、再投入のあとに読み戻し、{@code
@@ -54,29 +58,35 @@ final class FailedPublicationSweep {
   /** 設定値。 */
   private final EventPublicationResubmissionConfig.Properties properties;
 
+  /** Spring Modulith の、古い出版を FAILED に戻す処理。 */
+  private final EventPublicationRegistry registry;
+
   /* package */ FailedPublicationSweep(
       final DSLContext dsl,
       final FailedEventPublications failedEventPublications,
       final LockingTaskExecutor eventPublicationLockingTaskExecutor,
       final Clock clock,
-      final EventPublicationResubmissionConfig.Properties properties) {
+      final EventPublicationResubmissionConfig.Properties properties,
+      final EventPublicationRegistry registry) {
     this.dsl = dsl;
     this.failedEventPublications = failedEventPublications;
     this.lockingTaskExecutor = eventPublicationLockingTaskExecutor;
     this.clock = clock;
     this.properties = properties;
+    this.registry = registry;
   }
 
   /**
    * 再投入した結果。
    *
-   * @param advanced 実際に {@code RESUBMITTED} へ進んだ（または、すでに archive へ移った）出版の ID
+   * @param advanced 実際に {@code RESUBMITTED} へ進んだ（または、すでに archive へ移った）出版の ID と、この再投入の後の {@code
+   *     completion_attempts}
    * @param remaining 選ばれたが {@code max-per-run} を超えたため再投入しなかった数
    */
-  /* package */ record Swept(Set<UUID> advanced, int remaining) {
+  /* package */ record Swept(Map<UUID, Integer> advanced, int remaining) {
 
     /* package */ Swept {
-      advanced = Set.copyOf(advanced);
+      advanced = Map.copyOf(advanced);
     }
   }
 
@@ -111,7 +121,9 @@ final class FailedPublicationSweep {
   }
 
   /**
-   * ロックを 1 回試し、取れたら選んだ出版を再投入して、進んだ出版を返す。取れなければ空を返す。
+   * ロックを 1 回試し、取れたら古い出版を FAILED に戻してから選んだ出版を再投入して、進んだ出版を返す。取れなければ空を返す。
+   *
+   * <p>FAILED に戻した出版は、同じ回の再投入の候補になる。
    *
    * <p>{@code FailedEventPublications.resubmit} は {@code LIMIT} を条件の関数より先に掛けるため（Spring Modulith
    * の挙動は {@code ResubmissionOptionsLearningTest} が固定する）、毎回 FAILED の行をすべて読む。{@code withMinAge} は
@@ -141,6 +153,11 @@ final class FailedPublicationSweep {
         (Runnable)
             () -> {
               locked.set(true);
+              // markStalePublicationsFailed は、読んだ出版の状態を確かめずに FAILED にする。
+              // 読んでから FAILED にするまでに回が lock-at-most-for を超えて止まるとロックが切れ、
+              // 別のインスタンスが再投入した処理中の出版も FAILED に戻しうる（ADR-079）。
+              // 状態と last_resubmission_date を確かめる更新に替えるのは #740 で扱う。
+              registry.markStalePublicationsFailed(properties.staleness());
               failedEventPublications.resubmit(
                   ResubmissionOptions.defaults()
                       .withBatchSize(Integer.MAX_VALUE)
@@ -153,17 +170,18 @@ final class FailedPublicationSweep {
         : Optional.empty();
   }
 
-  /** 候補のうち、実際に {@code RESUBMITTED} へ進んだ出版の ID を返す。 */
-  private Set<UUID> advancedAmong(final Map<UUID, Integer> candidates) {
+  /** 候補のうち、実際に {@code RESUBMITTED} へ進んだ出版の ID と、この再投入の後の {@code completion_attempts} を返す。 */
+  private Map<UUID, Integer> advancedAmong(final Map<UUID, Integer> candidates) {
     final Map<UUID, EventPublicationStates.State> states =
         EventPublicationStates.read(dsl, candidates.keySet());
+    // markResubmitted は completion_attempts をちょうど 1 増やすため、進んだ後の値は候補の値 + 1 になる。
     return candidates.entrySet().stream()
         .filter(candidate -> {
           final EventPublicationStates.@Nullable State state = states.get(candidate.getKey());
           return state != null
               && (state.isArchived() || state.completionAttempts() > candidate.getValue());
         })
-        .map(Map.Entry::getKey)
-        .collect(Collectors.toUnmodifiableSet());
+        .collect(
+            Collectors.toUnmodifiableMap(Map.Entry::getKey, candidate -> candidate.getValue() + 1));
   }
 }

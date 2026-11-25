@@ -5,7 +5,6 @@ import io.micrometer.core.instrument.MeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
@@ -47,8 +46,16 @@ final class ResubmissionTracker {
   /** 覚えておく期間。未完了の状態の ID だけに適用する。 */
   private final Duration lifetime;
 
-  /** 再投入した出版の ID と、再投入した時刻。 */
-  private final Map<UUID, Instant> inFlight = new ConcurrentHashMap<>();
+  /** 再投入した出版の ID と、その再投入。 */
+  private final Map<UUID, Resubmission> inFlight = new ConcurrentHashMap<>();
+
+  /**
+   * このインスタンスの 1 回の再投入。
+   *
+   * @param at 再投入した回の時刻
+   * @param attempts 再投入の後の {@code completion_attempts}。後の再投入だけがこれを増やす
+   */
+  private record Resubmission(Instant at, int attempts) {}
 
   /* package */ ResubmissionTracker(
       final DSLContext dsl,
@@ -75,9 +82,9 @@ final class ResubmissionTracker {
    * 覚えておく期間。{@code max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 ×
    * interval)}。
    *
-   * <p>落ちたまま残った再投入の出版の last_resubmission_date は、この回の時刻から最大で {@code lock-at-most-for} 遅れる。 Staleness
-   * Monitor はそこから {@code in-flight-staleness} を過ぎた出版を {@code interval} ごとに FAILED に戻し、次の回はさらに最大で
-   * {@code interval} 後に数える。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
+   * <p>落ちたまま残った再投入の出版の last_resubmission_date は、この回の時刻から最大で {@code lock-at-most-for} 遅れる。
+   * 定期のジョブはロックを取った回に、そこから {@code in-flight-staleness} を過ぎた出版を FAILED に戻し、ロックはどれかのインスタンスがおよそ {@code
+   * interval} ごとに取る。 次の回はさらに最大で {@code interval} 後に数える。 その後の回で数えるまでの余裕として、ロックの上限の 3 倍とも比べて長い方を取る。
    */
   /* package */ static Duration lifetimeOf(
       final EventPublicationResubmissionConfig.Properties properties) {
@@ -90,16 +97,26 @@ final class ResubmissionTracker {
     return byLock.compareTo(byStaleness) > 0 ? byLock : byStaleness;
   }
 
-  /** {@code RESUBMITTED} へ進んだ出版を覚える。 */
-  /* package */ void remember(final Set<UUID> advanced, final Instant now) {
-    advanced.forEach(id -> inFlight.put(id, now));
+  /**
+   * {@code RESUBMITTED} へ進んだ出版を、再投入の後の {@code completion_attempts} と覚える。
+   *
+   * <p>覚えている出版をまた再投入したら、前の再投入は完了しなかったので {@code failed} に数える。 処理中のまま残った出版を、古い出版を FAILED
+   * に戻す処理が戻し、同じ回に再投入したときである。
+   */
+  /* package */ void remember(final Map<UUID, Integer> advanced, final Instant now) {
+    advanced.forEach((id, attempts) -> {
+      if (inFlight.put(id, new Resubmission(now, attempts)) != null) {
+        failed.increment();
+      }
+    });
   }
 
   /**
    * 覚えている出版の結果を DB から読み戻して数える。ロックの外ですべてのインスタンスが、自分が覚えている ID だけについて行う。
    *
-   * <p>{@code COMPLETED} は完了、{@code FAILED} と {@code ABANDONED} は再失敗として数えて忘れる。{@code ABANDONED} は
-   * ERROR でも知らせる。 処理中の状態（{@link
+   * <p>{@code completion_attempts} が覚えた値より増えた出版は、別のインスタンスか手での 1 回の再投入が再投入し直したので、再失敗として数えて忘れる。
+   * それ以外では、{@code COMPLETED} は完了、{@code FAILED} と {@code ABANDONED} は再失敗として数えて忘れる。{@code ABANDONED}
+   * は ERROR でも知らせる。 処理中の状態（{@link
    * EventPublicationStates.State#isInFlight()}）は次の回に回す。どちらの表にもない出版は、運用者が消したので数えずに忘れる。 未完了の状態のまま
    * {@code lifetime} を過ぎた ID は数えずに捨てる。
    */
@@ -109,12 +126,14 @@ final class ResubmissionTracker {
     }
     final Map<UUID, EventPublicationStates.State> states =
         EventPublicationStates.read(dsl, inFlight.keySet());
-    inFlight.forEach((id, resubmittedAt) -> {
+    inFlight.forEach((id, resubmission) -> {
       final EventPublicationStates.@Nullable State state = states.get(id);
       if (state == null) {
         inFlight.remove(id);
+      } else if (state.completionAttempts() > resubmission.attempts()) {
+        conclude(id, failed);
       } else if (state.isInFlight()) {
-        forgetIfExpired(id, resubmittedAt, now);
+        forgetIfExpired(id, resubmission.at(), now);
       } else if (state.status() == Status.COMPLETED) {
         conclude(id, completed);
       } else {
