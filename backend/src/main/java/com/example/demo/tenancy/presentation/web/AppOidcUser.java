@@ -7,7 +7,7 @@ import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 /**
- * IdP の {@link OidcUser} と同じ ID トークン、userinfo、権限を持ち、名前（{@link #getName()}）だけがアプリの利用者の ID になる利用者。
+ * IdP の {@link OidcUser} と同じ ID トークンと権限を持ち、名前（{@link #getName()}）だけがアプリの利用者の ID になる利用者。
  *
  * <p>共通カラムの {@code *_by} は、{@link AppUserPrincipal#userId()} としてこの ID を登録する。名前は IdP の claim
  * から取らないため、IdP が送る値で書き換えられない。

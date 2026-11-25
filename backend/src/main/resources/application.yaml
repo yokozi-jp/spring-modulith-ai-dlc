@@ -116,6 +116,11 @@ spring:
   # 送信 HTTP クライアントの共通設定。Boot の RestClient.Builder を使う Client すべてに効く。
   http:
     clients:
+      # 自分の値を持たない Boot の RestClient の既定。今は IdP のトークンの取得と、E2E の OIDC discovery が使う。
+      # ログインは利用者が待つが、トランザクションの外なので、read-timeout は決済代行（2s）より長く 5s にする。
+      # 決済代行は自分の値で上書きする。メールは AWS SDK の HTTP クライアントなので、この値を使わない。
+      connect-timeout: 1s
+      read-timeout: 5s
       # request factory を JDK の HttpClient に固定する（classpath にほかのクライアントがあっても変わらない）
       imperative:
         factory: jdk

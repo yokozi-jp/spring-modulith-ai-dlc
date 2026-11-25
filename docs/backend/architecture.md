@@ -33,6 +33,7 @@ backend/src/main/java/com/example/demo/
 ├── DemoApplication.java
 ├── SecurityConfig.java
 ├── OidcDiscoveryLocationConfig.java
+├── OidcTokenClientConfig.java
 ├── OpenApiConfig.java
 ├── OpenTelemetryAppenderInitializer.java
 ├── LocaleSupport.java

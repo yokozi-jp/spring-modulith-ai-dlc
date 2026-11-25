@@ -31,6 +31,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
+import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
@@ -55,6 +57,10 @@ class SignInOidcUserLoginTest {
   /** ログインの後の利用者を作るサービス。 */
   @Autowired private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService;
 
+  /** {@code OidcTokenClientConfig} の、タイムアウトを持つトークンのクライアント。 */
+  @Autowired
+  private OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest> tokenClient;
+
   /** 共有構成の OIDC クライアント登録。 */
   @Autowired private ClientRegistrationRepository registrations;
 
@@ -73,20 +79,14 @@ class SignInOidcUserLoginTest {
   }
 
   @Test
-  @DisplayName("OIDC のログインは、このサービスで利用者を引く")
-  void oauth2LoginUsesTheService() {
-    final List<Object> userServices =
-        springSecurityFilterChain.getFilterChains().stream()
-            .flatMap(chain -> chain.getFilters().stream())
-            .filter(OAuth2LoginAuthenticationFilter.class::isInstance)
-            .map(filter -> ReflectionTestUtils.getField(filter, "authenticationManager"))
-            .map(SignInOidcUserLoginTest::oidcProvider)
-            .map(provider -> ReflectionTestUtils.getField(provider, "userService"))
-            .toList();
-
-    assertThat(userServices)
+  @DisplayName("OIDC のログインは、このサービスで利用者を引き、タイムアウトを持つトークンのクライアントを使う")
+  void oauth2LoginUsesTheServiceAndTheTokenClientWithTimeouts() {
+    assertThat(oidcProviderFields("userService"))
         .as("OAuth2LoginAuthenticationFilter の OIDC の認証が使う OAuth2UserService")
         .containsExactly(oidcUserService);
+    assertThat(oidcProviderFields("accessTokenResponseClient"))
+        .as("OAuth2LoginAuthenticationFilter の OIDC の認証が使うトークンのクライアント")
+        .containsExactly(tokenClient);
   }
 
   @Test
@@ -222,21 +222,28 @@ class SignInOidcUserLoginTest {
                 .fetchOptional(M_USER.PUBLIC_ID));
   }
 
-  private static OidcAuthorizationCodeAuthenticationProvider oidcProvider(
-      final @Nullable Object manager) {
-    Object current = manager;
-    // 観測のための ObservationAuthenticationManager が ProviderManager を包んでいる。
-    while (current != null && !(current instanceof ProviderManager)) {
-      current = ReflectionTestUtils.getField(current, "delegate");
-    }
-    if (current == null) {
-      throw new AssertionError("ProviderManager が見つからない: manager=" + manager);
-    }
-    return ((ProviderManager) current)
-        .getProviders().stream()
-            .filter(OidcAuthorizationCodeAuthenticationProvider.class::isInstance)
-            .map(OidcAuthorizationCodeAuthenticationProvider.class::cast)
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("OIDC の認証プロバイダーがない: manager=" + manager));
+  /** OAuth2LoginAuthenticationFilter の OIDC の認証プロバイダーが持つ、{@code field} の値を、filter ごとに返す。 */
+  private List<@Nullable Object> oidcProviderFields(final String field) {
+    return springSecurityFilterChain.getFilterChains().stream()
+        .flatMap(chain -> chain.getFilters().stream())
+        .filter(OAuth2LoginAuthenticationFilter.class::isInstance)
+        .map(filter -> ReflectionTestUtils.getField(filter, "authenticationManager"))
+        .map(manager -> {
+          Object current = manager;
+          // 観測のための ObservationAuthenticationManager が ProviderManager を包んでいる。
+          while (current != null && !(current instanceof ProviderManager)) {
+            current = ReflectionTestUtils.getField(current, "delegate");
+          }
+          if (current == null) {
+            throw new AssertionError("ProviderManager が見つからない: manager=" + manager);
+          }
+          return ((ProviderManager) current)
+              .getProviders().stream()
+                  .filter(OidcAuthorizationCodeAuthenticationProvider.class::isInstance)
+                  .findFirst()
+                  .orElseThrow(() -> new AssertionError("OIDC の認証プロバイダーがない: manager=" + manager));
+        })
+        .map(provider -> ReflectionTestUtils.getField(provider, field))
+        .toList();
   }
 }
