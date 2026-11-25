@@ -45,7 +45,7 @@ tags: [convention, backend, class-role]
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `domain.model` の値オブジェクトと enum。
+- **依存してよい型**：`java.lang..`、`java.util..`、`java.math..`、`java.time..` の標準型、`org.jspecify..`、同じ `domain.model` の値オブジェクトと enum。
 - **依存してはいけない型**：Spring の型（`RestClient`、`ResponseEntity`、`HttpStatusCode`）、Resilience4j の型、Jackson の型、外部システムの SDK の型、`application`、モジュールルートの型、集約。
 
 ## 最小の例と典型的な例

@@ -65,6 +65,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/payment/infrastructure/client/PaymentGatewayClient.java \
   backend/src/main/java/com/example/demo/payment/infrastructure/persistence/JooqPaymentRepository.java \
   backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmitter.java \
+  backend/src/main/java/com/example/demo/shared/eventresubmission/FailedPublicationSweep.java \
   backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmitOnce.java \
   backend/src/main/java/com/example/demo/shared/persistence/TableWriter.java \
   backend/src/main/java/com/example/demo/shared/tenancy/TenantListenerAspect.java \
@@ -112,7 +113,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 | `DMarkFailed`     | `DefaultEventPublicationRegistry.markFailed` → `markFailedOrAbandoned`。`PublicationsInProgress` のこの配信の登録は、ほかの配信が外さないため、必ず判断する。`AbandonPolicies` の既定が、渡された出版の `getCompletionAttempts()`（配信 `d` では `d - 1`、最初の配信では 1）を `abandon-after-attempts` と比べ、それ以上なら（`d = MaxDeliveries`）archive へ `ABANDONED` で移し、未満なら `status != 'FAILED'` の UPDATE を実行する |
 | `DCrash`          | 配信の途中のプロセスの停止。リスナーのトランザクションはロールバックする                                                                                                                           |
 | `Stale`           | `DefaultEventPublicationRegistry.markStalePublicationsFailed`（`spring.modulith.events.staleness.*`、`last_resubmission_date` から測る）                                                           |
-| `RPick`、`RClaim` | `EventPublicationResubmitter.resubmit` か `EventPublicationResubmitOnce.run` → `FailedEventPublications.resubmit`、`JdbcEventPublicationRepositoryV2.markResubmitted`（`status != 'RESUBMITTED'` の UPDATE） |
+| `RPick`、`RClaim` | `FailedPublicationSweep.tryOnce`（`EventPublicationResubmitter`）か `FailedPublicationSweep.waitUpTo`（`EventPublicationResubmitOnce.run`）→ `FailedEventPublications.resubmit`、`JdbcEventPublicationRepositoryV2.markResubmitted`（`status != 'RESUBMITTED'` の UPDATE） |
 
 ## 変異
 

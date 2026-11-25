@@ -60,6 +60,7 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-event-resubmission
 skill=.agents/skills/formal-verify-event-resubmission/SKILL.md
 git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$skill")" -- \
   backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmitter.java \
+  backend/src/main/java/com/example/demo/shared/eventresubmission/FailedPublicationSweep.java \
   backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmissionConfig.java \
   backend/src/main/java/com/example/demo/shared/eventresubmission/ResubmissionPolicies.java \
   backend/src/test/java/com/example/demo/shared/eventresubmission/ResubmissionOptionsLearningTest.java \
@@ -78,9 +79,9 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 
 | アクション   | コード                                                                                                                                                                                                                       |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `RunStart`   | スケジューラのスレッドが空くと、`EventPublicationResubmitter.resubmitOnce` が `now` を取り、`executeWithLock` → ShedLock の `JooqStorageAccessor.updateRecord`（`lock_until <= now` の UPDATE、DB の時刻）                 |
+| `RunStart`   | スケジューラのスレッドが空くと、`EventPublicationResubmitter.resubmitOnce` が `now` を取り、`FailedPublicationSweep.tryOnce` の `executeWithLock` → ShedLock の `JooqStorageAccessor.updateRecord`（`lock_until <= now` の UPDATE、DB の時刻）                 |
 | `RunRead`    | `FailedEventPublications.resubmit` → `findFailedPublications`（`status = 'FAILED'` の SELECT）。一覧はその回の間古いまま使う                                                                                                |
-| `RunFinish`  | `withFilter` の述語（時間の予算と `ResubmissionPolicies.isDue`）、`markResubmitted`（`status != 'RESUBMITTED'` の UPDATE）と配信、ShedLock の `unlock`（`max(locked_at + lockAtLeastFor, now)`、`locked_by` が自分のとき） |
+| `RunFinish`  | `withFilter` の述語（`EventPublicationResubmitter.dueAt` の時間の予算と `ResubmissionPolicies.isDue`、`FailedPublicationSweep` の `max-per-run`）、`markResubmitted`（`status != 'RESUBMITTED'` の UPDATE）と配信、ShedLock の `unlock`（`max(locked_at + lockAtLeastFor, now)`、`locked_by` が自分のとき） |
 | `StaleFind`  | スケジューラのスレッドが空くと、`DefaultEventPublicationRegistry.markFailed(Status, Staleness)` の `findByStatus` と `getLastPublicationDate()`（`last_resubmission_date`）の絞り込み                                      |
 | `StaleMark`  | 同じメソッドが読んだ一覧の各行に呼ぶ `JdbcEventPublicationRepositoryV2.markFailed(id)`（`completion_date IS NULL AND status != 'FAILED'` の UPDATE。状態と日時を確かめ直さない）                                           |
 | `ExecStart`  | `CompletionRegisteringMethodInterceptor` → `markProcessing`。配信は `spring.task.execution` の executor の空きを待ってから始まる                                                                                             |

@@ -119,7 +119,7 @@ class EventPublicationResubmitterRunsTest {
             .lock(
                 new LockConfiguration(
                     clock.instant(),
-                    EventPublicationResubmitter.LOCK_NAME,
+                    FailedPublicationSweep.LOCK_NAME,
                     Duration.ofMinutes(1),
                     Duration.ZERO))
             .orElseThrow(() -> new AssertionError("テストのロックを取れない"));
@@ -187,14 +187,14 @@ class EventPublicationResubmitterRunsTest {
             .dsl();
     final FailedEventPublications failed = Mockito.mock(FailedEventPublications.class);
     final EventPublicationResubmitter resubmitter =
-        new EventPublicationResubmitter(
+        ResubmissionTestSupport.resubmitter(
             failingDsl,
             failed,
             lockingTaskExecutor,
-            policies,
             clock,
-            meterRegistry,
             properties,
+            policies,
+            meterRegistry,
             abandon);
     final Supplier<Double> exhaustedGauge =
         () ->
@@ -218,14 +218,14 @@ class EventPublicationResubmitterRunsTest {
 
   /** テスト専用のレジストリを使うジョブを作る。FailedEventPublications は何もしないモックで足りる。 */
   private EventPublicationResubmitter newResubmitter(final LockingTaskExecutor executor) {
-    return new EventPublicationResubmitter(
+    return ResubmissionTestSupport.resubmitter(
         dsl,
         Mockito.mock(FailedEventPublications.class),
         executor,
-        policies,
         clock,
-        meterRegistry,
         properties,
+        policies,
+        meterRegistry,
         abandon);
   }
 

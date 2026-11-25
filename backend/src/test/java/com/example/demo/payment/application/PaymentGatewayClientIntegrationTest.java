@@ -12,6 +12,7 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce;
+import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
@@ -369,7 +370,7 @@ class PaymentGatewayClientIntegrationTest {
     // 2. 決済代行を共有の成功のスタブに戻し、payment の方針の出版を手での 1 回の再投入で再投入する。
     // 1 回の再投入は本番と同じくトランザクションの外から呼び、リスナーの完了まで待ってから戻る。
     WIREMOCK.removeStub(failing);
-    assertThat(resubmitOnce.run("policy:payment").succeeded())
+    assertThat(resubmitOnce.run(new Target.Policy("payment")).succeeded())
         .as("orderId=%s の 1 回の再投入の結果", orderId)
         .isTrue();
     OrderConfirmedFixture.await(
