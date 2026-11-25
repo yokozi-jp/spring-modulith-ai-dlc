@@ -107,7 +107,8 @@ SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 
 ## 全テナントの行を書き換える処理
 
-業務テーブルの全テナントの行を書き換える処理（データの移行、開発用の代表データのreset）は、テナントを1つずつ設定して流す。
+業務テーブルの全テナントの行を書き換える処理（データの移行、開発用の代表データのreset、期限を過ぎた冪等性キーの掃除）は、テナントを1つずつ設定して流す。
+RLSの外の`tenancy`のスキーマの表は、テナントを設定せず、`tenancy`のロールで全テナントの行を1つずつの文で書き換えてよい（冪等性キーの表の理由は[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
 全テナントの行を読めるロールと、`BYPASSRLS`を持つロールは使わない。
 マイグレーションロールも`FORCE ROW LEVEL SECURITY`でポリシーを受けるため、changesetのデータの移行もテナントを設定して流す。
 

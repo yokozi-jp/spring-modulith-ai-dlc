@@ -113,13 +113,15 @@ Spring は、戻り値の型が `void` と `Future` 以外の `@Async` のメソ
 結果や失敗を呼び出し元で扱うときは、`CompletableFuture` を返す。
 
 `@Scheduled` のメソッドは、引数のない `void` のメソッドにし、`private` と `final` にしない。
+定期のジョブの `@Scheduled` は、ジョブを有効にする設定が真のときだけ作る構成（`@ConditionalOnBooleanProperty` の `@Configuration`）に置き、常に作る Bean に置かない。
+`@EnableScheduling` はアプリのすべての `@Scheduled` を動かすため、別のジョブを有効にしただけで、無効にしたジョブが動くからである。
 スケジューラは、`@Scheduled` のメソッドの戻り値を呼び出し元に返す値として使わず、`Publisher` に変換できない型の戻り値は捨てる。
 Reactor がクラスパスにあるいまの構成では、スケジューラは `Mono` などの `Publisher` を返すメソッドを登録のときに一度だけ呼び、返した `Publisher` を実行のたびに購読する（[Spring Framework, Scheduled](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/annotation/Scheduled.html)）。
 戻り値の型でメソッドの呼ばれ方が変わるため、戻り値は `void` に限る。
 引数のある `@Scheduled` のメソッドがあると、起動に失敗する。
 Bean が AOP のプロキシになると、`private` の `@Scheduled` のメソッドも起動に失敗し、`final` のメソッドは注入したフィールドが `null` のプロキシの上で動く。
 Spring はプロキシの Bean でも `static` の `@Scheduled` を呼べるため、`static` は禁じない。
-実行の結果はログかメトリクスに出す（`EventPublicationResubmitter.resubmitOnce`）。
+実行の結果はログかメトリクスに出す（`EventPublicationResubmitter.resubmitOnce`、`IdempotencyKeyPurge.purgeOnce`）。
 
 `@Around` などの AspectJ の advice と `@Pointcut` の式には `within(<パッケージ>..*<役割名>)` を書き、`execution` にはメソッドの名前と修飾子だけを書く。
 `execution` の宣言型だけで対象を絞ると、AspectJ がすべての Bean のすべてのメソッドで上位型をたどって照合し、Spring のコンテキストの起動が数倍遅くなる（[ADR-051](../adr/ADR-051-bind-pgm-cd-with-scoped-value-and-aspect.md)）。

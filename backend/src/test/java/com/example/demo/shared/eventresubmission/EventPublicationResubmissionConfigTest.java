@@ -1,5 +1,6 @@
 package com.example.demo.shared.eventresubmission;
 
+import static com.example.demo.testkit.ScheduledTasks.fixedDelayTasks;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
@@ -29,13 +30,14 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.EnvironmentPostProcessor;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
-import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.support.SpringFactoriesLoader;
@@ -47,9 +49,8 @@ import org.springframework.modulith.events.config.EventPublicationAutoConfigurat
 import org.springframework.modulith.events.core.EventPublicationRepository;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.config.FixedDelayTask;
-import org.springframework.scheduling.config.ScheduledTask;
-import org.springframework.scheduling.config.ScheduledTaskHolder;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /**
@@ -62,6 +63,9 @@ class EventPublicationResubmissionConfigTest {
 
   /** 定期の実行の有効と無効のキー。 */
   private static final String ENABLED = "event-publication.resubmission.enabled";
+
+  /** 定期の実行を有効にする設定。 */
+  private static final String ENABLE_SCHEDULING = ENABLED + "=true";
 
   /** 定期の実行を無効にする設定。 */
   private static final String DISABLED = ENABLED + "=false";
@@ -120,8 +124,8 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("enabled が true なら定期の実行を 1 つ登録する")
   void enabledRegistersScheduling() {
-    runner
-        .withPropertyValues(ENABLED + "=true")
+    runnerWithResubmitter()
+        .withPropertyValues(ENABLE_SCHEDULING)
         .run(context ->
             assertThat(context)
                 .hasNotFailed()
@@ -131,14 +135,26 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("enabled が true なら resubmitOnce を interval の固定の遅延のタスクとして 1 つ登録する")
   void enabledRegistersResubmitOnceAsFixedDelayTask() {
-    scheduledRunner()
+    runnerWithResubmitter()
+        .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
+        .withPropertyValues(ENABLE_SCHEDULING)
         .run(context -> {
           final List<FixedDelayTask> tasks = fixedDelayTasks(context);
           assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
           assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofMinutes(1));
           assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofMinutes(1));
-          assertThat(tasks.getFirst().getRunnable().toString()).contains("resubmitOnce");
+          tasks.getFirst().getRunnable().run();
+          Mockito.verify(context.getBean(EventPublicationResubmitter.class)).resubmitOnce();
         });
+  }
+
+  @Test
+  @DisplayName("enabled が false なら、ほかの定期のジョブが @EnableScheduling を付けても、再投入のタスクを登録しない")
+  void disabledDoesNotRegisterResubmitOnceWhenAnotherJobEnablesScheduling() {
+    scheduledRunner()
+        .withPropertyValues(DISABLED)
+        .withUserConfiguration(AnotherScheduledJob.class)
+        .run(context -> assertThat(fixedDelayTasks(context)).as("固定の遅延のタスク").isEmpty());
   }
 
   @Test
@@ -194,7 +210,16 @@ class EventPublicationResubmissionConfigTest {
             .hasMessageContaining("spring.modulith.events.staleness.published, processing and"));
   }
 
-  /** 定期の実行を有効にし、定期の再投入を足した runner。初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。 */
+  /** 定期の実行が呼ぶジョブを mock で足した runner。登録したタスクを動かして、mock が呼ばれることを確かめるテストに使う。 */
+  private ApplicationContextRunner runnerWithResubmitter() {
+    return runner.withBean(
+        EventPublicationResubmitter.class, () -> Mockito.mock(EventPublicationResubmitter.class));
+  }
+
+  /**
+   * 定期の実行を有効にし、定期の再投入を足した runner。{@code DISABLED} を重ねて無効にもできる。初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は
+   * mock で足りる。
+   */
   private ApplicationContextRunner scheduledRunner() {
     return runner
         .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
@@ -204,15 +229,19 @@ class EventPublicationResubmissionConfigTest {
             Clock.class,
             () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
         .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
-        .withPropertyValues(ENABLED + "=true");
+        .withPropertyValues(ENABLE_SCHEDULING);
   }
 
-  private static List<FixedDelayTask> fixedDelayTasks(final ApplicationContext context) {
-    return context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()
-        .map(ScheduledTask::getTask)
-        .filter(FixedDelayTask.class::isInstance)
-        .map(FixedDelayTask.class::cast)
-        .toList();
+  /** 期限を過ぎた冪等性キーの掃除を有効にする設定のキー。掃除の構成の条件から読み、キーを変えても、このテストが古い文字列を確かめ続けないようにする。 */
+  private static String purgeEnabledKey() {
+    try {
+      return Class.forName(
+              "com.example.demo.shared.persistence.IdempotencyKeyPurgeConfig$Scheduling")
+          .getAnnotation(ConditionalOnBooleanProperty.class)
+          .value()[0];
+    } catch (ClassNotFoundException e) {
+      throw new IllegalStateException("掃除の構成が見つからない", e);
+    }
   }
 
   @Test
@@ -389,6 +418,7 @@ class EventPublicationResubmissionConfigTest {
 
     assertThat(once.getProperty("spring.main.web-application-type")).isEqualTo("none");
     assertThat(once.getProperty(ENABLED)).isEqualTo("false");
+    assertThat(once.getProperty(purgeEnabledKey())).isEqualTo("false");
     assertThat(once.getProperty(AWAIT_TERMINATION)).isEqualTo("true");
     assertThat(once.getProperty(AWAIT_TERMINATION_PERIOD)).isEqualTo("20s");
     assertThat(normal.getProperty("spring.main.web-application-type")).isNull();
@@ -521,12 +551,12 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("定期の実行を有効にしても、@Async の Listener は concurrency-limit を持つ applicationTaskExecutor で動く")
   void schedulingKeepsAsyncListenersOnTheApplicationTaskExecutor() {
-    runner
+    runnerWithResubmitter()
         .withConfiguration(
             AutoConfigurations.of(
                 TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
         .withPropertyValues(
-            ENABLED + "=true",
+            ENABLE_SCHEDULING,
             "spring.threads.virtual.enabled=true",
             "spring.task.execution.simple.concurrency-limit=2")
         .run(context -> {
@@ -550,6 +580,11 @@ class EventPublicationResubmissionConfigTest {
                 .as("%s の起動の失敗", property)
                 .hasRootCauseInstanceOf(BindValidationException.class));
   }
+
+  /** 期限を過ぎた冪等性キーの掃除のように、定期のタスクを持たずに @EnableScheduling だけを付ける別の定期のジョブ。 */
+  @Configuration(proxyBeanMethods = false)
+  @EnableScheduling
+  /* package */ static class AnotherScheduledJob {}
 
   /** 設定にない方針の名前を指定したリスナー。 */
   // 受信メソッドは on と命名する規約のため。

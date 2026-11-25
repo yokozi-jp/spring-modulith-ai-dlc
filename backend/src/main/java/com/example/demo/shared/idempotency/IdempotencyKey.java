@@ -1,5 +1,6 @@
 package com.example.demo.shared.idempotency;
 
+import java.time.Duration;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -14,6 +15,9 @@ public record IdempotencyKey(UUID value) {
 
   /** ヘッダーの名前。 */
   public static final String HEADER = "Idempotency-Key";
+
+  /** キーと結果を保存する期間。保存するときの期限と、OpenAPI の説明が同じ値を使う。 */
+  public static final Duration RETENTION = Duration.ofHours(24);
 
   /**
    * 引用符で囲んだ UUID の Structured Field の String（draft-ietf-httpapi-idempotency-key-header-08 の 2.1）。

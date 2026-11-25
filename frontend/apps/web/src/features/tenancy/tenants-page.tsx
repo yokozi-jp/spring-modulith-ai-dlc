@@ -11,7 +11,8 @@ export function TenantsPage() {
   const { t } = useTranslation();
   const { data } = useSuspenseQuery(getListMembershipsSuspenseQueryOptions());
   const { items } = data.data;
-  const selectTenant = useSelectTenant();
+  // テナントの選択は Idempotency-Key を送らない操作なので、自動で再試行しない（ADR-126）。
+  const selectTenant = useSelectTenant({ mutation: { retry: false } });
   const problemTitle =
     selectTenant.error instanceof ApiProblemError ? selectTenant.error.problem?.title : undefined;
   const failure = selectTenant.isError ? (problemTitle ?? t("tenancy.selectFailed")) : undefined;

@@ -123,7 +123,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   引数が1つであることは、`listenersExposeOnlyOnAndCallOneCommandHandler`と`moduleListenersAreApplicationListeners`が見る。
   `TenantListenerAspect`がイベントのテナントを、リスナーのトランザクションが始まる時点で束縛するためである（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`OrderPlacedWithoutTenantListener`で確かめる。
-- `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`と`shared.tenancy.TenantListenerAspect`の2つだけにする。
+- `tenantIsBoundOnlyByAllowedCallers`：`TenantContext.call`を呼べるクラスは、`tenancy.presentation.web.TenantSelectionFilter`、`shared.tenancy.TenantListenerAspect`、`shared.persistence.IdempotencyKeyPurge`の3つだけにする。
   CommandHandlerやControllerや別のfilterが束縛を切り替えて、認証の権限やイベントに無関係なテナントを操作することを防ぐ。メソッド参照も検出する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   違反フィクスチャの`TenantSwitchingCommandHandler`（直接の呼び出し）と`HeaderTenantFilter`（別のモジュールのfilterのメソッド参照）で確かめ、規約どおりのフィクスチャの`TenantSelectionFilter`が通ることを確かめる。
   業務のバッチの`shared.batch`のAspectを許可先に足すのは、Aspectを作る[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)である（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。

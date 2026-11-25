@@ -610,8 +610,7 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
-        ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
-            basePackage),
+        ClassRoleArchTest.tenantIsBoundOnlyByAllowedCallersRule(basePackage),
         ClassRoleArchTest.unboundTenantIsReadOnlyByTransactionManagerRule(basePackage),
         ClassRoleArchTest.roleAndTenantAreSetOnlyByTransactionManagerRule(basePackage),
         ClassRoleArchTest.eventListenersAreApplicationModuleListeners,

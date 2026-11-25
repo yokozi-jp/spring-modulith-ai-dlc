@@ -13,6 +13,22 @@ import { problemResponse } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";
 import { goodsTenant, tenantNotSelected, tradingTenant } from "@/testing/tenancy";
 
+/** 502 を返すテナントの選択を押す。PUT を受けた回数を返す関数を返す。 */
+async function selectTenantFailingWith502() {
+  let requests = 0;
+  server.use(
+    getListMembershipsMockHandler({ items: [tradingTenant] }),
+    http.put("*/api/current-tenant", () => {
+      requests += 1;
+      return new HttpResponse("Bad Gateway", { status: 502 });
+    }),
+  );
+  const { user } = await renderRoute("/tenants");
+
+  await user.click(await screen.findByRole("button", { name: "サンプル商事" }));
+  return () => requests;
+}
+
 describe("テナントを選ぶ画面", () => {
   it("所属するテナントの名前のボタンを出し、選ぶとそのテナントを送ってから、文書を / で読み直す", async () => {
     const selected: unknown[] = [];
@@ -70,15 +86,16 @@ describe("テナントを選ぶ画面", () => {
   });
 
   it("problem でない失敗では、カタログの文言を出す", async () => {
-    server.use(
-      getListMembershipsMockHandler({ items: [tradingTenant] }),
-      http.put("*/api/current-tenant", () => new HttpResponse("Bad Gateway", { status: 502 })),
-    );
-    const { user } = await renderRoute("/tenants");
-
-    await user.click(await screen.findByRole("button", { name: "サンプル商事" }));
+    await selectTenantFailingWith502();
 
     await expect(screen.findByText("テナントを選べませんでした。")).resolves.toBeTruthy();
+  });
+
+  it("Idempotency-Key のない選択は、502 でも自動で再送しない", async () => {
+    const requests = await selectTenantFailingWith502();
+
+    await expect(screen.findByText("テナントを選べませんでした。")).resolves.toBeTruthy();
+    expect(requests()).toBe(1);
   });
 });
 

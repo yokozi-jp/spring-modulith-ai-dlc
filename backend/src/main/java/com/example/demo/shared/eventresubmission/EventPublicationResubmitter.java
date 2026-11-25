@@ -13,11 +13,11 @@ import lombok.extern.slf4j.Slf4j;
 import net.javacrumbs.shedlock.support.LockException;
 import org.jooq.DSLContext;
 import org.springframework.modulith.events.EventPublication;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 失敗したイベント出版を定期的に再投入するジョブ（ADR-079）。
+ * 失敗したイベント出版を定期的に再投入するジョブ（ADR-079）。定期の実行は、有効なときだけ {@code
+ * EventPublicationResubmissionConfig.Scheduling} が呼ぶ。
  *
  * <p>ShedLock のロックを取れたインスタンスだけが、古い出版を {@code FAILED} に戻してから（{@link
  * FailedPublicationSweep}）、リスナーの方針（{@link ResubmissionPolicies}）の待ち時間を過ぎ、再投入の回数が上限に達していない {@code
@@ -95,9 +95,6 @@ class EventPublicationResubmitter {
    */
   // スケジューラの既定のエラーハンドラに例外を漏らすと、ログは出ても runs のどの tag も動かず、停止に気づけないため、予期しない実行時の例外も受けて数える。
   @SuppressWarnings("PMD.AvoidCatchingGenericException")
-  @Scheduled(
-      fixedDelayString = "${event-publication.resubmission.interval}",
-      initialDelayString = "${event-publication.resubmission.interval}")
   /* package */ void resubmitOnce() {
     try {
       final Instant now = Instant.now(clock);

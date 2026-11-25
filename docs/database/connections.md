@@ -108,6 +108,7 @@ Liquibase用アカウントには、DDL、Liquibase管理テーブルの更新�
   同じSQLでテナントも設定し、業務テーブルを持つモジュールのトランザクションはテナントの束縛がなければ始めない（[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#テナントの設定)）。
   トランザクションの終わりで元に戻るため、プールの接続にロールが残らない。
   モジュールが分からない名前（Spring Modulithの内部、ShedLock、名前のない`TransactionTemplate`）はアプリケーション用ロールのまま動く。
+  CommandHandlerの外でモジュールの表を扱う共通処理（期限を過ぎた冪等性キーの掃除）は、`ModuleRoles.transactionNameIn`でモジュールの下の名前を付けた`TransactionTemplate`で始め、そのモジュールのロールで動く。
   ロールは物理的なトランザクションを始めた外側の名前で決まり、`REQUIRED`で参加した別のモジュールの`<Feature>Queries`は呼び出し元のロールで動く。
 - **アプリケーション用ロール**：業務のスキーマに権限を持たない。`modulith`スキーマ（イベントの出版、ShedLock、セッションの表）だけを読み書きする。モジュールのロールの継承はなく、`SET ROLE`で切り替えるだけのメンバーである。
 - **モジュールのロールの権限**：自分のスキーマのUSAGEと表のSELECT、INSERT、UPDATE、DELETE。依存の方向（`ordering`から`product`、`payment`から`ordering`）にだけ、依存先のスキーマのUSAGEとSELECT。`modulith`スキーマのUSAGEと`modulith.event_publication`へのINSERT。`tenancy`はどのモジュールにも依存せず、どのモジュールも`tenancy`に依存しないため、依存の方向のSELECTを持たない。

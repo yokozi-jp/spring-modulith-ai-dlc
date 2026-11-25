@@ -1,6 +1,7 @@
 package com.example.demo.shared.persistence;
 
 import com.example.demo.shared.idempotency.Idempotency;
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import com.example.demo.shared.idempotency.IdempotencyKeyException;
 import com.example.demo.shared.idempotency.IdempotentCommand;
 import com.example.demo.shared.tenancy.TenantContext;
@@ -8,7 +9,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -33,9 +33,6 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @Component
 /* package */ class JooqIdempotency implements Idempotency {
-
-  /** キーを保存する期間。docs と OpenAPI で公開する。 */
-  private static final Duration RETENTION = Duration.ofHours(24);
 
   /** Command と Result の JSON。 */
   private static final JsonMapper JSON =
@@ -80,7 +77,7 @@ import tools.jackson.databind.json.JsonMapper;
     final String pgmCd = PgmCdAspect.current();
     final byte[] payloadHash = payloadHash(pgmCd, command);
     final Instant now = Instant.now(clock);
-    if (writer.claim(keys, scopedKey, payloadHash, now, now.plus(RETENTION))) {
+    if (writer.claim(keys, scopedKey, payloadHash, now, now.plus(IdempotencyKey.RETENTION))) {
       final R result = operation.get();
       writer.saveResult(keys, scopedKey, JSONB.valueOf(JSON.writeValueAsString(result)));
       return result;

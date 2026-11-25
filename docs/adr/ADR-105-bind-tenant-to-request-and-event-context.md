@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る'
-description: 操作しているテナントの public_id を shared.tenancy の ScopedValue に束縛する決定。リクエストの間は入口の filter がセッションで選んだテナントを、リスナーの間は Aspect がイベントの TenantScoped からテナントを、トランザクションより外側で束縛する。テナントを持つイベントは TenantScoped を実装し、束縛を切り替えられる呼び出し元も filter と Aspect だけに、ArchUnit で守る。
+description: 操作しているテナントの public_id を shared.tenancy の ScopedValue に束縛する決定。リクエストの間は入口の filter がセッションで選んだテナントを、リスナーの間は Aspect がイベントの TenantScoped からテナントを、トランザクションより外側で束縛する。テナントを持つイベントは TenantScoped を実装し、束縛を切り替えられる呼び出し元も filter、Aspect、期限を過ぎた冪等性キーの掃除のジョブだけに、ArchUnit で守る。
 tags: [adr, backend, tenancy, aop, scoped-value, event]
 ---
 
@@ -39,6 +39,9 @@ RLS のポリシーは、トランザクションに設定したテナントの�
 [ADR-115](ADR-115-build-business-batches-with-spring-batch.md) が、業務のバッチの partition のテナントを `shared.batch` の Aspect で束縛するとしたので、`TenantContext.call` を呼んでよいクラスを 3 つに書き直した。
 バッチの partition にはセッションもイベントもなく、テナントは partition の ExecutionContext が運ぶためである。
 
+[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) の期限を過ぎた冪等性キーの掃除のジョブ（#540）が、RLS で分けたキーの表をテナントごとに消すので、`TenantContext.call` を呼んでよいクラスを 4 つに書き直した。
+ジョブにはセッションもイベントもなく、テナントは `tenancy.m_tenant` の行から取るためである。
+
 ## Decision
 
 操作しているテナントの `public_id` を、`shared.tenancy` の `ScopedValue` に束縛する。
@@ -59,8 +62,8 @@ RLS のポリシーは、トランザクションに設定したテナントの�
   引数が `TenantScoped` でなければ、`IllegalStateException` で拒否する。
 - テナントを持つイベントは、`TenantScoped` を実装し、`TenantId` の項目を持つ。イベントを発行する CommandHandler は `TenantContext.current()` を詰める。
   `@ApplicationModuleListener` の引数のイベントが `TenantScoped` を実装することを、ArchUnit の `moduleListenerEventsAreTenantScoped` で検査する。
-- `TenantContext.call` を呼んでよいのは、`tenancy` の `TenantSelectionFilter`、`TenantListenerAspect`、業務のバッチの partition のテナントを束縛する `shared.batch` の Aspect（[ADR-115](ADR-115-build-business-batches-with-spring-batch.md)）の 3 つだけである。
-  ほかのクラスが呼ぶと、認証の権限やイベントに無関係なテナントへ切り替えられるため、ArchUnit の `tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect` で検査する。
+- `TenantContext.call` を呼んでよいのは、`tenancy` の `TenantSelectionFilter`、`TenantListenerAspect`、`tenancy.m_tenant` のテナントを 1 つずつ束縛して期限を過ぎた冪等性キーを消す `shared.persistence` の `IdempotencyKeyPurge`（[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）、業務のバッチの partition のテナントを束縛する `shared.batch` の Aspect（[ADR-115](ADR-115-build-business-batches-with-spring-batch.md)）の 4 つだけである。
+  ほかのクラスが呼ぶと、認証の権限やイベントに無関係なテナントへ切り替えられるため、ArchUnit の `tenantIsBoundOnlyByAllowedCallers` で検査する。
   メソッド参照も検出する。filter を別のモジュールに足すときも、この規則の許可先とこの ADR を先に変える。
   `shared.batch` の Aspect を規則の許可先に足すのは、Aspect を作る [#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667) である。
 - ArchUnit の `moduleApiDoesNotExposeInternalTypes` は、モジュールルートの型が依存してよい型に、`shared.tenancy.TenantId` と `shared.tenancy.TenantScoped` の 2 つだけを足す。イベントがこの 2 つを使うためで、`TenantContext` には依存させない。

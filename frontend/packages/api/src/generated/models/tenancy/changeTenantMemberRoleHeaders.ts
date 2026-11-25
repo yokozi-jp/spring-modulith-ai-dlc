@@ -6,7 +6,7 @@ import type { IdempotencyKeyParameter } from '../idempotencyKeyParameter.ts';
 
 export type ChangeTenantMemberRoleHeaders = {
 /**
- * 利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）
+ * 利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）。成功した要求のキーと結果は、受け付けてから 24 時間保存し、その間に同じキーと同じ内容で再送すると 1 回目と同じ応答を返す。期限を過ぎたキーは新しいキーとして扱う
  * @pattern ^"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"$
  */
 'Idempotency-Key': IdempotencyKeyParameter;

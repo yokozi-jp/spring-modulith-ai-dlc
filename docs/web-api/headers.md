@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: APIのリクエストヘッダーとレスポンスヘッダー
-description: APIが受け付けるリクエストヘッダー、品質値の扱い、Content-Type、Cache-Control、Server-Timingの付け方を定める規約。APIにヘッダーを追加するとき、応答のキャッシュの扱いを確かめるとき、処理時間をクライアントへ返すときに読む。
+description: APIが受け付けるリクエストヘッダー（Idempotency-Keyを含む）、品質値の扱い、Content-Type、Cache-Control、Server-Timingの付け方を定める規約。APIにヘッダーを追加するとき、応答のキャッシュの扱いを確かめるとき、処理時間をクライアントへ返すときに読む。
 tags: [convention, web-api, http, future-arch-guidelines]
 ---
 
@@ -17,6 +17,7 @@ API応答はキャッシュさせない。
 - **Content-Type**：APIが対応するメディアタイプを指定させる。通常は`application/json`であり、PATCHは[HTTPメソッドの使い分け](http-methods.md)に従う。
 - **User-Agent**：クライアントが対向システムの場合は、利用実績を把握するため`User-Agent: SystemABC/1.0`の形式で送るよう求めてよい。
 - **Accept-Language**：応答の言語の選択は[ADR-016](../adr/ADR-016-localize-api-and-spa-messages.md)と[フロントエンドの国際化](../frontend/i18n.md)に従う。
+- **Idempotency-Key**：GETとHEAD以外の業務の操作で必須にする。対象、形式、保存期間、再送の応答は[HTTPメソッドの使い分け](http-methods.md#再試行への備え)に従う。
 
 独自ヘッダーの名前は[Web APIの方式とURLの設計](api-style.md)に従う。
 
@@ -62,6 +63,7 @@ Server-Timing: cache;dur=23.4, db;dur=50, app;dur=75.3
 - セキュリティ関連の応答ヘッダーは[ADR-014](../adr/ADR-014-use-same-origin-spa-security-boundary.md)に従う。
 - 廃止予定を示す応答ヘッダーは[APIの互換性と廃止](versioning.md)に従う。
 - レート制限時の`Retry-After`は[入口とAPIの機能配置](edge-responsibilities.md)に従う。
+- 同じ`Idempotency-Key`の要求の処理中の409の`Retry-After`は[HTTPステータスコードの選択](status-codes.md#前提)に従う。
 
 ## 出典
 

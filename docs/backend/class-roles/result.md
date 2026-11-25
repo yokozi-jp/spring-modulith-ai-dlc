@@ -87,7 +87,7 @@ public sealed interface ChargeOrderResult {
 ```
 
 sealed interface の Result を JSON に保存するときの形（Jackson の型の情報）は確かめていない。
-HTTP の要求の Result を sealed にするときは、[Idempotency-Key の保存の形](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)で読み書きできることを確かめる。
+HTTP の要求の Result を sealed にするときは、[Idempotency-Key の保存の形](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md#処理の流れ)で読み書きできることを確かめる。
 `ChargeOrderResult` はリスナーから呼ばれる CommandHandler の Result で、その保存の対象に入らない。
 
 典型的な例は、Controller が `PlaceOrderResult` の ID で作成した注文の URI を作り、201 の `Location` に入れる場面である。

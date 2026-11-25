@@ -230,6 +230,19 @@ event-publication:
     # 再投入した出版の処理が終わるのを待つ上限。
     completion-timeout: PT10M
 
+# 期限を過ぎた Idempotency-Key の行の掃除（ADR-126）。ロックは event-publication.resubmission と同じ ShedLock の表で取る。
+idempotency-key:
+  purge:
+    # 定期の掃除を動かすか。テストは false にする。
+    enabled: ${IDEMPOTENCY_KEY_PURGE_ENABLED}
+    # 前の回の終わりから次の回までの間隔。ロックを持つ下限はこの半分にする。lock-at-most-for より短くする。
+    interval: ${IDEMPOTENCY_KEY_PURGE_INTERVAL}
+    # 以下は環境で変えないため固定値にする。
+    # ロックを持つ上限。1 回の実行の最長より十分に長くし、interval より長くする。短いと起動に失敗する。
+    lock-at-most-for: PT2H
+    # 1 つの DELETE で消す行の上限。トランザクションを短く保ち、消し残しは同じ回で繰り返し消す。
+    batch-size: 1000
+
 # 決済代行の URL。既定値を置かず、未設定なら起動に失敗する。ローカルと E2E だけが WireMock を指す。
 payment-gateway:
   base-url: ${PAYMENT_GATEWAY_BASE_URL}

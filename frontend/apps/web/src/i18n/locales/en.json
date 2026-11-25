@@ -24,7 +24,8 @@
   "loginAgain": "Log in again",
   "notice": {
     "generalTitle": "The operation could not be completed",
-    "generalFailure": "Try again later."
+    "generalFailure": "Try again later.",
+    "inProgress": "The previous request is still being processed. Wait a moment, reload the page, and check the result."
   },
   "orders": {
     "missingValue": "(none)",

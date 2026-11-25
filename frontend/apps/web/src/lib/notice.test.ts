@@ -98,4 +98,22 @@ describe("操作の失敗の通知", () => {
     });
     expect(failureNotice(t, error, descriptions)).toStrictEqual(general);
   });
+
+  it("同じ Idempotency-Key の処理中の 409 は、競合を画面が自分で扱う場合も、サーバーの見出しと処理中の説明を出す", () => {
+    const error = new ApiProblemError(409, {
+      type: "/problems/idempotency-key-in-progress",
+      title: "同じ Idempotency-Key の要求を処理しています",
+      status: 409,
+    });
+    const inProgress = {
+      heading: "同じ Idempotency-Key の要求を処理しています",
+      description:
+        "前の操作をまだ処理しています。しばらく待ってから画面を読み込み直し、結果を確かめてください。",
+    };
+
+    expect(failureNotice(t, error, descriptions)).toStrictEqual(inProgress);
+    expect(
+      failureNotice(t, error, { conflict: undefined, unprocessable: "処理できない説明" }),
+    ).toStrictEqual(inProgress);
+  });
 });

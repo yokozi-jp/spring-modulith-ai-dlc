@@ -16,7 +16,8 @@ HTTPメソッドで表せない操作だけを、パスの末尾に置くPOSTの
 
 この規約は、バックエンドが`/api`配下に公開するJSON APIに適用する。
 APIの配置先は[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)と[ADR-014](../adr/ADR-014-use-same-origin-spa-security-boundary.md)に従い、SPAと同じオリジンの`/api`配下に置く。
-エラー表現、ページング、バージョニング、冪等性キー、OpenAPIの契約はADR-013が定める。
+エラー表現、ページング、バージョニング、OpenAPIの契約はADR-013が定める。
+`Idempotency-Key`の規則は[HTTPメソッドの使い分け](http-methods.md#再試行への備え)にあり、ADR-013の冪等性の節を改めた[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)が理由を示す。
 
 ## API方式の選択
 

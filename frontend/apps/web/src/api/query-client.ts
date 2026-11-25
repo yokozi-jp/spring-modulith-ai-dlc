@@ -1,4 +1,8 @@
-import { redirectToLoginOnUnauthorized, retryUnlessClientError } from "@frontend/api/api-error";
+import {
+  redirectToLoginOnUnauthorized,
+  retryIdempotentMutation,
+  retryUnlessClientError,
+} from "@frontend/api/api-error";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 /** 本番とテストが同じ設定で使う QueryClient を作る。 */
@@ -13,7 +17,12 @@ export function createQueryClient(): QueryClient {
       // 遅れが画面で問題になったら、refetchType か mutationKey で無効化の範囲を絞る。
       onSettled: () => queryClient.invalidateQueries(),
     }),
-    defaultOptions: { queries: { retry: retryUnlessClientError } },
+    defaultOptions: {
+      queries: { retry: retryUnlessClientError },
+      // 再試行は同じ変数で mutationFn を呼ぶので、変数の headers の Idempotency-Key も同じになる（ADR-126）。
+      // キーを送らない mutation（テナントの選択）は、呼び出し側で retry: false にする。そのような操作の一覧は api-error.test.ts が契約から確かめる。
+      mutations: { retry: retryIdempotentMutation },
+    },
   });
   return queryClient;
 }

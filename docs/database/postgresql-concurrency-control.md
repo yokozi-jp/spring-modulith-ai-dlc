@@ -168,9 +168,10 @@ HTTPの要求と応答をまたいでDBのトランザクションを保てな�
 接続を固定しないため、RDS ProxyやPgBouncerのトランザクションモードの後ろでも動き、`tableWritesGoThroughTableWriter`（H1）の例外も要らない。
 アプリで使うロックの名前は次の表だけにし、新しい名前を足すときは同じ変更で表に足す。
 
-| 名前                             | 使うクラス                                                                                | 用途                                                                           |
-| -------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `event-publication-resubmission` | `shared.eventresubmission`の`EventPublicationResubmitter`、`EventPublicationResubmitOnce` | 失敗したイベント出版の定期の再投入と手での1回の再投入を1つのインスタンスに絞る |
+| 名前                             | 使うクラス                                                                                | 用途                                                                                                                                              |
+| -------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `event-publication-resubmission` | `shared.eventresubmission`の`EventPublicationResubmitter`、`EventPublicationResubmitOnce` | 失敗したイベント出版の定期の再投入と手での1回の再投入を1つのインスタンスに絞る                                                                    |
+| `idempotency-key-purge`          | `shared.persistence`の`IdempotencyKeyPurge`                                               | 期限を過ぎた冪等性キーの定期の掃除を1つのインスタンスに絞る（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)） |
 
 セッションのadvisory lock（`pg_advisory_lock`、`pg_try_advisory_lock`）は使わない。
 ロックがセッションの状態であり、接続を多重化するプロキシの後ろでは保たれないためである（[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md)の「テンプレートの利用先で変わる前提」）。

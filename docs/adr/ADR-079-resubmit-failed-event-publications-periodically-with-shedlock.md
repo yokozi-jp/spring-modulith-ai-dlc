@@ -87,12 +87,16 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、`markStalePub
 この窓は、読んでから更新する 2 つの手順があるために生まれる。
 更新で状態と時刻を確かめれば、窓は生まれない。
 
+Proposed の間に、`@Scheduled` を `EventPublicationResubmitter` から、`enabled` が真のときだけ作る構成へ移した（[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)）。
+期限を過ぎた冪等性キーの掃除のジョブ（[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）も `@EnableScheduling` を足し、`@EnableScheduling` はアプリのすべての `@Scheduled` を動かすので、ジョブのクラスに置いたままでは `enabled` を偽にしても再投入が動くためである。
+
 ## Decision
 
 失敗したイベント出版を、定期のジョブで自動で再投入する。
 
-- ジョブは `shared.eventresubmission` の `EventPublicationResubmitter` に置き、`@Scheduled` の固定の遅延で動かす。
-  `event-publication.resubmission.enabled` が `true` 以外なら、定期の実行を登録せず、古い出版を `FAILED` に戻す処理も再投入も動かない。
+- ジョブは `shared.eventresubmission` の `EventPublicationResubmitter` に置き、`event-publication.resubmission.enabled` が `true` のときだけ作る構成の `@Scheduled` の固定の遅延で動かす。
+  `true` 以外なら、定期の実行を登録せず、古い出版を `FAILED` に戻す処理も再投入も動かない。
+  ほかの定期のジョブが `@EnableScheduling` を足しても、この構成がなければ再投入は動かない。
   この条件は `true`（大文字小文字を区別しない）だけを真と読むため、環境変数には `true` か `false` だけを使う。
   Spring Modulith の starter が入れる Moments は、既定で有効なとき `@EnableScheduling` を足し、この切り替えを効かなくする。
   Moments は使っていないため、`spring.modulith.moments.enabled` を偽にする。

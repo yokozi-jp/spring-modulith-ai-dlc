@@ -30,6 +30,14 @@ CSRFトークンの検証に失敗した403は`/problems/csrf-token-invalid`に�
 テナントを選ぶ前に業務のAPIを呼んだ403は`/problems/tenant-not-selected`にする（[テナントを選ぶ](authentication-and-session.md#テナントを選ぶ)）。
 権限不足の403は`about:blank`のままにする。
 入力検証エラーは`/problems/validation-error`の400で、`errors`拡張に誤りのある入力のJSON Pointerと説明を入れる。
+`Idempotency-Key`の誤りと処理中は、次のtypeにする（キーの対象と形式は[HTTPメソッドの使い分け](http-methods.md#再試行への備え)）。
+
+- **キーがない**：400、`/problems/idempotency-key-missing`。
+- **キーの形式の誤り**：400、`/problems/idempotency-key-invalid`。ヘッダーの行が2つ以上あるときも、この誤りにする。
+- **内容の違う要求に同じキーを使った**：400、`/problems/idempotency-key-payload-mismatch`。422にしない理由は[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)にある。
+- **同じキーの要求を処理している**：409、`/problems/idempotency-key-in-progress`。`Retry-After`に、同じキーで再試行するまで待つ秒数（今は1）を付ける。
+
+クライアントは409を`type`で分け、処理中の409だけを同じキーで自動で再試行する。
 OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJavadoc](openapi-annotations.md#エラー応答)に従う。
 
 ## 使うステータスコード
@@ -52,7 +60,7 @@ OpenAPIへのエラー応答の付け方は[OpenAPIのアノテーションとJa
   Spring Securityが受け付ける7つのメソッド（DELETE、GET、HEAD、OPTIONS、PATCH、POST、PUT）以外は、405にも404にもならず400になる。
   OpenAPIには、405を今は書いていない。
   `OpenApiConfig`のcustomizerが付けるのは、401、403、500、入力を持つ操作の400、`Idempotency-Key`を求める操作の409である。
-- **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反。
+- **409 Conflict**：楽観ロックの競合、悲観ロックの取得失敗、一意制約違反、同じ`Idempotency-Key`の要求の処理中。
   `shared.concurrency`の`ConflictException`は、`ApiExceptionHandler`が競合の種類ごとのtypeの409にする。
 - **413 Content Too Large**：リクエストの本文が上限を超えた。ヘッダーの超過は、Tomcatが400を返す。
 - **422 Unprocessable Content**：入力が業務処理の条件を満たさない（在庫不足で出荷指示できない場合など）。
