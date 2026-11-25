@@ -59,7 +59,7 @@ import org.jooq.Table;
    *
    * @throws IllegalArgumentException 表に列がない、または型が異なる場合
    */
-  /* package */ static IdempotencyKeyTable from(final Table<?> table) {
+  private static IdempotencyKeyTable from(final Table<?> table) {
     CommonColumns.requireAuditColumns(table);
     return new IdempotencyKeyTable(
         table,

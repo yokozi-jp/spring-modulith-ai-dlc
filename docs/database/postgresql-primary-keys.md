@@ -80,7 +80,7 @@ IDENTITY列の定義は[PostgreSQLのデータ型](postgresql-data-types.md#iden
 UUIDの採番はアプリケーションで行い、DBでは行わない。
 `uuid`カラムに`DEFAULT`を付けず、`uuidv7()`と`gen_random_uuid()`を使わない。
 IDをINSERTの前に確定し、イベントや子テーブルの外部キーに保存を待たず使えるようにするためである。
-例外は、業務テーブルの`tenant_public_id`の既定値だけである。
+例外は、RLSのスキーマの表の`tenant_public_id`の既定値だけである。
 この既定値はIDを採番せず、トランザクションに設定したテナントを入れる（[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける業務テーブル)）。
 永続化用の主キーはRepositoryが発行し、Domain上の外部公開識別子である`public_id`はDomainが発行する。
 主キーの次の値はRepositoryの`nextId()`から得る。
@@ -89,7 +89,7 @@ Javaの型は`java.util.UUID`にし、`String`にしない。
 jOOQは`uuid`を`UUID`に対応づける。
 
 `uuid`カラムの`DEFAULT`は、`SchemaConventionsTest`と`SchemaInspectionTest`が使う`SchemaTableConventions.columns`（規則T13）が検査する。
-T13は、`tenant_public_id`の既定値が`current_setting('app.current_tenant')::uuid`のときだけ除く。
+T13は、RLSのスキーマの表の`tenant_public_id`の既定値が`current_setting('app.current_tenant')::uuid`のときだけ除く。
 Spring Modulithのイベント出版テーブルは対象にしない。
 
 UUID v7の生成方法は決めていない。

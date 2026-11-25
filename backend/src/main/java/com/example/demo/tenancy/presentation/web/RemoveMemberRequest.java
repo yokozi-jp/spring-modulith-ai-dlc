@@ -1,6 +1,7 @@
 package com.example.demo.tenancy.presentation.web;
 
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import com.example.demo.tenancy.application.RemoveMemberCommand;
 import java.util.UUID;
 
@@ -11,8 +12,8 @@ import java.util.UUID;
  */
 public record RemoveMemberRequest(long lockNo) {
 
-  /** 選んだテナントの ID とパス変数の利用者の ID と合わせて Command へ変換する。 */
-  public RemoveMemberCommand toCommand(final String tenantId, final UUID userId) {
-    return new RemoveMemberCommand(tenantId, userId.toString(), new ExpectedLockNo(lockNo));
+  /** パス変数の利用者の ID、ヘッダーの冪等性キーと合わせて Command へ変換する。 */
+  public RemoveMemberCommand toCommand(final UUID userId, final IdempotencyKey idempotencyKey) {
+    return new RemoveMemberCommand(userId.toString(), new ExpectedLockNo(lockNo), idempotencyKey);
   }
 }

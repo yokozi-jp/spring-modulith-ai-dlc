@@ -325,11 +325,11 @@ class ArchitectureRuleFixtureTest {
             "ordering.application.ReleaseOrderCommandHandler"),
         row(
             "unsafeHandlersTakeIdempotencyKey: no key",
-            IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(VIOLATING, Set.of()),
+            IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(VIOLATING),
             "ordering.presentation.web.OrderKeyController.place("),
         row(
             "unsafeHandlersTakeIdempotencyKey: key after the body",
-            IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(VIOLATING, Set.of()),
+            IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(VIOLATING),
             "ordering.presentation.web.OrderKeyController.ship("),
         row(
             "idempotentCommandHandlersExecuteThroughIdempotency",
@@ -629,7 +629,7 @@ class ArchitectureRuleFixtureTest {
         TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage),
         TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
         TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
-        IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(basePackage, Set.of()),
+        IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(basePackage),
         IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotencyRule(basePackage),
         PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage),
         DatabaseConventionsArchTest.ownGeneratedSchemaRule(

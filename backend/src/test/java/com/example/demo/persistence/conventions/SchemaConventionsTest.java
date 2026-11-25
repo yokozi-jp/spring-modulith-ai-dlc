@@ -480,6 +480,31 @@ class SchemaConventionsTest {
     }
 
     @Test
+    @DisplayName("T13：RLSの外のスキーマでは、テナントの列のトランザクションのテナントを入れるDEFAULTも、文で書くよう促して拒否する")
+    void rejectsTenantColumnDefaultOutsideRowLevelSecurity() {
+      assertThat(
+              SchemaTableConventions.columns(
+                  List.of(
+                      new ColumnRow(
+                          "tenancy",
+                          "t_idempotency_key",
+                          "tenant_public_id",
+                          UUID,
+                          "b",
+                          "",
+                          "",
+                          TenantIsolation.CATALOG_TENANT_DEFAULT))))
+          .singleElement()
+          .satisfies(violation -> {
+            assertThat(violation.key()).isEqualTo("T13 tenancy.t_idempotency_key.tenant_public_id");
+            assertThat(violation.detail())
+                .startsWith("RLSの外のスキーマでは、tenant_public_idのDEFAULT")
+                .contains("文で値を書く", "docs/database/postgresql-multitenancy.md")
+                .doesNotContain("nextId()");
+          });
+    }
+
+    @Test
     @DisplayName("T13：イベント出版テーブルのuuidはDEFAULTの有無を問わず対象外にする")
     void ignoresEventPublicationUuidColumns() {
       assertThat(

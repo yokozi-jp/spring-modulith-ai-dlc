@@ -1,5 +1,6 @@
 package com.example.demo.tenancy.presentation.web;
 
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import com.example.demo.shared.security.TenantNotSelectedException;
 import com.example.demo.tenancy.TenancyQueries;
 import com.example.demo.tenancy.application.ChangeMemberRoleCommandHandler;
@@ -79,8 +80,8 @@ class CurrentTenantMemberController {
    * <p>変更は、その利用者の次のリクエストから効く。管理者以外には 403、最後の管理者を下げると 422 を返す。
    *
    * @param userId 役割を変える利用者の ID
+   * @param idempotencyKey 役割の変更の操作ごとにクライアントが採番したキー
    * @param request 新しい役割と、画面が読んだテナントのロック番号
-   * @param authentication ログインした利用者の認証
    * @return 本文のない 204 の応答
    */
   @Operation(operationId = "changeTenantMemberRole")
@@ -91,9 +92,9 @@ class CurrentTenantMemberController {
   @PutMapping("/{userId}")
   /* package */ ResponseEntity<Void> changeRole(
       @PathVariable final UUID userId,
-      @Valid @RequestBody final ChangeMemberRoleRequest request,
-      final Authentication authentication) {
-    changeMemberRole.handle(request.toCommand(selectedTenantId(authentication), userId));
+      final IdempotencyKey idempotencyKey,
+      @Valid @RequestBody final ChangeMemberRoleRequest request) {
+    changeMemberRole.handle(request.toCommand(userId, idempotencyKey));
     return ResponseEntity.noContent().build();
   }
 
@@ -103,8 +104,8 @@ class CurrentTenantMemberController {
    * <p>外した利用者は、次のリクエストから業務の API を呼べない。管理者以外には 403、最後の管理者を外すと 422 を返す。
    *
    * @param userId 所属を外す利用者の ID
+   * @param idempotencyKey 所属の取り外しの操作ごとにクライアントが採番したキー
    * @param lockNo 画面が読んだテナントのロック番号
-   * @param authentication ログインした利用者の認証
    * @return 本文のない 204 の応答
    */
   @Operation(operationId = "removeTenantMember")
@@ -115,10 +116,9 @@ class CurrentTenantMemberController {
   @DeleteMapping("/{userId}")
   /* package */ ResponseEntity<Void> remove(
       @PathVariable final UUID userId,
-      @RequestParam @Min(1) final long lockNo,
-      final Authentication authentication) {
-    removeMember.handle(
-        new RemoveMemberRequest(lockNo).toCommand(selectedTenantId(authentication), userId));
+      final IdempotencyKey idempotencyKey,
+      @RequestParam @Min(1) final long lockNo) {
+    removeMember.handle(new RemoveMemberRequest(lockNo).toCommand(userId, idempotencyKey));
     return ResponseEntity.noContent().build();
   }
 

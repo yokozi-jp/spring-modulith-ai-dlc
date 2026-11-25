@@ -28,6 +28,9 @@ final class SchemaTableConventions {
   /** 主キーの規約の文書。 */
   private static final String PRIMARY_KEYS_DOC = "docs/database/postgresql-primary-keys.md";
 
+  /** マルチテナントの規約の文書。 */
+  private static final String MULTITENANCY_DOC = "docs/database/postgresql-multitenancy.md";
+
   /** 履歴の表（{@code h_}）が、退避した処理の trace ID を持つ列。共通カラムの {@code created_tx_id} と同じく、行を指さない（ADR-131）。 */
   private static final String ARCHIVED_TX_ID = "archived_tx_id";
 
@@ -247,23 +250,32 @@ final class SchemaTableConventions {
     return violations;
   }
 
-  /** T13：uuidのDEFAULT。テナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。 */
+  /** T13：uuidのDEFAULT。RLSのスキーマの表のテナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。 */
   private static void uuidDefault(
       final ColumnRow row, final String target, final List<ConventionViolation> violations) {
     final String defaultExpression = row.defaultExpression();
+    final boolean tenantColumn = TenantIsolation.TENANT_COLUMN.equals(row.column());
+    final boolean rlsSchema = TenantIsolation.isTenantScoped(row.schema());
     final boolean tenantDefault =
-        TenantIsolation.TENANT_COLUMN.equals(row.column())
+        tenantColumn
+            && rlsSchema
             && TenantIsolation.CATALOG_TENANT_DEFAULT.equals(defaultExpression);
     if ("uuid".equals(row.typeName()) && defaultExpression != null && !tenantDefault) {
       violations.add(
           new ConventionViolation(
               "T13",
               target,
-              "uuidはアプリケーションでRepositoryのnextId()から採番し、DEFAULT（"
-                  + defaultExpression
-                  + "）を外す（"
-                  + PRIMARY_KEYS_DOC
-                  + "）。"));
+              tenantColumn && !rlsSchema
+                  ? "RLSの外のスキーマでは、tenant_public_idのDEFAULT（"
+                      + defaultExpression
+                      + "）を外し、文で値を書く（"
+                      + MULTITENANCY_DOC
+                      + "）。"
+                  : "uuidはアプリケーションでRepositoryのnextId()から採番し、DEFAULT（"
+                      + defaultExpression
+                      + "）を外す（"
+                      + PRIMARY_KEYS_DOC
+                      + "）。"));
     }
   }
 }

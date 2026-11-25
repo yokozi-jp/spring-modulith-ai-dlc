@@ -2,6 +2,7 @@ package com.example.demo.ordering.presentation.web;
 
 import static com.example.demo.jooq.ordering.Tables.T_IDEMPOTENCY_KEY;
 import static com.example.demo.testkit.AppUsers.oidcLogin;
+import static com.example.demo.testkit.IdempotencyKeys.expectIdempotencyProblem;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -474,16 +475,5 @@ class OrderIdempotencyApiTest {
 
   private ResultActions orderCount() throws Exception {
     return mockMvc.perform(get("/api/orders").with(oidcLogin()));
-  }
-
-  /** Idempotency-Key の problem type で、detail を持たないことを確かめる。 */
-  private static ResultActions expectIdempotencyProblem(
-      final ResultActions actions, final int status, final String type) throws Exception {
-    return actions
-        .andExpect(status().is(status))
-        .andExpect(jsonPath("$.type").value("/problems/" + type))
-        .andExpect(jsonPath("$.status").value(status))
-        .andExpect(jsonPath("$.title").exists())
-        .andExpect(jsonPath("$.detail").doesNotExist());
   }
 }

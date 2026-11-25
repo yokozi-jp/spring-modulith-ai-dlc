@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-107: 業務テーブルを RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する'
-description: 業務テーブルに tenant_public_id を持たせ、既定値をトランザクションのテナントにし、ENABLE と FORCE の RLS と、missing_ok を使わない TO PUBLIC のポリシーでテナントを分ける決定。テナントはトランザクションマネージャーが TenantContext から読み、モジュールのロールと同じ SQL でトランザクションの間だけ設定し、テナントを束縛しない業務のモジュールのトランザクションは始めない。RLS の外に置くのは modulith と tenancy のスキーマの表だけにし、業務テーブルのユニークインデックスは tenant_public_id から始め、全テナントの行はテナントを 1 つずつ設定して書き換える。
+description: 業務テーブルに tenant_public_id を持たせ、既定値をトランザクションのテナントにし、ENABLE と FORCE の RLS と、missing_ok を使わない TO PUBLIC のポリシーでテナントを分ける決定。テナントはトランザクションマネージャーが TenantContext から読み、モジュールのロールと同じ SQL でトランザクションの間だけ設定し、テナントを束縛しない業務のモジュールのトランザクションは始めない。RLS の外に置くのは modulith と tenancy のスキーマの表だけにし、業務テーブルのユニークインデックスは tenant_public_id から始め、業務テーブルの全テナントの行はテナントを 1 つずつ設定して書き換える。
 tags: [adr, database, postgresql, security, tenancy, rls]
 ---
 
@@ -60,6 +60,8 @@ Repository と seed の INSERT がテナントの列を書かずに済み、書�
 その計画が表を順に走査し、漏洩のない比較（`order_status_typ = $1` など）で全行を落とすと、RLS の式は一度も評価されない。
 そこで Decision に、トランザクションマネージャーがテナントのない業務のトランザクションを始めないことを足し、ポリシーのエラーを 2 段目の防御に改めた。
 
+[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) が `tenancy` にキーの表を足したので、RLS の外の単位と、全テナントの書き換えの範囲を明記した。
+
 ## Decision
 
 業務テーブルを、PostgreSQL の RLS でテナントごとに分ける。
@@ -102,9 +104,10 @@ RLS の外に置く表は、`modulith` と `tenancy` のスキーマの表だけ
 - `modulith` のスキーマの表（イベントの出版、その archive、ShedLock）は、Spring Modulith が決まった列だけを INSERT し、再投入のジョブ（古い出版を `FAILED` に戻す処理を含む、[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）が全テナントの行を扱う。
   テナントは、イベントの本文が運ぶ（ADR-105）。
 - `tenancy` のスキーマの表は、テナントが決まる前に引く。
+  RLS の外はスキーマの単位で決めるので、同じスキーマのキーの表（ADR-126）も RLS の外に置く。
   触れるのは `tenancy` のモジュールのロールだけである（ADR-094、ADR-101）。
 
-全テナントの行を書き換える処理（データの移行、開発用の代表データの reset など）は、テナントを 1 つずつ設定して流す。
+業務テーブルの全テナントの行を書き換える処理（データの移行、開発用の代表データの reset など）は、テナントを 1 つずつ設定して流す。
 全テナントの行を読める専用のロールと、`BYPASSRLS` を持つアプリのロールは作らない。
 
 本番にデータはないので、移行の手順は作らない。

@@ -9,7 +9,7 @@ tags: [convention, database, postgresql, multi-tenancy, rls, future-arch-guideli
 
 業務テーブルはRow Level Security（RLS）でテナントごとに分け、`tenant_public_id`とトランザクションに設定したテナントを比べるポリシーで、別のテナントの行を読めず書けなくする。
 テナントはモジュールのロールと同じSQLでトランザクションの間だけ設定し、テナントを束縛しない業務のトランザクションはトランザクションマネージャーが始めない。
-全テナントの行を書き換える処理はテナントを1つずつ設定して流し、テナントごとにスキーマの差を作らない。
+業務テーブルの全テナントの行を書き換える処理はテナントを1つずつ設定して流し、テナントごとにスキーマの差を作らない。
 
 ## 対象
 
@@ -72,8 +72,10 @@ RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけに�
 
 - **`modulith`**：Spring Modulithのイベントの出版とそのarchive、ShedLockとSpring Sessionの表である。
   テナントは、イベントの本文が運ぶ（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
-- **`tenancy`**：テナント、利用者、ID連携、所属の表である。
-  テナントが決まる前に引く。
+- **`tenancy`**：テナント、利用者、ID連携、所属の表と、冪等性キーの表`t_idempotency_key`である。
+  テナント、利用者、ID連携、所属の表は、テナントが決まる前に引く。
+  `t_idempotency_key`の`tenant_public_id`には既定値を付けない。
+  キーの表の文が`tenant_public_id`を`TenantContext`のテナントで書き、読み書きの条件に入れる（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「保存先」）。
   触れるのは`tenancy_module`だけである（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
 
 ## テナントの設定
@@ -105,7 +107,7 @@ SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 
 ## 全テナントの行を書き換える処理
 
-全テナントの行を書き換える処理（データの移行、開発用の代表データのreset）は、テナントを1つずつ設定して流す。
+業務テーブルの全テナントの行を書き換える処理（データの移行、開発用の代表データのreset）は、テナントを1つずつ設定して流す。
 全テナントの行を読めるロールと、`BYPASSRLS`を持つロールは使わない。
 マイグレーションロールも`FORCE ROW LEVEL SECURITY`でポリシーを受けるため、changesetのデータの移行もテナントを設定して流す。
 
@@ -124,7 +126,7 @@ RLSの規則は次の検査で確かめる。
   表の所有者のマイグレーションロールの接続でも、テナントを設定しない読み取りがエラーになり、設定したテナントの行だけを読むことを確かめ、`FORCE ROW LEVEL SECURITY`の効き目を見る。
   トランザクションマネージャーを通らない読み取りが、汎用の実行計画が残った接続ではエラーにならず0件を返すことも確かめ、マネージャーの検査が要る前提を示す。
   テナントのないトランザクションの中で、テストの補助の`AsModule`がテナントを設定して戻した後も、テナントのない読み取りがエラーになることを確かめる。
-  業務テーブルは、`tenant_public_id`を持つjOOQの生成した表から導く。
+  業務テーブルは、`ModuleRoles.TENANT_SCOPED_MODULES`のスキーマのjOOQの生成した表から導く。
 - **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にロールとテナントが残らないことと、テナントを束縛しない`product`、`ordering`、`payment`のトランザクションを始めないことを確かめる。
   設定の後に空文字列が残る接続でも、ポリシーが失敗する側に倒れることを、残った設定ごとのSQLSTATE（未設定なら`42704`、空文字列なら`22P02`）で確かめる。
 

@@ -18,7 +18,6 @@ import org.jooq.DSLContext;
 import org.jooq.JSONB;
 import org.jooq.Record2;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -59,20 +58,11 @@ import tools.jackson.databind.json.JsonMapper;
    *
    * @throws IllegalArgumentException キーの表に列がない、または型が異なる場合
    */
-  /* package */ @Autowired
-  JooqIdempotency(final DSLContext dsl, final CommonColumns commonColumns, final Clock clock) {
-    this(dsl, commonColumns, clock, IdempotencyKeyTable.inCatalog());
-  }
-
-  /** モジュールの名前からキーの表への対応を受け取る。生成されたカタログにない表で確かめるテストが使う。 */
   /* package */ JooqIdempotency(
-      final DSLContext dsl,
-      final CommonColumns commonColumns,
-      final Clock clock,
-      final Map<String, IdempotencyKeyTable> tables) {
+      final DSLContext dsl, final CommonColumns commonColumns, final Clock clock) {
     this.dsl = dsl;
     this.writer = new IdempotencyKeyWriter(dsl, commonColumns);
-    this.tables = Map.copyOf(tables);
+    this.tables = IdempotencyKeyTable.inCatalog();
     this.clock = clock;
   }
 

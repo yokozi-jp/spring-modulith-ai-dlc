@@ -28,7 +28,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 
 - **業務テーブルどうしの参照**：`(tenant_public_id, 参照先の主キー)`の複合の外部キーにし、参照先に同じ組のユニークインデックスを作る（`ordering.t_order_line`から`ordering.t_order`）。
   業務テーブルの範囲は[PostgreSQLのマルチテナント設計](postgresql-multitenancy.md#rlsでテナントを分ける業務テーブル)に示す。
-- **`tenancy`の表どうしの参照**：`tenant_public_id`を持たないため、参照先の主キーだけの単独の列の外部キーにする。
+- **`tenancy`の表どうしの参照**：RLSの外のスキーマなので、参照先の主キーだけの単独の列の外部キーにする。
   今の該当は、`tenancy.m_user_identity.user_id`と`tenancy.m_membership.user_id`から`tenancy.m_user.user_id`、`tenancy.m_membership.tenant_id`から`tenancy.m_tenant.tenant_id`である。
 - **モジュールをまたぐ参照**：外部キー（スキーマをまたぐ外部キー）を作らない。
   論理設計のER図に書き、参照の整合性はアプリケーションで保つ。

@@ -10,6 +10,7 @@ import com.example.demo.jooq.tenancy.tables.MMembership;
 import com.example.demo.jooq.tenancy.tables.MTenant;
 import com.example.demo.jooq.tenancy.tables.MUser;
 import com.example.demo.jooq.tenancy.tables.MUserIdentity;
+import com.example.demo.jooq.tenancy.tables.TIdempotencyKey;
 
 import javax.annotation.processing.Generated;
 
@@ -56,4 +57,9 @@ public class Tables {
      * IdP識別
      */
     public static final MUserIdentity M_USER_IDENTITY = MUserIdentity.M_USER_IDENTITY;
+
+    /**
+     * 冪等性キー
+     */
+    public static final TIdempotencyKey T_IDEMPOTENCY_KEY = TIdempotencyKey.T_IDEMPOTENCY_KEY;
 }

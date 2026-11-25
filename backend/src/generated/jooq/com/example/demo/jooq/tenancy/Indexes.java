@@ -8,6 +8,7 @@ import com.example.demo.jooq.tenancy.tables.MMembership;
 import com.example.demo.jooq.tenancy.tables.MTenant;
 import com.example.demo.jooq.tenancy.tables.MUser;
 import com.example.demo.jooq.tenancy.tables.MUserIdentity;
+import com.example.demo.jooq.tenancy.tables.TIdempotencyKey;
 
 import javax.annotation.processing.Generated;
 
@@ -39,4 +40,5 @@ public class Indexes {
     public static final Index UK_M_TENANT = Internal.createIndex(DSL.name("uk_m_tenant"), MTenant.M_TENANT, new OrderField[] { MTenant.M_TENANT.PUBLIC_ID }, true);
     public static final Index UK_M_USER = Internal.createIndex(DSL.name("uk_m_user"), MUser.M_USER, new OrderField[] { MUser.M_USER.PUBLIC_ID }, true);
     public static final Index UK_M_USER_IDENTITY = Internal.createIndex(DSL.name("uk_m_user_identity"), MUserIdentity.M_USER_IDENTITY, new OrderField[] { MUserIdentity.M_USER_IDENTITY.ISSUER_URL, MUserIdentity.M_USER_IDENTITY.SUBJECT_CODE }, true);
+    public static final Index UK_T_IDEMPOTENCY_KEY = Internal.createIndex(DSL.name("uk_t_idempotency_key"), TIdempotencyKey.T_IDEMPOTENCY_KEY, new OrderField[] { TIdempotencyKey.T_IDEMPOTENCY_KEY.TENANT_PUBLIC_ID, TIdempotencyKey.T_IDEMPOTENCY_KEY.USER_PUBLIC_ID, TIdempotencyKey.T_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY }, true);
 }
