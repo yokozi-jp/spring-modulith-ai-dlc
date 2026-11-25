@@ -8,7 +8,6 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderId;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.ordering.domain.model.OrderStatus;
-import com.example.demo.shared.security.NoRoleRequired;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,7 +28,6 @@ class OrderQueryService implements OrderQueries {
   }
 
   @Override
-  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public Optional<OrderDetails> findDetails(final String orderId) {
     return orderRepository
@@ -38,7 +36,6 @@ class OrderQueryService implements OrderQueries {
   }
 
   @Override
-  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<OrderSummary> search(final OrderSearchCriteria criteria) {
     // ponytail: ページングしない。参照業務機能の注文の件数は少ない。数百件を超えるなら ADR-013 のカーソルを足す。
@@ -70,13 +67,14 @@ class OrderQueryService implements OrderQueries {
         order.total().amount(),
         order.lockNo(),
         order.lines().stream()
-            .map(line ->
-                new OrderDetails.Line(
-                    line.lineNumber(),
-                    line.productId().value().toString(),
-                    line.quantity().value(),
-                    line.unitPrice().amount(),
-                    line.amount().amount()))
+            .map(
+                line ->
+                    new OrderDetails.Line(
+                        line.lineNumber(),
+                        line.productId().value().toString(),
+                        line.quantity().value(),
+                        line.unitPrice().amount(),
+                        line.amount().amount()))
             .toList());
   }
 }

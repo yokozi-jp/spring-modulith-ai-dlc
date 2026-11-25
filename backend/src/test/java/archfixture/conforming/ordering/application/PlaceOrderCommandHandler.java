@@ -6,7 +6,6 @@ import archfixture.conforming.ordering.domain.model.Order;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.ordering.domain.service.OrderLimitPolicy;
 import archfixture.conforming.shared.tenancy.TenantContext;
-import com.example.demo.shared.security.NoRoleRequired;
 import java.time.Clock;
 import java.time.Instant;
 import org.springframework.context.ApplicationEventPublisher;
@@ -42,7 +41,6 @@ public class PlaceOrderCommandHandler {
   }
 
   /** 上限を確かめて注文を保存し、受付のイベントを発行する。 */
-  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional
   public PlaceOrderResult handle(final PlaceOrderCommand command) {
     final CustomerId customerId = new CustomerId(command.customerId());

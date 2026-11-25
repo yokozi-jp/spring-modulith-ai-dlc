@@ -256,10 +256,15 @@ class ObservabilityContractTest {
   @Test
   @DisplayName("@PreAuthorize が拒否した 403 のログは、テナントの束縛の中で記録されるので、user.id と tenant.id を持つ")
   void methodSecurityDenialLogCarriesUserAndTenant() throws Exception {
-    final String path = "/api/current-tenant/members";
+    // 所属を外す API は他のテストも呼ぶ。他のテストの受信の span と分けるため、パスを一意にする。
+    final String path = "/api/current-tenant/members/" + UUID.randomUUID();
 
     mockMvc
-        .perform(MockMvcRequestBuilders.get(path).with(AppUsers.oidcLogin()))
+        .perform(
+            MockMvcRequestBuilders.delete(path)
+                .param("lockNo", "1")
+                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                .with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("about:blank"));
 

@@ -1,5 +1,5 @@
 /** 商品の参照を公開する機能モジュール。 */
-@ApplicationModule(allowedDependencies = {"shared :: security", "jooq"})
+@ApplicationModule(allowedDependencies = "jooq")
 @NullMarked
 package com.example.demo.product;
 

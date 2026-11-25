@@ -7,7 +7,6 @@ import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentRepository;
-import com.example.demo.shared.security.NoRoleRequired;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -26,7 +25,6 @@ class PaymentQueryService implements PaymentQueries {
   }
 
   @Override
-  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<PaymentSummary> search(final PaymentSearchCriteria criteria) {
     return paymentRepository

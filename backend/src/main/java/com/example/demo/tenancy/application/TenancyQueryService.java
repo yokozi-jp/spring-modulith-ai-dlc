@@ -1,6 +1,5 @@
 package com.example.demo.tenancy.application;
 
-import com.example.demo.shared.security.NoRoleRequired;
 import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
@@ -35,7 +34,6 @@ class TenancyQueryService implements TenancyQueries {
   }
 
   @Override
-  @NoRoleRequired(NoRoleRequired.Basis.CALLER_PASSES_OWN_USER_ID)
   @Transactional(readOnly = true)
   public List<MembershipSummary> memberships(final String userId) {
     return membershipRepository.findByUser(new UserId(UUID.fromString(userId))).stream()
@@ -44,7 +42,6 @@ class TenancyQueryService implements TenancyQueries {
   }
 
   @Override
-  @NoRoleRequired(NoRoleRequired.Basis.CALLER_PASSES_OWN_USER_ID)
   @Transactional(readOnly = true)
   public Optional<MembershipSummary> membership(final String userId, final String tenantId) {
     return membershipRepository

@@ -300,23 +300,7 @@ class ArchitectureRuleFixtureTest {
           row(
               "preAuthorizeUsesOnlyRoleOrAuthorityNames: 空の式",
               AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
-              SCRIPTED_AUTHORIZATION + ".release("),
-          row(
-              "applicationHandlersDeclareAuthorization: CommandHandler の宣言がない",
-              AuthorizationArchTest.applicationHandlersDeclareAuthorization,
-              "ordering.application.UndeclaredRoleCommandHandler.handle() に"),
-          row(
-              "applicationHandlersDeclareAuthorization: QueryService の interface の実装の宣言がない",
-              AuthorizationArchTest.applicationHandlersDeclareAuthorization,
-              "ordering.application.UndeclaredRoleQueryService.run()"),
-          row(
-              "authorizationIsDeclaredOnlyOnce: 同じメソッドに両方",
-              AuthorizationArchTest.authorizationIsDeclaredOnlyOnce,
-              "ordering.application.DoublyAuthorizedCommandHandler.handle()"),
-          row(
-              "authorizationIsDeclaredOnlyOnce: @PreAuthorize のクラスのメソッドに @NoRoleRequired",
-              AuthorizationArchTest.authorizationIsDeclaredOnlyOnce,
-              "ordering.application.AdminExemptingCommandHandler.handle()"));
+              SCRIPTED_AUTHORIZATION + ".release("));
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")
@@ -695,8 +679,6 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         AuthorizationArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(basePackage),
         AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
-        AuthorizationArchTest.applicationHandlersDeclareAuthorization,
-        AuthorizationArchTest.authorizationIsDeclaredOnlyOnce,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
         ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(

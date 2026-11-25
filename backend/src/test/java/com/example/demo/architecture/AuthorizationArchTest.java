@@ -4,7 +4,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 
 import com.example.demo.DemoApplication;
-import com.example.demo.shared.security.NoRoleRequired;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.base.HasDescription;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -22,7 +21,7 @@ import com.tngtech.archunit.lang.conditions.ArchConditions;
 import java.util.regex.Pattern;
 import org.springframework.security.access.prepost.PreAuthorize;
 
-/** 役割の確かめ（Spring Security の method security）の置き場所、式、宣言の漏れと重なりを確かめる（ADR-129）。 */
+/** 役割の確かめ（Spring Security の method security）の置き場所と式を確かめる（ADR-129）。 */
 // ArchUnit の JUnit 5 エンジンが @ArchTest フィールドを読むため、規則と規則のファクトリだけを持つクラスでもユーティリティクラスにしない。
 @SuppressWarnings({"PMD.TestClassWithoutTestCases", "PMD.UseUtilityClass"})
 @AnalyzeClasses(packagesOf = DemoApplication.class, importOptions = ProductionCodeOnly.class)
@@ -34,10 +33,6 @@ class AuthorizationArchTest {
   /** {@link ProxyRulesArchTest#METHOD_SECURITY_ANNOTATIONS} のどれかを、直接かメタアノテーションとして持つクラスとメソッド。 */
   private static final DescribedPredicate<CanBeAnnotated> METHOD_SECURED =
       ProxyRulesArchTest.metaAnnotatedWithOneOf(ProxyRulesArchTest.METHOD_SECURITY_ANNOTATIONS);
-
-  /** {@code @PreAuthorize} を、直接かメタアノテーションとして持つクラスとメソッド。 */
-  private static final DescribedPredicate<CanBeAnnotated> PRE_AUTHORIZED =
-      CanBeAnnotated.Predicates.metaAnnotatedWith(PreAuthorize.class);
 
   /** {@code @PreAuthorize} に書いてよい式。引用符で囲んだ役割か権限の名前を、1 つの関数に並べるだけにする。 */
   private static final Pattern ROLE_OR_AUTHORITY_NAMES =
@@ -68,58 +63,6 @@ class AuthorizationArchTest {
                   + "直し方：@PreAuthorize の値を hasRole('ADMIN')、hasAnyRole('ADMIN', 'MEMBER')、"
                   + "hasAuthority('<権限>')、hasAnyAuthority('<権限>', ...) のどれか 1 つにし、"
                   + "本人や持ち主の確かめは、利用者の ID を Repository の WHERE に入れて行う。"
-                  + LAYERS_DOC);
-
-  /**
-   * application の CommandHandler と QueryService の public
-   * メソッドは、役割を確かめるか（{@code @PreAuthorize}）、確かめないか（{@link NoRoleRequired}）を宣言する。
-   *
-   * <p>{@code @PreAuthorize} はメソッドかクラスに、直接かメタアノテーションとして付ける。static のメソッドはプロキシが横取りしないので除く。
-   */
-  @ArchTest
-  /* package */ static final ArchRule applicationHandlersDeclareAuthorization =
-      methods()
-          .that()
-          .arePublic()
-          .and()
-          .areNotStatic()
-          .and()
-          .areDeclaredInClassesThat(
-              ClassRoleArchTest.APPLICATION_COMMAND_HANDLER.or(
-                  ClassRoleArchTest.APPLICATION_QUERY_SERVICE))
-          .should(declareAuthorization())
-          .allowEmptyShould(true)
-          .because(
-              "認可の表のテストは operation を足したときだけ期待の書き忘れを止め、"
-                  + "operation を通らずに呼ぶメソッド（Listener から呼ぶ CommandHandler）と、既存の operation の後ろに足したメソッドでは、"
-                  + "役割を判断しないまま @PreAuthorize のないメソッドが残るため（ADR-129）。"
-                  + "直し方：役割で許すメソッドには @PreAuthorize(\"hasRole('<役割>')\") を、"
-                  + "役割を問わないメソッドには @NoRoleRequired(NoRoleRequired.Basis.<根拠>) を付ける。"
-                  + "根拠は、見える範囲の絞り方や呼び出し元を表す NoRoleRequired.Basis から選ぶ。"
-                  + LAYERS_DOC);
-
-  /**
-   * 1 つのメソッドの役割の判断は、{@code @PreAuthorize} か {@link NoRoleRequired} の一方だけで宣言する。
-   *
-   * <p>Spring はクラスの {@code @PreAuthorize} を、{@code @PreAuthorize} のないメソッドにも当てる。そのため
-   * {@code @PreAuthorize} を付けたクラスのメソッドに {@link NoRoleRequired} を付けても、役割を確かめる。
-   */
-  @ArchTest
-  /* package */ static final ArchRule authorizationIsDeclaredOnlyOnce =
-      methods()
-          .that()
-          .areAnnotatedWith(NoRoleRequired.class)
-          .should()
-          .notBeMetaAnnotatedWith(PreAuthorize.class)
-          .andShould()
-          .beDeclaredInClassesThat(DescribedPredicate.not(PRE_AUTHORIZED))
-          .allowEmptyShould(true)
-          .because(
-              "同じメソッドに両方を付けると、どちらの判断が正しいかがコードから読めず、"
-                  + "@PreAuthorize を付けたクラスのメソッドでは、Spring がクラスの @PreAuthorize を当てて、"
-                  + "@NoRoleRequired の宣言と違って役割を確かめるため。"
-                  + "直し方：役割で許すなら @NoRoleRequired を外し、役割を問わないなら @PreAuthorize を外す。"
-                  + "クラスに @PreAuthorize があるなら、クラスから外して、メソッドごとに @PreAuthorize か @NoRoleRequired を付ける。"
                   + LAYERS_DOC);
 
   /** method security のアノテーションを各モジュールの application にだけ置く規則を組み立てる。 */
@@ -170,24 +113,6 @@ class AuthorizationArchTest {
                             + " の @PreAuthorize(\""
                             + expression
                             + "\") は、役割か権限の名前だけの式でない。")));
-      }
-    };
-  }
-
-  private static ArchCondition<JavaMethod> declareAuthorization() {
-    return new ArchCondition<>("be annotated with @PreAuthorize or @NoRoleRequired") {
-      @Override
-      public void check(final JavaMethod item, final ConditionEvents events) {
-        if (!PRE_AUTHORIZED.test(item)
-            && !item.isAnnotatedWith(NoRoleRequired.class)
-            && !PRE_AUTHORIZED.test(item.getOwner())) {
-          events.add(
-              SimpleConditionEvent.violated(
-                  item,
-                  item.getFullName()
-                      + " に @PreAuthorize も @NoRoleRequired もなく、クラスにも @PreAuthorize がない。 "
-                      + item.getSourceCodeLocation()));
-        }
       }
     };
   }

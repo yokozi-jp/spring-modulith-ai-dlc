@@ -3,7 +3,6 @@ package archfixture.conforming.payment.application;
 import archfixture.conforming.ordering.OrderQueries;
 import archfixture.conforming.ordering.OrderSearchCriteria;
 import archfixture.conforming.ordering.OrderSummary;
-import com.example.demo.shared.security.NoRoleRequired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +19,6 @@ public class ChargeOrderCommandHandler {
   }
 
   /** 顧客の注文の状態の名前を読む。 */
-  @NoRoleRequired(NoRoleRequired.Basis.CALLED_WITHOUT_AUTHENTICATION)
   @Transactional
   public ChargeOrderResult handle(final ChargeOrderCommand command) {
     return new ChargeOrderResult(

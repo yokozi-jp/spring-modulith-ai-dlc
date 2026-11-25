@@ -5,7 +5,6 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderId;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.shared.failure.NotFoundException;
-import com.example.demo.shared.security.NoRoleRequired;
 import com.example.demo.shared.tenancy.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -38,7 +37,6 @@ public class ConfirmOrderCommandHandler {
   }
 
   /** ロック番号を確かめて注文を確定して保存し、確定のイベントを発行する。 */
-  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional
   public ConfirmOrderResult handle(final ConfirmOrderCommand command) {
     final Order order =

@@ -5,7 +5,6 @@ import com.example.demo.product.ProductSummary;
 import com.example.demo.product.domain.model.Product;
 import com.example.demo.product.domain.model.ProductId;
 import com.example.demo.product.domain.model.ProductRepository;
-import com.example.demo.shared.security.NoRoleRequired;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -24,14 +23,12 @@ class ProductQueryService implements ProductQueries {
   }
 
   @Override
-  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<ProductSummary> search() {
     return productRepository.findAll().stream().map(ProductQueryService::toSummary).toList();
   }
 
   @Override
-  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<ProductSummary> findByIds(final List<String> productIds) {
     return productRepository
