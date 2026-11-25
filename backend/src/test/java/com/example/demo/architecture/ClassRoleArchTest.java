@@ -669,6 +669,7 @@ class ClassRoleArchTest {
         .that(
             resideInAPackage(basePackage + ".*..")
                 .and(not(name(basePackage + ".shared.concurrency.VersionedCommand")))
+                .and(not(name(basePackage + ".shared.idempotency.IdempotentCommand")))
                 .and(simpleNameEndingWith("Command").or(simpleNameEndingWith(RESULT))))
         .should(beRecordOrSealedInterfaceOfRecordsForResult())
         .andShould()

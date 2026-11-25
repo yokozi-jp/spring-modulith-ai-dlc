@@ -324,6 +324,18 @@ class ArchitectureRuleFixtureTest {
             TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
             "ordering.application.ReleaseOrderCommandHandler"),
         row(
+            "unsafeHandlersTakeIdempotencyKey: no key",
+            IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(VIOLATING, Set.of()),
+            "ordering.presentation.web.OrderKeyController.place("),
+        row(
+            "unsafeHandlersTakeIdempotencyKey: key after the body",
+            IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(VIOLATING, Set.of()),
+            "ordering.presentation.web.OrderKeyController.ship("),
+        row(
+            "idempotentCommandHandlersExecuteThroughIdempotency",
+            IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotencyRule(VIOLATING),
+            "ordering.application.RedeliverOrderCommandHandler.handle("),
+        row(
             "commandsBuiltByPresentationForWritesAreVersioned: static factory call",
             TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(VIOLATING),
             "ordering.application.SuspendOrderCommandHandler"),
@@ -617,6 +629,8 @@ class ArchitectureRuleFixtureTest {
         TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage),
         TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
         TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
+        IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(basePackage, Set.of()),
+        IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotencyRule(basePackage),
         PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage),
         DatabaseConventionsArchTest.ownGeneratedSchemaRule(
             basePackage, JOOQ_PACKAGE, FIXTURE_MODULES),

@@ -4,6 +4,7 @@ import com.example.demo.LocaleSupport;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.idempotency.IdempotencyKeyException;
 import com.example.demo.shared.security.TenantNotSelectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,11 +32,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import org.springframework.web.util.DisconnectedClientHelper;
 
 /**
- * Spring MVC と Spring Security の例外と、業務上の失敗（shared.failure と shared.concurrency）を RFC 9457 Problem
- * Details へ変換する。
+ * Spring MVC と Spring Security の例外と、業務上の失敗（shared.failure と shared.concurrency）と、Idempotency-Key
+ * の誤り（shared.idempotency）を RFC 9457 Problem Details へ変換する。
  */
 // 基底クラスの override と例外ごとの @ExceptionHandler は、1 つの advice に置く必要がある。
-@SuppressWarnings("PMD.TooManyMethods")
+// 対応づける例外の型ごとに結合が増えるため、メソッドの数と結合の数の上限を外す。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -69,15 +71,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(AccessDeniedException.class)
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
-    final Locale locale = resolveLocale(request);
     // Invalid と Missing の親にあたる CsrfException で受け、subtype が増えても専用の type にする。
     if (exception instanceof CsrfException) {
-      return problem(
-          exception, problemDetails.problem(CommonProblem.CSRF_TOKEN_INVALID, locale), request);
+      return problem(exception, CommonProblem.CSRF_TOKEN_INVALID, request);
     }
     if (exception instanceof TenantNotSelectedException) {
-      return problem(
-          exception, problemDetails.problem(CommonProblem.TENANT_NOT_SELECTED, locale), request);
+      return problem(exception, CommonProblem.TENANT_NOT_SELECTED, request);
     }
     return problem(exception, HttpStatus.FORBIDDEN, request);
   }
@@ -100,10 +99,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(ConflictException.class)
   /* package */ @Nullable ResponseEntity<Object> handleConflictException(
       final ConflictException exception, final WebRequest request) {
-    return problem(
-        exception,
-        problemDetails.problem(CommonProblem.forConflict(exception.kind()), resolveLocale(request)),
-        request);
+    return problem(exception, CommonProblem.forConflict(exception.kind()), request);
+  }
+
+  /** Idempotency-Key の誤りを、理由ごとの type の 400 Problem Details へ変換する（ADR-126）。 */
+  @ExceptionHandler(IdempotencyKeyException.class)
+  /* package */ @Nullable ResponseEntity<Object> handleIdempotencyKeyException(
+      final IdempotencyKeyException exception, final WebRequest request) {
+    return problem(exception, CommonProblem.forIdempotencyKey(exception.reason()), request);
   }
 
   /** 見つからない集約や行を 404 Problem Details へ変換する。例外の内容は応答に入れない。 */
@@ -200,6 +203,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
     return super.createResponseEntity(
         body, ApiProblemDetails.responseHeaders(headers, status, locale), status, request);
+  }
+
+  /** モジュールによらない problem で応答する。problem が {@code Retry-After} を持てば付ける。 */
+  private @Nullable ResponseEntity<Object> problem(
+      final Exception exception, final CommonProblem common, final WebRequest request) {
+    final HttpHeaders headers = new HttpHeaders();
+    common
+        .retryAfter()
+        .ifPresent(delay -> headers.set(HttpHeaders.RETRY_AFTER, Long.toString(delay.toSeconds())));
+    return handleExceptionInternal(
+        exception,
+        problemDetails.problem(common, resolveLocale(request)),
+        headers,
+        common.status(),
+        request);
   }
 
   private @Nullable ResponseEntity<Object> problem(

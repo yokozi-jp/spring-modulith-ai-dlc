@@ -1,6 +1,7 @@
 package com.example.demo.ordering.presentation.web;
 
 import com.example.demo.ordering.application.DraftOrderCommand;
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -23,12 +24,13 @@ public record DraftOrderRequest(
     lines = List.copyOf(lines);
   }
 
-  /** Command へ変換する。 */
-  public DraftOrderCommand toCommand() {
+  /** ヘッダーの冪等性キーと合わせて Command へ変換する。 */
+  public DraftOrderCommand toCommand(final IdempotencyKey idempotencyKey) {
     return new DraftOrderCommand(
         customerOrderCode,
         lines.stream()
             .map(line -> new DraftOrderCommand.Line(line.productId().toString(), line.quantity()))
-            .toList());
+            .toList(),
+        idempotencyKey);
   }
 }

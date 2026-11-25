@@ -223,7 +223,7 @@ class LocalDataSeederTest {
         .filter(schema -> !Set.of("modulith", "tenancy").contains(schema.getName()))
         .forEach(schema -> generated.addAll(schema.getTables()));
 
-    assertThat(Set.copyOf(LocalDataSeeder.BUSINESS_TABLES)).isEqualTo(generated);
+    assertThat(Set.copyOf(LocalDataSeeder.RESET_TABLES)).isEqualTo(generated);
   }
 
   @Test

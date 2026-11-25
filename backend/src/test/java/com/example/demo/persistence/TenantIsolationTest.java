@@ -1,5 +1,6 @@
 package com.example.demo.persistence;
 
+import static com.example.demo.jooq.ordering.Tables.T_IDEMPOTENCY_KEY;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static com.example.demo.jooq.product.Tables.M_PRODUCT;
@@ -111,6 +112,20 @@ class TenantIsolationTest {
     void seedOtherTenant() {
       BusinessSeeds.insert(
           dsl, OTHER, new Faker(Locale.ENGLISH, new Random(377L)), UUID::randomUUID, SEEDED_AT);
+      // Idempotency-Key の表は代表データに含めないので、ここで 1 行入れる。
+      AsModule.run(
+          dsl,
+          ORDERING_MODULE,
+          OTHER,
+          tx ->
+              TestCommonColumns.runAs(() ->
+                  tx.insertInto(T_IDEMPOTENCY_KEY)
+                      .set(T_IDEMPOTENCY_KEY.USER_PUBLIC_ID, UUID.randomUUID())
+                      .set(T_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY, UUID.randomUUID())
+                      .set(T_IDEMPOTENCY_KEY.PAYLOAD_HASH, new byte[] {1})
+                      .set(T_IDEMPOTENCY_KEY.EXPIRES_AT, SEEDED_AT)
+                      .set(TestCommonColumns.at(SEEDED_AT).forInsert(T_IDEMPOTENCY_KEY))
+                      .execute()));
     }
 
     @ParameterizedTest(name = "{0}")

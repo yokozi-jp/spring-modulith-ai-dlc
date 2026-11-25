@@ -260,7 +260,7 @@ task be-seed                           # 業務データが空のときだけ代
 業務データが空かの判定とresetの削除は、`tenancy.m_tenant`のテナントごとに、そのテナントを設定して行う。
 業務テーブルはRLSでテナントごとに分かれ、テナントを設定しないまま読むとエラーになるからである（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#全テナントの行を書き換える処理)）。
 
-reset は業務の4表（`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`payment.t_payment`）だけを消す。
+reset は業務テーブルの5表（`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`ordering.t_idempotency_key`、`payment.t_payment`）だけを消す（キーの表を消す理由は[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「保存期間と掃除」）。
 `tenancy`の表、`modulith`の出版の表、Liquibaseの管理表は残す。
 消した注文を指す出版が残ることがあり、手での1回の再投入（`EVENT_PUBLICATION_RESUBMIT_ONCE_TARGET`）で再投入しても注文がないか状態が違うので、決済代行は呼ばれない。
 出版も消したいときは`task compose-reset CONFIRM_RESET=yes`でDBを作り直す。

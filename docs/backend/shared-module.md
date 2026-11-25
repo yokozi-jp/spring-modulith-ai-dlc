@@ -34,13 +34,18 @@ tags: [architecture, backend, spring-modulith, shared-module]
   `JobPeriodRule` 以外のクラスは package-private にする。
   Runner と Aspect の振る舞いは [バッチ](../batch/index.md) に従う。
 - メールアドレスの形式の制約 `MailAddress` を `shared.validation` に置き、このパッケージも `@NamedInterface("validation")` で公開する（[メールアドレスの扱い](../mail/email-address.md#形式の検査)）。
+- `Idempotency-Key` の値 `IdempotencyKey`、それを持つ Command の印 `IdempotentCommand`、CommandHandler が呼ぶ入口 `Idempotency`、クライアントの誤りの例外 `IdempotencyKeyException` を `shared.idempotency` に置き、このパッケージも `@NamedInterface("idempotency")` で公開する（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+  同じキーの処理中は、`shared.concurrency` の `ConflictException` の種類 `IDEMPOTENCY_IN_PROGRESS` で表す。
+  `Idempotency` の実装 `JooqIdempotency` は、キーの表を jOOQ で読むため `shared.persistence` に置き、キーの行の書き込みは同じパッケージの `IdempotencyKeyWriter` が行う。
+  キーの表は、起動のときに jOOQ のカタログからモジュールごとに引き、呼び出し中の CommandHandler の `*_pgm_cd` のモジュールで選ぶ。
+  ヘッダーから `IdempotencyKey` の引数を作る resolver は、HTTP の型を使うため、ベースパッケージ直下の `IdempotencyKeyConfig` に置く。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - 使う場所を限る `shared` のパッケージは、次の 3 つだけである。
   - `shared.persistence`：他のモジュールの `infrastructure.persistence` だけが使ってよい。
   - `shared.eventresubmission`：`shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
   - `shared.batch`：機能モジュールの `batch` だけが使ってよい。
-- ほかの `shared` のパッケージ（`concurrency`、`failure`、`events`、`security`、`tenancy`、`validation`）は、どの層からも使える。
+- ほかの `shared` のパッケージ（`concurrency`、`failure`、`events`、`idempotency`、`security`、`tenancy`、`validation`）は、どの層からも使える。
   使う場所を限る必要が出たときだけ、パッケージを ArchUnit の規則へ足す。
   ただし `domain.model` と `domain.service` が使える `shared` の型は許可リストに限る（[ArchUnit の規則](architecture-tests.md)）。
 

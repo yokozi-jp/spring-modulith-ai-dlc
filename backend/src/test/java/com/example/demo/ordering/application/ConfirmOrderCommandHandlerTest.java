@@ -8,10 +8,12 @@ import com.example.demo.ordering.TestOrders;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.IdempotencyKeys;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
@@ -69,8 +71,12 @@ class ConfirmOrderCommandHandlerTest {
                             dsl,
                             "ordering",
                             tx ->
-                                confirmOrder.handle(
-                                    new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))))
+                                AppUsers.signedIn(() ->
+                                    confirmOrder.handle(
+                                        new ConfirmOrderCommand(
+                                            orderId,
+                                            new ExpectedLockNo(1),
+                                            IdempotencyKeys.next())))))
                 .andWaitForEventOfType(OrderConfirmed.class)
                 .matching(event -> event.orderId().equals(orderId))
                 .toArriveAndVerify(event -> {
@@ -89,8 +95,10 @@ class ConfirmOrderCommandHandlerTest {
     final String orderId = draftedOrderId();
 
     assertThatThrownBy(() ->
-            observed(
-                () -> confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(2)))))
+            observed(() ->
+                confirmOrder.handle(
+                    new ConfirmOrderCommand(
+                        orderId, new ExpectedLockNo(2), IdempotencyKeys.next()))))
         .isInstanceOf(ConflictException.class);
 
     assertThat(events.ofType(OrderConfirmed.class)).as("orderId=%s の発行", orderId).isEmpty();
@@ -100,11 +108,15 @@ class ConfirmOrderCommandHandlerTest {
   @DisplayName("取り消した注文の確定は 422 の例外になり、OrderConfirmed を発行しない")
   void cancelledOrderPublishesNothing(final AssertablePublishedEvents events) {
     final String orderId = draftedOrderId();
-    observed(() -> cancelOrder.handle(new CancelOrderCommand(orderId, new ExpectedLockNo(1))));
+    observed(() ->
+        cancelOrder.handle(
+            new CancelOrderCommand(orderId, new ExpectedLockNo(1), IdempotencyKeys.next())));
 
     assertThatThrownBy(() ->
-            observed(
-                () -> confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(2)))))
+            observed(() ->
+                confirmOrder.handle(
+                    new ConfirmOrderCommand(
+                        orderId, new ExpectedLockNo(2), IdempotencyKeys.next()))))
         .isInstanceOf(BusinessRuleViolationException.class);
 
     assertThat(events.ofType(OrderConfirmed.class)).as("orderId=%s の発行", orderId).isEmpty();
@@ -115,8 +127,8 @@ class ConfirmOrderCommandHandlerTest {
     return TestOrders.drafted(dsl, draftOrder, observationRegistry);
   }
 
-  /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */
+  /** 共通カラムの trace ID を取れるよう、observation の中で、テストの利用者で認証して処理を呼ぶ。 */
   private <T> T observed(final Supplier<T> action) {
-    return Observation.createNotStarted("order-test", observationRegistry).observe(action);
+    return AppUsers.signedInAndObserved(observationRegistry, action);
   }
 }

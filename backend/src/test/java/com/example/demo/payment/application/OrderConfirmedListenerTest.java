@@ -23,6 +23,7 @@ import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.IdempotencyKeys;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.tracing.Span;
 import io.micrometer.tracing.Tracer;
@@ -271,8 +272,10 @@ class OrderConfirmedListenerTest {
   @DisplayName("取り消した注文の OrderConfirmed では請求せず、決済記録を作らず、イベントのテナントを持ち利用者を持たない INFO を記録して出版を完了にする")
   void cancelledOrderIsNotCharged(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
-    fixture.observed(
-        () -> cancelOrder.handle(new CancelOrderCommand(orderId, new ExpectedLockNo(1))));
+    fixture.observed(() ->
+        AppUsers.signedIn(() ->
+            cancelOrder.handle(
+                new CancelOrderCommand(orderId, new ExpectedLockNo(1), IdempotencyKeys.next()))));
 
     // 要求の中で発行したときと同じく、発行するスレッドの MDC に利用者を入れ、Listener へ伝わらないことを確かめる。
     try (MDC.MDCCloseable ignored = MDC.putCloseable("user.id", AppUsers.USER_ID)) {

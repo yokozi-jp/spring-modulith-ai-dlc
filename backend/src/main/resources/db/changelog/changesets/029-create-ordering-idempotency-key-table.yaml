@@ -1,0 +1,150 @@
+databaseChangeLog:
+  - changeSet:
+      id: 029-create-ordering-idempotency-key-table
+      author: system
+      comment: >-
+        ordering モジュールに、Idempotency-Key と保存した CommandHandler の Result の表（t_idempotency_key）を作る（ADR-126、#540）。
+        ADR-126 の主キー（テナント、利用者、キー）は、複合主キーを使わない規約（ADR-112）に合わせ、同じ列の組のユニークインデックスにする。
+        ON CONFLICT はこのユニークインデックスで同じキーを見つける。
+        権限は 012 の既定の権限（ALTER DEFAULT PRIVILEGES）で ordering_module に付く。
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - createTable:
+            tableName: t_idempotency_key
+            schemaName: ordering
+            remarks: 冪等性キー
+            columns:
+              - column:
+                  name: idempotency_key_id
+                  type: bigint
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  remarks: 冪等性キーID
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_t_idempotency_key
+              - column:
+                  name: tenant_public_id
+                  type: uuid
+                  defaultValueComputed: current_setting('app.current_tenant')::uuid
+                  remarks: テナント公開ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_public_id
+                  type: uuid
+                  remarks: 利用者公開ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: idempotency_key
+                  type: uuid
+                  remarks: 冪等性キー
+                  constraints:
+                    nullable: false
+              - column:
+                  name: payload_hash
+                  type: bytea
+                  remarks: ペイロードのハッシュ（操作の名前と Command の SHA-256）
+                  constraints:
+                    nullable: false
+              # 業務の処理を終えるまで NULL で、同じトランザクションで Result を書く。commit した行は必ず Result を持つ。
+              - column:
+                  name: result_json
+                  type: jsonb
+                  remarks: 保存した Result（操作の Result の record の JSON。ADR-126）
+              - column:
+                  name: expires_at
+                  type: timestamptz
+                  remarks: 期限日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  remarks: 作成日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  remarks: 作成者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  remarks: 作成プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  remarks: 作成トレースID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  remarks: 更新日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  remarks: 更新者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  remarks: 更新プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  remarks: 更新トレースID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  remarks: ロック番号
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+                  remarks: データパッチ日時
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+                  remarks: データパッチ作業者
+              - column:
+                  name: patched_id
+                  type: integer
+                  remarks: データパッチ課題番号
+        - createIndex:
+            indexName: uk_t_idempotency_key
+            tableName: t_idempotency_key
+            schemaName: ordering
+            unique: true
+            columns:
+              - column:
+                  name: tenant_public_id
+              - column:
+                  name: user_public_id
+              - column:
+                  name: idempotency_key
+        - sql:
+            sql: |
+              ALTER TABLE ordering.t_idempotency_key ENABLE ROW LEVEL SECURITY;
+              ALTER TABLE ordering.t_idempotency_key FORCE ROW LEVEL SECURITY;
+              CREATE POLICY tenant_isolation ON ordering.t_idempotency_key AS PERMISSIVE FOR ALL TO PUBLIC USING (tenant_public_id = current_setting('app.current_tenant')::uuid);
+      rollback:
+        - dropTable:
+            tableName: t_idempotency_key
+            schemaName: ordering

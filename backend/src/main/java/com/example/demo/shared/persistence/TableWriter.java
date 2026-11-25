@@ -75,7 +75,7 @@ public class TableWriter {
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final ChildRows<?>... childRows) {
-    requireTransaction();
+    requireTransaction(dsl);
     final List<ChildRows<?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
     final long id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
     for (final ChildRows<?> childRow : rows) {
@@ -106,7 +106,7 @@ public class TableWriter {
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final ChildRows<?>... childRows) {
-    requireTransaction();
+    requireTransaction(dsl);
     final K key = aggregate.keyOf(root);
     final long expectedLockNo = root.lockNo();
     final Table<R> table = aggregate.table();
@@ -217,9 +217,9 @@ public class TableWriter {
    * 書き込みは、開いていて読み取り専用でないトランザクションの中でだけ行う。
    *
    * <p>Spring の {@code @Transactional} と、jOOQ の {@code transactionResult}
-   * のどちらで開いたトランザクションも、接続が自動コミットではないことで見分ける。
+   * のどちらで開いたトランザクションも、接続が自動コミットではないことで見分ける。{@link IdempotencyKeyWriter} も使う。
    */
-  private void requireTransaction() {
+  /* package */ static void requireTransaction(final DSLContext dsl) {
     final boolean writable =
         dsl.connectionResult(connection -> !connection.getAutoCommit() && !connection.isReadOnly());
     if (!writable) {
