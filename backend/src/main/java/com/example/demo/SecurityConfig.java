@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
@@ -131,7 +132,14 @@ public class SecurityConfig {
                     referrer -> referrer.policy(ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
                 .permissionsPolicyHeader(permissions ->
                     permissions.policy(
-                        "camera=(), microphone=(), geolocation=(), payment=(), usb=()")))
+                        "camera=(), microphone=(), geolocation=(), payment=(), usb=()"))
+                // Spring Security の既定は includeSubDomains を付ける。
+                // 全 subdomain の HTTPS 化を確認するまで付けない（ADR-014）。
+                .httpStrictTransportSecurity(
+                    hsts -> hsts.maxAgeInSeconds(31_536_000).includeSubDomains(false))
+                // ほかのオリジンのページが API の応答を読み込めないようにする（ADR-132）。
+                .crossOriginResourcePolicy(
+                    corp -> corp.policy(CrossOriginResourcePolicy.SAME_ORIGIN)))
         // 認証が要る要求は SPA の API だけで、SPA が 401 を受けて自分でログインへ遷移する。
         // 既定の要求の保存は Accept のない API の GET を保存し、ログインの後にその JSON へ戻すため、保存しない。
         .requestCache(cache -> cache.requestCache(new NullRequestCache()))

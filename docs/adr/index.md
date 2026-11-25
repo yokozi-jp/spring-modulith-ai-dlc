@@ -15,7 +15,7 @@
 - [ADR-011: モジュール所有のデータベーススキーマを使う](ADR-011-use-module-owned-database-schemas.md)（Proposed, 2026-09-14）
 - [ADR-012: プロパティベーステストとミューテーションテストを採用する](ADR-012-adopt-property-based-and-mutation-testing.md)（Proposed, 2026-09-14）
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, Amended by ADR-117, Amended by ADR-126, 2026-09-14）
-- [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, 2026-09-14）
+- [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, Amended by ADR-132, 2026-09-14）
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, Amended by ADR-110, 2026-09-15）
 - [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, Amended by ADR-047, 2026-09-15）
 - [ADR-017: トランクベース開発とリポジトリ保護を採用する](ADR-017-adopt-trunk-based-repository-governance.md)（Proposed, 2026-09-15）
@@ -131,3 +131,4 @@
 - [ADR-129: 処理済みのメッセージの表を一律に置かず、すべてのリスナーの冪等性を全件の結合テストで確かめる](ADR-129-check-all-listeners-for-idempotency-without-a-uniform-processed-message-table.md)（Proposed, 2026-11-25）
 - [ADR-130: E2E のデータを各テストが作り、商品は本番の商品を登録する API で作る](ADR-130-create-e2e-data-per-test-with-product-registration-api.md)（Proposed, 2026-11-25）
 - [ADR-131: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す](ADR-131-archive-removed-child-rows-in-table-writer.md)（Proposed, 2026-11-25）
+- [ADR-132: 配信するセキュリティヘッダーに CORP と COOP を足し、HSTS を ADR-014 に揃える](ADR-132-add-corp-and-coop-to-delivered-security-headers.md)（Proposed, 2026-11-25）
