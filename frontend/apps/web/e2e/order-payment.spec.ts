@@ -22,29 +22,31 @@ async function attachScreenshot(page: Page, testInfo: TestInfo, name: string): P
   await testInfo.attach(name, { body: await page.screenshot(), contentType: "image/png" });
 }
 
-// 販売中の商品で下書きを作り、確定して、注文 ID と合計金額を返す。確定の前に決済代行の応答を切り替えられる。
+// 販売中の商品で下書きを作り、確定して、注文 ID、客先注文番号、合計金額を返す。確定の前に決済代行の応答を切り替えられる。
 async function createAndConfirm(
   page: Page,
   { product, prefix }: { product: Product; prefix: string },
   beforeConfirm?: (orderId: string) => Promise<void>,
-): Promise<{ orderId: string; total: number }> {
+): Promise<{ orderId: string; code: string; total: number }> {
   const quantity = 2;
-  const orderId = await createOrder(page, {
-    code: uniqueCode(prefix),
-    productName: product.productName,
-    quantity,
-  });
+  const code = uniqueCode(prefix);
+  const orderId = await createOrder(page, { code, productName: product.productName, quantity });
   await beforeConfirm?.(orderId);
   await page.getByRole("button", { name: "確定する" }).click();
   await expect(page.getByText("注文を確定しました。")).toBeVisible();
-  return { orderId, total: product.unitPrice * quantity };
+  return { orderId, code, total: product.unitPrice * quantity };
+}
+
+async function openFromList(page: Page, code: string): Promise<void> {
+  await page.goto("/orders");
+  await page.getByRole("link", { name: `${code} の詳細` }).click();
 }
 
 test("注文を作成し確定すると、Listener が決済代行へ請求し、決済済みと金額を表示する", async ({
   page,
   productFactory,
 }, testInfo) => {
-  const { orderId, total } = await createAndConfirm(page, {
+  const { orderId, code, total } = await createAndConfirm(page, {
     product: await productFactory(),
     prefix: "E2E-PAY",
   });
@@ -58,6 +60,9 @@ test("注文を作成し確定すると、Listener が決済代行へ請求し�
   );
   expect(await chargeRequestCount(page.request, orderId), `orderId=${orderId} の請求`).toBe(1);
   await attachScreenshot(page, testInfo, "paid");
+
+  await openFromList(page, code);
+  await expectPaymentText(page, "決済済み");
 });
 
 // 決済代行を成功に戻した後に読み直しのボタンで読み直しても、決済の欄は再投入待ちのままで、請求は 1 回のままである。
@@ -117,10 +122,12 @@ test("決済代行が拒否すると、拒否を表示する", async ({ page, pr
   const product = await productFactory();
   const restores: (() => Promise<void>)[] = [];
   try {
-    await createAndConfirm(page, { product, prefix: "E2E-DECL" }, async (id) => {
+    const { code } = await createAndConfirm(page, { product, prefix: "E2E-DECL" }, async (id) => {
       restores.push(await failChargesFor(page.request, id, { kind: "declined" }));
     });
 
+    await expectPaymentText(page, "決済代行が決済を拒否しました。");
+    await openFromList(page, code);
     await expectPaymentText(page, "決済代行が決済を拒否しました。");
   } finally {
     await Promise.all(restores.map((restore) => restore()));
@@ -223,8 +230,7 @@ test.describe("一覧と詳細と作成の画面で、注文と商品の状態�
   }) => {
     const code = await createInStatus(page, await productFactory(), "取消済み");
 
-    await page.goto("/orders");
-    await page.getByRole("link", { name: `${code} の詳細` }).click();
+    await openFromList(page, code);
 
     await expectPaymentText(page, "この注文は決済の対象ではありません。");
   });
