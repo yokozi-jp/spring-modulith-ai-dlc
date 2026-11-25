@@ -1,7 +1,7 @@
 package com.example.demo.tenancy.presentation.web;
 
 import com.example.demo.shared.idempotency.IdempotencyKey;
-import com.example.demo.shared.tenancy.TenantContext;
+import com.example.demo.shared.security.TenantNotSelectedException;
 import com.example.demo.tenancy.TenancyQueries;
 import com.example.demo.tenancy.application.ChangeMemberRoleCommandHandler;
 import com.example.demo.tenancy.application.RemoveMemberCommandHandler;
@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,9 +25,7 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * セッションで選んだテナントの所属の HTTP API。テナントの管理者だけが呼べる。
  *
- * <p>対象のテナントは、リクエストの値ではなく、{@link TenantSelectionFilter} がセッションで選んだテナントから束縛した {@link TenantContext}
- * から取る。{@code Idempotency-Key} の行も同じ束縛のテナントで分けるので、キーのテナントと操作のテナントは一致する（ADR-126）。管理者のロールの判定は {@link
- * TenantSecurityCustomizer} が行う。
+ * <p>対象のテナントは、リクエストの値ではなく、セッションで選んだテナントから取る。管理者のロールの判定は {@link TenantSecurityCustomizer} が行う。
  */
 @RestController
 @RequestMapping(CurrentTenantMemberController.PATH)
@@ -60,12 +59,13 @@ class CurrentTenantMemberController {
    *
    * <p>一覧は所属した順に items で包んで返す。lockNo は変更の操作で送り返す。管理者以外には 403 を返す。
    *
+   * @param authentication ログインした利用者の認証
    * @return 所属の一覧
    */
   @Operation(operationId = "listTenantMembers")
   @GetMapping
-  /* package */ TenantMembersDetailsResponse search() {
-    final String tenantId = TenantContext.current().toString();
+  /* package */ TenantMembersDetailsResponse search(final Authentication authentication) {
+    final String tenantId = selectedTenantId(authentication);
     // TenantSelectionFilter が所属を確かめた後なので、選んだテナントは必ずある。なければ実装の不備として 500 にする。
     return tenancyQueries
         .findMembers(tenantId)
@@ -94,8 +94,7 @@ class CurrentTenantMemberController {
       @PathVariable final UUID userId,
       final IdempotencyKey idempotencyKey,
       @Valid @RequestBody final ChangeMemberRoleRequest request) {
-    changeMemberRole.handle(
-        request.toCommand(TenantContext.current().toString(), userId, idempotencyKey));
+    changeMemberRole.handle(request.toCommand(userId, idempotencyKey));
     return ResponseEntity.noContent().build();
   }
 
@@ -119,9 +118,14 @@ class CurrentTenantMemberController {
       @PathVariable final UUID userId,
       final IdempotencyKey idempotencyKey,
       @RequestParam @Min(1) final long lockNo) {
-    removeMember.handle(
-        new RemoveMemberRequest(lockNo)
-            .toCommand(TenantContext.current().toString(), userId, idempotencyKey));
+    removeMember.handle(new RemoveMemberRequest(lockNo).toCommand(userId, idempotencyKey));
     return ResponseEntity.noContent().build();
+  }
+
+  /** セッションで選んだテナントの ID。{@link TenantSelectionFilter} が選ぶ前を拒否するため、ここで空になるのは実装の不備である。 */
+  private static String selectedTenantId(final Authentication authentication) {
+    return TenantSession.selectedTenant(authentication)
+        .map(TenantMembershipAuthority::tenantId)
+        .orElseThrow(() -> new TenantNotSelectedException("tenant not selected"));
   }
 }

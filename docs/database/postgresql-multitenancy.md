@@ -72,13 +72,11 @@ RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけに�
 
 - **`modulith`**：Spring Modulithのイベントの出版とそのarchive、ShedLockとSpring Sessionの表である。
   テナントは、イベントの本文が運ぶ（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
-- **`tenancy`**：テナント、利用者、ID連携、所属の表である。
-  テナントが決まる前に引く。
+- **`tenancy`**：テナント、利用者、ID連携、所属の表と、冪等性キーの表`t_idempotency_key`である。
+  テナント、利用者、ID連携、所属の表は、テナントが決まる前に引く。
+  `t_idempotency_key`の`tenant_public_id`には既定値を付けない。
+  キーの表の文が`tenant_public_id`を`TenantContext`のテナントで書き、読み書きの条件に入れる（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「保存先」）。
   触れるのは`tenancy_module`だけである（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
-
-`tenancy.t_idempotency_key`は`tenant_public_id`を持つが、RLSの外に置き、`tenant_public_id`に既定値を付けない（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「保存先」）。
-`tenancy`のトランザクションはテナントなしで始められ、既定値の`current_setting`がエラーになるためである。
-キーの表の文が`tenant_public_id`を`TenantContext`のテナントで書き、読み書きの条件に入れて、別のテナントの行に当たらないようにする。
 
 ## テナントの設定
 
@@ -109,7 +107,7 @@ SELECT set_config('role', ?, true), set_config('app.current_tenant', ?, true)
 
 ## 全テナントの行を書き換える処理
 
-全テナントの行を書き換える処理（データの移行、開発用の代表データのreset）は、テナントを1つずつ設定して流す。
+業務テーブルの全テナントの行を書き換える処理（データの移行、開発用の代表データのreset）は、テナントを1つずつ設定して流す。
 全テナントの行を読めるロールと、`BYPASSRLS`を持つロールは使わない。
 マイグレーションロールも`FORCE ROW LEVEL SECURITY`でポリシーを受けるため、changesetのデータの移行もテナントを設定して流す。
 

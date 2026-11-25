@@ -19,10 +19,9 @@ public record ChangeMemberRoleRequest(
     @NotNull @Pattern(regexp = "^(ADMIN|MEMBER)$") @Schema(example = "MEMBER") String role,
     @NotNull @Min(1) @Schema(example = "1") long lockNo) {
 
-  /** 選んだテナントの ID、パス変数の利用者の ID、ヘッダーの冪等性キーと合わせて Command へ変換する。 */
-  public ChangeMemberRoleCommand toCommand(
-      final String tenantId, final UUID userId, final IdempotencyKey idempotencyKey) {
+  /** パス変数の利用者の ID、ヘッダーの冪等性キーと合わせて Command へ変換する。 */
+  public ChangeMemberRoleCommand toCommand(final UUID userId, final IdempotencyKey idempotencyKey) {
     return new ChangeMemberRoleCommand(
-        tenantId, userId.toString(), role, new ExpectedLockNo(lockNo), idempotencyKey);
+        userId.toString(), role, new ExpectedLockNo(lockNo), idempotencyKey);
   }
 }

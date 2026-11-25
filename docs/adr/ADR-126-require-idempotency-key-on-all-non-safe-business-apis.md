@@ -40,7 +40,7 @@ Proposed の間に Decision を書き直した。
 [ADR-127](ADR-127-derive-problem-types-from-failure-reasons.md) が problem type の作り方を決めたので、失敗の表現の type をその形に合わせた。
 Pull Request #742 のレビューを受けて、次を足した。
 キーの表の文がテナントを RLS に任せず自分で書くこと、重なったヘッダーの扱い、Controller がキーを受ける形、ペイロードのハッシュが配備をまたぐときの扱い、代表データの reset がキーの表を消す理由である。
-`tenancy` のキーの表を足したときに、reset が消すキーの表を、業務テーブルと同じモジュールのものに限った。
+Pull Request #754 のレビューを受けて、`tenancy` のキーの表に RLS と既定値を付けない理由、期限切れの行を 1 つの文で消すこと、reset が残して古い Result を返しうることを明確にした（reset の対象は変えていない）。
 
 ## Decision
 
@@ -81,9 +81,10 @@ Pull Request #742 のレビューを受けて、次を足した。
 - 列は、ペイロードのハッシュ、保存した Result、期限を持つ。
 - RLS（`ENABLE` と `FORCE`）で別のテナントの行を隠し、自分のモジュールのロールだけに権限を与える。
   別の利用者の行は、このユニークインデックスで分ける。
+  例外として、`tenancy` のキーの表には RLS を付けず、`tenant_public_id` に既定値を付けない。
+  `tenancy` のトランザクションはテナントなしで始められ（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）、そのときポリシーと既定値の `current_setting('app.current_tenant')` がエラーになるので、テナントは文で書く。
 - キーの表の文は、`tenant_public_id` を `TenantContext` のテナントで書き、読み書きの条件に入れる。
-  RLS は重ねた守りにし、RLS のない表でも同じ文で別のテナントの行に当たらないようにする。
-  `tenancy` のスキーマは [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md) が RLS の外に置き、テナントなしでトランザクションを始められるので、`tenancy` のキーの表は RLS を付けない。
+  RLS は重ねた守りにし、RLS のない `tenancy` のキーの表でも、同じ文で別のテナントの行に当たらないようにする。
 - 業務の更新と同じトランザクションに書くので、業務の結果とキーの記録は、一緒に commit されるか一緒に rollback される。
   Servlet の Filter や `HandlerInterceptor` など、トランザクションの外の層には置かない。
 
@@ -128,13 +129,15 @@ Pull Request #742 のレビューを受けて、次を足した。
 ### 保存期間と掃除
 
 - 保存期間は 24 時間とし、docs と OpenAPI に公開する（draft 2.3、2.5.2）。
-- 期限切れの行は、[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) と同じ ShedLock の形の定期のジョブで、テナントごとに消す。
-  ジョブはテナントとモジュールのロールを設定して動かす。
+- 期限切れの行は、[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) と同じ ShedLock の形の定期のジョブで消す。
+  RLS のスキーマのキーの表は、テナントとモジュールのロールを設定して、テナントごとに消す。
+  `tenancy` のキーの表は、RLS がなくテナントを設定しないので、テナントごとに回さず、`tenancy` のロールの 1 つの文で全テナントの行を消す。
 - 期限を過ぎて、まだ消えていない行は無いものとして扱い、同じキーは新しいキーとして受ける。
   取り直した行は、作成のカラムも取り直した操作の値にし、新しいキーを表すようにする。
-- ローカルとテストの代表データの reset は、業務テーブルと一緒に、同じモジュールのキーの表も消す。
+- ローカルとテストの代表データの reset は、`ordering` のキーの表を含む業務テーブルを消す。
   消した注文の作成を、同じキーの再送で返し直さないためである。
-  reset は `tenancy` の表を消さないので、`tenancy` のキーの表も残す。
+  `tenancy` のキーの表は業務テーブルでないので、reset は残す。
+  reset をまたいだ古いキーの再送は、seed が入れ直した所属に対して `tenancy` の操作の古い Result を返しうるが、ローカルとテストのデータに限るので許す。
 
 ### 失敗の表現
 
@@ -183,7 +186,8 @@ type と `title` のキーは [ADR-127](ADR-127-derive-problem-types-from-failur
 - 成功して応答を失った更新を再送しても、409 にならず、1 回目と同じ応答が返る。
 - 付け忘れを Spectral が止める。操作ごとに、キーの要否を判断しなくてよい。
 - キーの記録は業務の更新と同じトランザクションにあるので、記録だけが残る、業務だけが残る、という状態が起きない。
-- キーの表も RLS とモジュールのロールの対象なので、別のテナントと別の利用者の記録に当たらない。
+- RLS のスキーマのキーの表は RLS とモジュールのロールで、`tenancy` のキーの表は各文のテナントの条件で、別のテナントの記録に当たらない。
+  別の利用者の記録には、どちらもユニークインデックスの組で当たらない。
 
 ### Negative
 

@@ -12,10 +12,8 @@ import java.util.UUID;
  */
 public record RemoveMemberRequest(long lockNo) {
 
-  /** 選んだテナントの ID、パス変数の利用者の ID、ヘッダーの冪等性キーと合わせて Command へ変換する。 */
-  public RemoveMemberCommand toCommand(
-      final String tenantId, final UUID userId, final IdempotencyKey idempotencyKey) {
-    return new RemoveMemberCommand(
-        tenantId, userId.toString(), new ExpectedLockNo(lockNo), idempotencyKey);
+  /** パス変数の利用者の ID、ヘッダーの冪等性キーと合わせて Command へ変換する。 */
+  public RemoveMemberCommand toCommand(final UUID userId, final IdempotencyKey idempotencyKey) {
+    return new RemoveMemberCommand(userId.toString(), new ExpectedLockNo(lockNo), idempotencyKey);
   }
 }

@@ -2,6 +2,7 @@ package com.example.demo.tenancy.application;
 
 import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.shared.idempotency.Idempotency;
+import com.example.demo.shared.tenancy.TenantContext;
 import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.domain.model.Role;
 import com.example.demo.tenancy.domain.model.Tenant;
@@ -35,14 +36,14 @@ public class ChangeMemberRoleCommandHandler {
   }
 
   private ChangeMemberRoleResult changeRole(final ChangeMemberRoleCommand command) {
+    final TenantId tenantId = TenantContext.current();
     final Tenant tenant =
         tenantRepository
-            .findById(new TenantId(UUID.fromString(command.tenantId())))
-            .orElseThrow(
-                () -> new NotFoundException("tenant not found: tenantId=" + command.tenantId()));
+            .findById(tenantId)
+            .orElseThrow(() -> new NotFoundException("tenant not found: tenantId=" + tenantId));
     tenant.ensureLockNo(command.expectedLockNo());
     tenant.changeRole(new UserId(UUID.fromString(command.userId())), Role.valueOf(command.role()));
     tenantRepository.update(tenant);
-    return new ChangeMemberRoleResult(command.tenantId(), command.userId());
+    return new ChangeMemberRoleResult(tenantId.toString(), command.userId());
   }
 }

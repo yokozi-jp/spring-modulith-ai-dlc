@@ -28,6 +28,9 @@ final class SchemaTableConventions {
   /** 主キーの規約の文書。 */
   private static final String PRIMARY_KEYS_DOC = "docs/database/postgresql-primary-keys.md";
 
+  /** マルチテナントの規約の文書。 */
+  private static final String MULTITENANCY_DOC = "docs/database/postgresql-multitenancy.md";
+
   /** 禁止する制約の{@code contype}と、規則の記号と内容。PG18の{@code n}（NOT NULL）は含めない。 */
   private static final Map<String, Map.Entry<String, String>> BANNED_CONSTRAINTS =
       Map.of(
@@ -243,18 +246,28 @@ final class SchemaTableConventions {
   }
 
   /**
-   * T13：uuidのDEFAULT。テナントで分ける表のテナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。
+   * T13：uuidのDEFAULT。業務テーブルのテナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。
    *
-   * <p>RLSの外の表は、テナントを設定しないトランザクションでも書くので、テナントの列にも既定値を付けず、文が値を書く。
+   * <p>RLSの外のスキーマのテナントの列は、既定値を付けず、文が値を書く。
    */
   private static void uuidDefault(
       final ColumnRow row, final String target, final List<ConventionViolation> violations) {
     final String defaultExpression = row.defaultExpression();
-    final boolean tenantDefault =
-        TenantIsolation.isTenantScoped(row.schema())
-            && TenantIsolation.TENANT_COLUMN.equals(row.column())
-            && TenantIsolation.CATALOG_TENANT_DEFAULT.equals(defaultExpression);
-    if ("uuid".equals(row.typeName()) && defaultExpression != null && !tenantDefault) {
+    if (!"uuid".equals(row.typeName()) || defaultExpression == null) {
+      return;
+    }
+    final boolean tenantColumn = TenantIsolation.TENANT_COLUMN.equals(row.column());
+    if (tenantColumn && !TenantIsolation.isTenantScoped(row.schema())) {
+      violations.add(
+          new ConventionViolation(
+              "T13",
+              target,
+              "RLSの外のスキーマでは、tenant_public_idのDEFAULT（"
+                  + defaultExpression
+                  + "）を外し、文で値を書く（"
+                  + MULTITENANCY_DOC
+                  + "）。"));
+    } else if (!tenantColumn || !TenantIsolation.CATALOG_TENANT_DEFAULT.equals(defaultExpression)) {
       violations.add(
           new ConventionViolation(
               "T13",
