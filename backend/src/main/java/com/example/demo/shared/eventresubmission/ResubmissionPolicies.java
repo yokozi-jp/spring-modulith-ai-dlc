@@ -2,6 +2,7 @@ package com.example.demo.shared.eventresubmission;
 
 import com.example.demo.shared.events.ListenerIds;
 import com.example.demo.shared.events.ResubmissionPolicy;
+import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.context.event.EventListener;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.modulith.events.AbandonPolicy;
@@ -91,33 +93,31 @@ class ResubmissionPolicies implements AbandonPolicy {
       final ConfigurableListableBeanFactory beanFactory,
       final EventPublicationResubmissionConfig.Properties properties) {
     final Map<String, String> names = new HashMap<>();
-    ListenerIds.beanClasses(beanFactory)
-        .forEach(type ->
-            MethodIntrospector.selectMethods(
-                    type,
-                    (MethodIntrospector.MetadataLookup<ResubmissionPolicy>)
-                        method ->
-                            AnnotatedElementUtils.findMergedAnnotation(
-                                method, ResubmissionPolicy.class))
-                .forEach((method, policy) -> {
-                  if (!properties.policies().containsKey(policy.value())) {
-                    throw new IllegalStateException(
-                        "@ResubmissionPolicy(\""
-                            + policy.value()
-                            + "\") on "
-                            + method
-                            + " is not defined in event-publication.resubmission.policies "
-                            + properties.policies().keySet());
-                  }
-                  final String listenerId =
-                      ListenerIds.fromMethod(method)
-                          .orElseThrow(() ->
-                              new IllegalStateException(
-                                  "@ResubmissionPolicy must be placed on an"
-                                      + " @ApplicationModuleListener method: "
-                                      + method));
-                  names.put(listenerId, policy.value());
-                }));
+    for (final Class<?> type : ListenerIds.beanClasses(beanFactory).toList()) {
+      final Map<Method, ResubmissionPolicy> methods =
+          MethodIntrospector.selectMethods(
+              type,
+              (MethodIntrospector.MetadataLookup<ResubmissionPolicy>)
+                  method ->
+                      AnnotatedElementUtils.findMergedAnnotation(method, ResubmissionPolicy.class));
+      methods.forEach((method, policy) -> {
+        if (!properties.policies().containsKey(policy.value())) {
+          throw new IllegalStateException(
+              "@ResubmissionPolicy(\""
+                  + policy.value()
+                  + "\") on "
+                  + method
+                  + " is not defined in event-publication.resubmission.policies "
+                  + properties.policies().keySet());
+        }
+        if (!AnnotatedElementUtils.hasAnnotation(method, EventListener.class)) {
+          throw new IllegalStateException(
+              "@ResubmissionPolicy must be placed on an @ApplicationModuleListener method: "
+                  + method);
+        }
+        names.put(ListenerIds.fromMethod(method), policy.value());
+      });
+    }
     return names;
   }
 

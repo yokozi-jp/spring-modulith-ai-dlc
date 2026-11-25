@@ -85,8 +85,8 @@ class ResubmissionPoliciesTest {
 
     assertThat(
             policies.nameOf(
-                ListenerIds.fromMethod(PaymentListener.class.getDeclaredMethod("on", String.class))
-                    .orElseThrow(() -> new AssertionError("no listener id: PaymentListener.on"))))
+                ListenerIds.fromMethod(
+                    PaymentListener.class.getDeclaredMethod("on", String.class))))
         .isEqualTo(PAYMENT);
   }
 
@@ -119,8 +119,7 @@ class ResubmissionPoliciesTest {
   @DisplayName("id が空なら、リスナーの ID はメソッドの完全修飾名と引数の型になる")
   void emptyIdFallsBackToQualifiedMethodNameAndParameterTypes() throws NoSuchMethodException {
     final String id =
-        ListenerIds.fromMethod(PaymentListener.class.getDeclaredMethod("on", String.class))
-            .orElseThrow(() -> new AssertionError("no listener id: PaymentListener.on"));
+        ListenerIds.fromMethod(PaymentListener.class.getDeclaredMethod("on", String.class));
 
     assertThat(id).isEqualTo(PaymentListener.class.getName() + ".on(java.lang.String)");
   }

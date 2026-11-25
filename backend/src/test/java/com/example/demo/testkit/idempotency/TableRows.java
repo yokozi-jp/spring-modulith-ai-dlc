@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -23,7 +24,6 @@ import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.SQLDialect;
 import org.jooq.Table;
-import org.jooq.UniqueKey;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.env.Environment;
@@ -34,7 +34,7 @@ import org.springframework.core.env.Environment;
  * <p>所有者の接続で読む。業務の表は所有者にも RLS が効くため、{@code m_tenant} のテナントを 1 つずつ設定して読む。RLS の外の表（{@code
  * tenancy}）はテナントを設定せずに読み、{@code modulith} の表は読まない。表は jOOQ の生成コードから集める。
  *
- * @param slices 表とテナントの組 → 主キーの順の行
+ * @param slices 表とテナントの組 → 行。行の順は比べない
  */
 /* package */ record TableRows(Map<Slice, List<Row>> slices) {
 
@@ -56,6 +56,8 @@ import org.springframework.core.env.Environment;
     }
   }
 
+  // 1 つのスレッドで読み切ってから不変にするため並行の Map は要らず、表とテナントの組ごとに鍵を作るため、ループの中で作る。
+  @SuppressWarnings({"PMD.UseConcurrentHashMap", "PMD.AvoidInstantiatingObjectsInLoops"})
   private static TableRows read(final Connection connection, final DSLContext owner) {
     final List<TenantId> tenants =
         owner
@@ -71,25 +73,22 @@ import org.springframework.core.env.Environment;
             .filter(schema -> !schema.equals(Modulith.MODULITH))
             .flatMap(schema -> schema.getTables().stream())
             .toList();
-    final Stream<Map.Entry<Slice, List<Row>>> exempt =
-        tables.stream()
-            .filter(TableRows::rlsExempt)
-            .map(table -> Map.entry(new Slice(table, new Scope.NoTenant()), fetch(owner, table)));
+    final Map<Slice, List<Row>> bySlice = new HashMap<>();
+    for (final Table<?> table : tables) {
+      if (rlsExempt(table)) {
+        bySlice.put(new Slice(table, new Scope.NoTenant()), fetch(owner, table));
+      }
+    }
     // テナントの設定は接続の状態なので、テナントごとに読み切ってから次のテナントを設定する。
-    final Stream<Map.Entry<Slice, List<Row>>> scoped =
-        tenants.stream()
-            .flatMap(tenant -> {
-              setTenant(connection, tenant);
-              return tables.stream()
-                  .filter(table -> !rlsExempt(table))
-                  .map(table ->
-                      Map.entry(new Slice(table, new Scope.Tenant(tenant)), fetch(owner, table)))
-                  .toList()
-                  .stream();
-            });
-    return new TableRows(
-        Stream.concat(exempt, scoped)
-            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    for (final TenantId tenant : tenants) {
+      setTenant(connection, tenant);
+      for (final Table<?> table : tables) {
+        if (!rlsExempt(table)) {
+          bySlice.put(new Slice(table, new Scope.Tenant(tenant)), fetch(owner, table));
+        }
+      }
+    }
+    return new TableRows(bySlice);
   }
 
   private static boolean rlsExempt(final Table<?> table) {
@@ -106,12 +105,7 @@ import org.springframework.core.env.Environment;
   }
 
   private static List<Row> fetch(final DSLContext owner, final Table<?> table) {
-    final UniqueKey<?> key = table.getPrimaryKey();
-    final List<? extends Record> records =
-        key == null
-            ? owner.selectFrom(table).fetch()
-            : owner.selectFrom(table).orderBy(key.getFields()).fetch();
-    return records.stream().map(Row::from).toList();
+    return owner.selectFrom(table).fetch().stream().map(Row::from).toList();
   }
 
   /** {@code after} との差を、表とテナントごとに、消えた行と現れた行で書く。変わった行は両方に出る。差がなければ空。 */
@@ -199,7 +193,7 @@ import org.springframework.core.env.Environment;
    */
   /* package */ record Row(Map<String, @Nullable Object> columns) {
 
-    private static Row from(final Record record) {
+    /* package */ static Row from(final Record record) {
       final Map<String, @Nullable Object> columns = record.intoMap();
       columns.replaceAll((name, value) -> comparable(value));
       return new Row(columns);

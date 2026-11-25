@@ -1,18 +1,12 @@
 package com.example.demo.testkit.idempotency;
 
 import com.example.demo.shared.events.ListenerIds;
-import com.example.demo.shared.tenancy.TenantId;
-import com.example.demo.tenancy.TestTenancy;
-import com.example.demo.testkit.AppUsers;
-import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.idempotency.Violation.Kind;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import org.jooq.DSLContext;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 
 /**
@@ -23,18 +17,11 @@ import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
  */
 public final class ListenerIdempotencyChecker {
 
-  /** 既定でないほうのテナント。順の 2 回で、テナントを設定せずに読まないことを確かめるために使う。 */
-  public static final TenantId OTHER_TENANT =
-      new TenantId(UUID.fromString("9c1f6a2e-3b4d-4e5f-8a70-1b2c3d4e5f60"));
-
   /** すべての Bean を走査する。 */
   private final ConfigurableListableBeanFactory beanFactory;
 
   /** モジュールの入力例。 */
   private final List<ListenerExample> examples;
-
-  /** テナントを登録する jOOQ のコンテキスト。 */
-  private final DSLContext dsl;
 
   /** 順の 2 回の検査。 */
   private final SequentialCheck sequential;
@@ -45,12 +32,10 @@ public final class ListenerIdempotencyChecker {
   /* package */ ListenerIdempotencyChecker(
       final ConfigurableListableBeanFactory beanFactory,
       final List<ListenerExample> examples,
-      final DSLContext dsl,
       final SequentialCheck sequential,
       final ConcurrentCheck concurrent) {
     this.beanFactory = beanFactory;
     this.examples = List.copyOf(examples);
-    this.dsl = dsl;
     this.sequential = sequential;
     this.concurrent = concurrent;
   }
@@ -93,19 +78,11 @@ public final class ListenerIdempotencyChecker {
 
   /** 前提を 2 つのテナントに作り、既定でないほうのテナントのイベントを順に 2 回届けて比べる。 */
   public List<Violation> checkSequential(final ListenerExample example) {
-    ensureTenants();
     return sequential.run(example);
   }
 
   /** 前提を作り、1 回目をコミットの直前で止めたまま 2 回目を届けて競合させ、1 回だけ届けたときと比べる。 */
   public List<Violation> checkConcurrent(final ListenerExample example) {
-    ensureTenants();
     return concurrent.run(example);
-  }
-
-  /** 既定のテナントと既定でないほうのテナントを {@code m_tenant} に登録する。業務の表は {@code m_tenant} のテナントごとに読むためである。 */
-  private void ensureTenants() {
-    Stream.of(AsTenant.TENANT, OTHER_TENANT)
-        .forEach(tenant -> TestTenancy.member(dsl, AppUsers.USER_ID, tenant.value(), "MEMBER"));
   }
 }

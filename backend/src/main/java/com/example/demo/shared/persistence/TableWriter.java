@@ -8,7 +8,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
-import java.util.function.Function;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -19,6 +18,7 @@ import org.jooq.Record1;
 import org.jooq.Result;
 import org.jooq.Table;
 import org.jooq.TableField;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -81,7 +81,7 @@ public class TableWriter {
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final ChildRows<?>... childRows) {
-    insertAggregate(aggregate, root, rootColumns, childRows, step -> step);
+    insertAggregate(aggregate, root, rootColumns, childRows, null);
   }
 
   /**
@@ -108,12 +108,7 @@ public class TableWriter {
       final List<? extends TableField<R, ?>> conflictTarget,
       final Consumer<ColumnValues<R>> rootColumns,
       final ChildRows<?>... childRows) {
-    return insertAggregate(
-        aggregate,
-        root,
-        rootColumns,
-        childRows,
-        step -> step.onConflict(conflictTarget).doNothing());
+    return insertAggregate(aggregate, root, rootColumns, childRows, conflictTarget);
   }
 
   /**
@@ -198,32 +193,37 @@ public class TableWriter {
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final ChildRows<?>[] childRows,
-      final Function<InsertSetMoreStep<R>, InsertReturningStep<R>> onConflict) {
+      final @Nullable List<? extends TableField<R, ?>> conflictTarget) {
     requireTransaction();
     final List<ChildRows<?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
-    final Optional<Long> id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns, onConflict);
+    final Optional<Long> id =
+        insertRoot(aggregate, aggregate.keyOf(root), rootColumns, conflictTarget);
     id.ifPresent(inserted -> rows.forEach(childRow -> children.insertAll(inserted, childRow)));
     return id.isPresent();
   }
 
-  /** ルートを INSERT し、RETURNING で受けた内部の主キーを返す。衝突で入れなかったら空を返す。 */
+  /**
+   * ルートを INSERT し、RETURNING で受けた内部の主キーを返す。
+   *
+   * @param conflictTarget 衝突を許す一意索引の列。{@code null} なら衝突を許さない
+   * @return 内部の主キー。{@code conflictTarget} の衝突で入れなかったら空
+   */
   private <R extends Record, K> Optional<Long> insertRoot(
       final AggregateTable<R, K, ?> aggregate,
       final K key,
       final Consumer<ColumnValues<R>> rootColumns,
-      final Function<InsertSetMoreStep<R>, InsertReturningStep<R>> onConflict) {
+      final @Nullable List<? extends TableField<R, ?>> conflictTarget) {
     final Table<R> table = aggregate.table();
     final ColumnValues<R> values = collect(aggregate, rootColumns);
+    final InsertSetMoreStep<R> insert =
+        dsl.insertInto(table)
+            .set(aggregate.key(), key)
+            .set(values.values())
+            .set(commonColumns.forInsert(table));
+    final InsertReturningStep<R> step =
+        conflictTarget == null ? insert : insert.onConflict(conflictTarget).doNothing();
     return ConflictTranslator.executeOrConflict(
-        () ->
-            onConflict
-                .apply(
-                    dsl.insertInto(table)
-                        .set(aggregate.key(), key)
-                        .set(values.values())
-                        .set(commonColumns.forInsert(table)))
-                .returningResult(aggregate.id())
-                .fetchOptional(Record1::value1),
+        () -> step.returningResult(aggregate.id()).fetchOptional(Record1::value1),
         () -> "table=" + table.getName() + ", key=" + key);
   }
 

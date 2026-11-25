@@ -43,8 +43,7 @@ public class ListenerIdempotencyConfig {
     return new ListenerIdempotencyChecker(
         beanFactory,
         examples.orderedStream().toList(),
-        dsl,
-        new SequentialCheck(registry, calls, environment),
-        new ConcurrentCheck(registry, gate, calls, environment));
+        new SequentialCheck(dsl, registry, calls, environment),
+        new ConcurrentCheck(dsl, registry, gate, calls, environment));
   }
 }

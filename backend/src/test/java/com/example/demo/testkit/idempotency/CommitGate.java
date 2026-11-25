@@ -7,6 +7,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -31,17 +32,27 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * にする。
  *
  * <p>止めた配信は、届いた順に 1 つずつ通す（公平な {@link Semaphore}）。通す許可が届く前に出ていれば、届いた配信は待たずに通る。止めるのは、テストが通すか、{@link
- * #HOLD_LIMIT} を過ぎるまでである。過ぎたら例外でロールバックさせる。上限は、止めたトランザクションを {@code
- * idle_in_transaction_session_timeout}（テストは 10 秒）が切るより短くする。
+ * #HOLD_LIMIT} を過ぎるまでである。過ぎたら例外でロールバックさせる。
  */
 @Aspect
 @Order(Ordered.LOWEST_PRECEDENCE)
 /* package */ final class CommitGate {
 
-  /** 1 回の配信を止める上限。 */
+  /**
+   * 1 回の配信を止める上限。検査のほかの時間の上限は、この値から導く。
+   *
+   * <p>止めたトランザクションを {@code idle_in_transaction_session_timeout}（テストは {@code
+   * DB_IDLE_IN_TRANSACTION_TIMEOUT_MS} の 10 秒）が切ると、門で諦める前に接続が切られ、失敗の理由が変わる。そのため、それより短くする。
+   */
   /* package */ static final Duration HOLD_LIMIT = Duration.ofSeconds(5);
 
-  /** 止めた配信のセッションの ID を読む jOOQ のコンテキスト。リスナーのトランザクションの接続で読む。 */
+  /**
+   * 門を開けるときに足す許可の数。開けた後の {@link Hold#releaseNext} が許可の上限（{@link
+   * Integer#MAX_VALUE}）を超えないよう、上限の半分にする。
+   */
+  private static final int OPEN_PERMITS = Integer.MAX_VALUE / 2;
+
+  /** 止めた配信のセッションの ID と、その ID を待つセッションを読む jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
   /** 閉じている門。開いていれば {@code null}。 */
@@ -53,7 +64,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
   /** 門を閉じ、そのリスナーの配信を、届くたびにコミットの直前で止める。閉じたままの門は開けてから閉じ直す。 */
   /* package */ Hold close(final ListenerId listener) {
-    final Hold hold = new Hold(listener);
+    final Hold hold = new Hold(listener, dsl);
     final @Nullable Hold previous = closed.getAndSet(hold);
     if (previous != null) {
       previous.open();
@@ -97,7 +108,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
     }
   }
 
-  /** 今のトランザクションの接続の、PostgreSQL のセッションの ID。 */
+  /** 今のトランザクションの接続の、PostgreSQL のセッションの ID。リスナーのトランザクションの接続で読む。 */
   private int backendPid() {
     return dsl.select(DSL.function(DSL.name("pg_backend_pid"), Integer.class))
         .fetchSingle()
@@ -109,6 +120,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
     /** 止める対象のリスナー。 */
     private final ListenerId listener;
+
+    /** 止めた配信を待つセッションを読む jOOQ のコンテキスト。 */
+    private final DSLContext dsl;
 
     /** 止めた配信を通す許可。届いた順に通すため公平にする。 */
     private final Semaphore commits = new Semaphore(0, true);
@@ -122,8 +136,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
     /** 対象のリスナーが投げた例外。 */
     private final Queue<Throwable> thrown = new ConcurrentLinkedQueue<>();
 
-    private Hold(final ListenerId listener) {
+    /** 開けたか。許可を一度だけ足すために使う。 */
+    private final AtomicBoolean opened = new AtomicBoolean();
+
+    private Hold(final ListenerId listener, final DSLContext dsl) {
       this.listener = listener;
+      this.dsl = dsl;
     }
 
     /** コミットの直前に届いた配信の数。 */
@@ -136,12 +154,29 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
      *
      * @throws IllegalStateException まだ届いた配信がない場合
      */
-    /* package */ int firstPid() {
+    private int firstPid() {
       final @Nullable Integer pid = arrivedPids.peek();
       if (pid == null) {
         throw new IllegalStateException("no delivery has reached the commit gate: " + listener);
       }
       return pid;
+    }
+
+    /**
+     * 最初にコミットの直前に届いた配信が持つロックを待っているセッションの数。待ち先で絞り、無関係なロックの待ちを数えない。
+     *
+     * @throws IllegalStateException まだ届いた配信がない場合
+     */
+    /* package */ int waitersOnFirst() {
+      return dsl.fetchCount(
+          DSL.table(DSL.name("pg_catalog", "pg_stat_activity")),
+          DSL.val(firstPid())
+              .eq(
+                  DSL.any(
+                      DSL.function(
+                          DSL.name("pg_catalog", "pg_blocking_pids"),
+                          Integer[].class,
+                          DSL.field(DSL.name("pid"), Integer.class)))));
     }
 
     /** 止めている配信のうち、最も早く届いたものを通す。まだ届いていなければ、次に届く配信を通す。 */
@@ -159,9 +194,11 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
       return thrown.stream().map(Throwable::toString).toList();
     }
 
-    /** 止めている配信と、これから届く配信をすべて通す。許可を上限まで足し、何度呼んでも溢れさせない。 */
+    /** 止めている配信と、これから届く配信をすべて通す。許可は最初の 1 回だけ足す。 */
     private void open() {
-      commits.release(Integer.MAX_VALUE - commits.availablePermits());
+      if (opened.compareAndSet(false, true)) {
+        commits.release(OPEN_PERMITS);
+      }
     }
 
     // 止めている間に割り込まれたら、割り込みの状態を戻してロールバックさせる。

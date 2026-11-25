@@ -34,8 +34,7 @@ tags: [convention, integration, async, idempotency, future-arch-guidelines]
 
 - **一意索引の `INSERT ... ON CONFLICT DO NOTHING`**：入れた行が 0 件なら処理済みとする。
 - **`lock_no` を WHERE に書く `TableWriter.update`**：楽観的ロックの更新である（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
-  `TableWriter.update` は 0 件の更新を `ConflictException`（種類 `version`）にする。
-  CommandHandler はこの種類の例外を catch して集約を読み直し、操作が済んでいれば処理済みとする。
+  更新した行が 0 件なら、集約を読み直して処理済みかを決める。
 - **`SELECT ... FOR UPDATE` の後の判定**：行をロックしてから状態を読み、処理済みかを決める。
 
 ロックを取らない SELECT で判定しない（`order.isPaid()` を見るだけで済ませる、など）。
@@ -44,11 +43,17 @@ tags: [convention, integration, async, idempotency, future-arch-guidelines]
 全件の結合テストの同時の 2 回は、この書き方のリスナーを失敗にする（[非同期処理のテスト](async-testing.md)の「冪等性のテスト」）。
 ロックを取らない先読みは、外部システムの呼び出しを省く最適化としてだけ使い、判定は上の三つのどれかで行う。
 
-一意索引の衝突と 0 件の更新は、例外にせず、処理済みとして正常に終える。
-例外にすると、イベント出版が `FAILED` に残る。
+INSERT の衝突と、WHERE に版を書く UPDATE の 0 件は、処理済みとして正常に終え、例外をリスナーの外へ出さない。
+例外を出すと、イベント出版が `FAILED` に残る。
 2 回目の配信が毎回同じ衝突で失敗する書き方では、定期の再投入が方針の回数の上限まで失敗を繰り返し、出版は `ABANDONED` で archive の表へ移る（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-一意制約の違反（SQLSTATE `23505`）を catch して続けることはできない。
-PostgreSQL は違反した時点でトランザクションを中断し、以後の文を受け付けないためである。
+
+処理済みとして終える書き方は、判定の操作で違う。
+`INSERT ... ON CONFLICT DO NOTHING` の衝突は例外にならず、入れた行の数で分かる。
+一方、`TableWriter.update` は 0 件の更新を `ConflictException`（種類 `version`）にする。
+CommandHandler は種類 `version` だけを catch し、同じトランザクションで集約を読み直して、操作が済んでいれば処理済みとして終える。
+0 件の更新は SQL の失敗ではないため、PostgreSQL のトランザクションは続けられる。
+種類 `unique`（一意制約の違反、SQLSTATE `23505`）と種類 `lock`（`55P03`）は catch して続けない。
+PostgreSQL は SQL が失敗した時点でトランザクションを中断し、以後の文を受け付けないためである。
 
 ### 処理済みのメッセージ ID の表の形
 

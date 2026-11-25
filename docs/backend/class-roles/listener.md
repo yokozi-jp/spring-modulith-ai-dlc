@@ -168,11 +168,14 @@ class OrderPlacedListenerTest {
 全件の結合テスト `ListenerIdempotencyTest` は、すべての Listener に同じイベントを順に 2 回と同時に 2 回届け、入力例のない Listener があると失敗する（[非同期処理のテスト](../../integration/async-testing.md)の「冪等性のテスト」）。
 Listener を足したら、次の手順で入力例を足す。
 
-1. 受信する側のモジュールのテストのパッケージに、`testkit.idempotency` の `ListenerExample` を実装するクラスを置き、テストの Bean にする。
-2. `listener()` で、足した Listener のリスナーの ID を返す。
-3. `prepare(TenantId tenant)` で、引数のテナントに前提の状態を呼ぶたびに新しく作り、そのテナントのイベントを返す。
+1. 受信する側のモジュールのテストのパッケージに、`testkit.idempotency` の `ListenerExample` を実装するクラスを置く（`payment.application` の `OrderConfirmedListenerExample`）。
+2. そのクラスを、`ListenerIdempotencyTest` の `@Import` に足す。
+   テストは入力例を Spring の文脈の Bean として集めるため、`@Import` に足さない入力例は使われず、Listener が入力例のない違反になる。
+3. `listener()` で `ListenerId.forListener(<Listener>.class)` を返す。
+   `forListener` は、Listener のただ 1 つの `@ApplicationModuleListener` のメソッドから、イベント出版の `listener_id` と同じ ID を作る。
+4. `prepare(TenantId tenant)` で、引数のテナントに前提の状態を呼ぶたびに新しく作り、そのテナントのイベントを返す。
    前提は、Listener が業務の本筋の処理を通る状態にする（`OrderConfirmedListener` なら、確定した注文）。
-4. `cd backend && ./gradlew test --tests '*ListenerIdempotencyTest'` を実行し、足した Listener の ID を挙げた失敗が出ないことを確かめる。
+5. `cd backend && ./gradlew test --tests '*ListenerIdempotencyTest'` を実行し、足した Listener の ID を挙げた失敗が出ないことを確かめる。
 
 脇の道を通る前提（取り消した注文など）を選ぶと、1 回目の配信が行を変えずにテストが失敗するか、1 行だけ変えて本筋の重複を確かめずに通る。
 
@@ -266,7 +269,7 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 - [ ] 発行側のモジュールのルートのイベントだけを使い、内部パッケージの型を使わない。［Spring Modulith で検査：ApplicationModuleArchitectureTest］
 - [ ] 名前をイベントの名前に `Listener` を付けた形にし、イベントごとに一つ作る。［自分で点検］
 - [ ] 他のクラスから呼ばず、interface も実装しない。［ArchUnit で検査：ClassRoleArchTest.listenersAreNotCalled、ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces］
-- [ ] 呼ぶ CommandHandler は、重複を DB が直列にする操作（`INSERT ... ON CONFLICT DO NOTHING`、`lock_no` を WHERE に書く `TableWriter.update`、`SELECT ... FOR UPDATE` の後の判定）で判定し、衝突と 0 件の更新を処理済みとして正常に終える。［結合テストで検査：ListenerIdempotencyTest］
+- [ ] 呼ぶ CommandHandler は、重複を DB が直列にする操作（`INSERT ... ON CONFLICT DO NOTHING`、`lock_no` を WHERE に書く `TableWriter.update`、`SELECT ... FOR UPDATE` の後の判定）で判定し、重複を処理済みとして正常に終える（`TableWriter.update` の 0 件の更新は、種類 `version` の `ConflictException` だけを catch して読み直す）。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] 同じイベントの 2 回目の配信は、外部システムを呼ばないか、1 回目と同じ引数で呼ぶ。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] Listener の入力例を足す。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] 入力例の前提が、Listener の業務の本筋の処理を通る（脇の道で 1 行だけ変えて通していない）。［自分で点検］

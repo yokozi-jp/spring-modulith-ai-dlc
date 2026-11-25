@@ -22,13 +22,10 @@ public record Violation(ListenerId listener, Kind kind, String detail) {
     FIRST_DELIVERY_CHANGED_NOTHING,
     /** 順の 2 回目の配信が業務の表の行を足す、消す、変える。 */
     SECOND_DELIVERY_CHANGED_ROWS,
-    /**
-     * 出版が待つ上限までに完了（archive）にならない。順の 2 回では {@code FAILED} も含む。同時の 2 回の {@code FAILED} は {@link
-     * #CONCURRENT_DELIVERY_FAILED} にする。
-     */
+    /** 配信が例外で終わり、出版が {@code FAILED} か {@code ABANDONED} になる。順の 2 回と同時の 2 回で共通である。 */
+    DELIVERY_FAILED,
+    /** 出版が、待つ上限までに完了（archive の {@code COMPLETED}）にも失敗にもならない。 */
     PUBLICATION_NOT_COMPLETED,
-    /** 同時の 2 回のどちらかが例外で終わり、出版が {@code FAILED} に残る。 */
-    CONCURRENT_DELIVERY_FAILED,
     /** 同時の 2 回の後の業務の表が、1 回だけ届けたときと違う。 */
     CONCURRENT_RESULT_DIFFERS,
     /** 外部システムの呼び出しの組の集合が、1 回だけ届けたときと違う。 */
@@ -36,7 +33,9 @@ public record Violation(ListenerId listener, Kind kind, String detail) {
     /** 同時の 2 回の 1 回目が、コミットの直前の門で止まらない。止めずに競合を作ったことにすると、検査が偽の合格を返す。 */
     FIRST_NOT_HELD,
     /** 同時の 2 回の 2 回目が、待つ上限までに 1 回目のロックを待たず、門にも届かず、失敗もしない。 */
-    SECOND_NOT_CONTENDED
+    SECOND_NOT_CONTENDED,
+    /** 同時の 2 回で 1 回目をコミットさせた後、2 回目が待つ上限までにコミットの直前に届かず、失敗もしない。 */
+    SECOND_NOT_AT_COMMIT
   }
 
   /** {@code violated} なら違反を返す。説明は違反のときだけ作る。 */

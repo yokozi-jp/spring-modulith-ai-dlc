@@ -145,9 +145,8 @@ class FailedPublicationGaugesTest {
     final String listenerId =
         "once".equals(listener)
             ? ListenerIds.fromMethod(
-                    ResubmissionProbes.OnceProbeListener.class.getDeclaredMethod(
-                        "on", ResubmissionProbes.OnceProbe.class))
-                .orElseThrow(() -> new AssertionError("no listener id: OnceProbeListener.on"))
+                ResubmissionProbes.OnceProbeListener.class.getDeclaredMethod(
+                    "on", ResubmissionProbes.OnceProbe.class))
             : listener;
     final UUID id =
         ResubmissionTestSupport.insertPublication(

@@ -15,6 +15,10 @@ public final class AsTenant {
   /** テストの利用者が選ぶテナント。{@link AppUsers#TENANT_ID} と同じ値である。 */
   public static final TenantId TENANT = new TenantId(UUID.fromString(AppUsers.TENANT_ID));
 
+  /** {@link #TENANT} でないテナント。2 つのテナントの行を比べるテストが使う。 */
+  public static final TenantId OTHER_TENANT =
+      new TenantId(UUID.fromString("9c1f6a2e-3b4d-4e5f-8a70-1b2c3d4e5f60"));
+
   private AsTenant() {}
 
   /** 束縛中のテナントの文字列を返す。束縛していなければ {@code unbound} を返す。 */

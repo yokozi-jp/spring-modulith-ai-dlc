@@ -2,7 +2,6 @@ package com.example.demo.shared.events;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
@@ -30,22 +29,24 @@ public final class ListenerIds {
    * リスナーのメソッドの ID を返す。
    *
    * @param method {@code @ApplicationModuleListener} を付けたメソッド。proxy でなく元のクラスのメソッドを渡す
-   * @return リスナーの ID。メソッドに {@code @EventListener}（{@code @ApplicationModuleListener} が含む）がなければ空
+   * @return リスナーの ID
+   * @throws IllegalArgumentException メソッドに
+   *     {@code @EventListener}（{@code @ApplicationModuleListener} が含む）がない場合
    */
-  public static Optional<String> fromMethod(final Method method) {
+  public static String fromMethod(final Method method) {
     final @Nullable EventListener listener =
         AnnotatedElementUtils.findMergedAnnotation(method, EventListener.class);
     if (listener == null) {
-      return Optional.empty();
+      throw new IllegalArgumentException("not an @ApplicationModuleListener method: " + method);
     }
     if (!listener.id().isEmpty()) {
-      return Optional.of(listener.id());
+      return listener.id();
     }
     final StringJoiner parameters = new StringJoiner(",", "(", ")");
     for (final Class<?> type : method.getParameterTypes()) {
       parameters.add(type.getName());
     }
-    return Optional.of(ClassUtils.getQualifiedMethodName(method) + parameters);
+    return ClassUtils.getQualifiedMethodName(method) + parameters;
   }
 
   /**

@@ -164,8 +164,7 @@ class EventPublicationResubmitterTest {
     assertThat(listenerId)
         .isEqualTo(
             ListenerIds.fromMethod(
-                    ProbeListener.class.getDeclaredMethod("on", ResubmissionProbe.class))
-                .orElseThrow(() -> new AssertionError("no listener id: ProbeListener.on")));
+                ProbeListener.class.getDeclaredMethod("on", ResubmissionProbe.class)));
     assertThat(policies.nameOf(listenerId)).isEqualTo(ResubmissionProbes.PROBE_POLICY);
     assertThat(policies.nameOf("unknown.Listener.on(java.lang.Object)")).isEqualTo("default");
   }

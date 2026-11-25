@@ -2,6 +2,8 @@ package com.example.demo.testkit.idempotency;
 
 import static com.example.demo.testkit.idempotency.PublicationRegistry.COMPLETION_TIMEOUT;
 
+import com.example.demo.tenancy.TestTenancy;
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.idempotency.ExternalCallRecorder.ExternalCall;
 import com.example.demo.testkit.idempotency.PublicationRegistry.Publications;
@@ -10,13 +12,19 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.jooq.DSLContext;
 import org.springframework.core.env.Environment;
 
 /**
- * 順の 2 回の検査。前提を 2 つのテナントに作り、既定でないほうのテナント（{@link ListenerIdempotencyChecker#OTHER_TENANT}）のイベントを順に 2
- * 回届け、両方のテナントの行と外部システムの呼び出しを比べる。
+ * 順の 2 回の検査。前提を 2 つのテナントに作り、{@link AsTenant#OTHER_TENANT} のイベントを順に 2 回届け、両方のテナントの行と外部システムの呼び出しを比べる。
  */
 /* package */ final class SequentialCheck {
+
+  /** 違反の説明の、出版の状態の欄。 */
+  private static final String REGISTRY = ", registry=";
+
+  /** テナントを登録する jOOQ のコンテキスト。 */
+  private final DSLContext dsl;
 
   /** 出版と、出版の状態の読み取り。 */
   private final PublicationRegistry registry;
@@ -28,18 +36,27 @@ import org.springframework.core.env.Environment;
   private final Environment environment;
 
   /* package */ SequentialCheck(
+      final DSLContext dsl,
       final PublicationRegistry registry,
       final ExternalCallRecorder calls,
       final Environment environment) {
+    this.dsl = dsl;
     this.registry = registry;
     this.calls = calls;
     this.environment = environment;
   }
 
+  /**
+   * 前提を作り、同じ本文のイベントを順に 2 回届けて比べる。
+   *
+   * <p>前提を作る 2 つのテナントを {@code m_tenant} に登録する。業務の表は {@code m_tenant} のテナントごとに読むためである。
+   */
   /* package */ List<Violation> run(final ListenerExample example) {
+    Stream.of(AsTenant.TENANT, AsTenant.OTHER_TENANT)
+        .forEach(tenant -> TestTenancy.member(dsl, AppUsers.USER_ID, tenant.value(), "MEMBER"));
     final ListenerId listener = example.listener();
     example.prepare(AsTenant.TENANT);
-    final Object event = example.prepare(ListenerIdempotencyChecker.OTHER_TENANT);
+    final Object event = example.prepare(AsTenant.OTHER_TENANT);
     calls.reset();
     final TableRows before = TableRows.read(environment);
     final Publications start = registry.read(listener);
@@ -49,12 +66,16 @@ import org.springframework.core.env.Environment;
         registry.await(listener, COMPLETION_TIMEOUT, state -> state.settledSince(start) > 0);
     final TableRows afterFirst = TableRows.read(environment);
     final Set<ExternalCall> callsFirst = calls.distinct();
-    if (!first.completedOnceSince(start)) {
-      return List.of(
-          new Violation(
-              listener,
-              Kind.PUBLICATION_NOT_COMPLETED,
-              "first delivery: event=" + event + ", registry=" + first.since(start)));
+    final Optional<Violation> firstUnsettled =
+        first
+            .unsettledSince(start, 1)
+            .map(kind ->
+                new Violation(
+                    listener,
+                    kind,
+                    "first delivery: event=" + event + REGISTRY + first.describeSince(start)));
+    if (firstUnsettled.isPresent()) {
+      return firstUnsettled.stream().toList();
     }
 
     registry.publish(event);
@@ -68,11 +89,16 @@ import org.springframework.core.env.Environment;
                 listener,
                 Kind.FIRST_DELIVERY_CHANGED_NOTHING,
                 () -> "event=" + event + " changed no row in any tenant"),
-            Violation.when(
-                !second.completedOnceSince(first),
-                listener,
-                Kind.PUBLICATION_NOT_COMPLETED,
-                () -> "second delivery: event=" + event + ", registry=" + second.since(first)),
+            second
+                .unsettledSince(first, 1)
+                .map(kind ->
+                    new Violation(
+                        listener,
+                        kind,
+                        "second delivery: event="
+                            + event
+                            + REGISTRY
+                            + second.describeSince(first))),
             secondDiff.map(diff ->
                 new Violation(
                     listener,

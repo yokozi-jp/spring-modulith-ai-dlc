@@ -10,11 +10,9 @@ import com.example.demo.testkit.AsModule;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
-import java.util.function.Function;
 import org.jooq.DSLContext;
 import org.jooq.InsertSetMoreStep;
 import org.jooq.Record1;
-import org.jooq.ResultQuery;
 import org.jooq.SelectConditionStep;
 
 /**
@@ -71,18 +69,16 @@ import org.jooq.SelectConditionStep;
   /**
    * 決済の状態を読み、{@code DECLINED} なら {@link #addOne} する。
    *
-   * @param lock 状態を読む SELECT に、ロックを付けるか（{@code SELECT ... FOR UPDATE}）を決める
+   * @param lock 状態を {@code SELECT ... FOR UPDATE} で読むか。{@code false} ならロックを取らずに読む
    */
   /* package */ static void addOneIfDeclined(
-      final DSLContext dsl,
-      final UUID paymentId,
-      final Function<SelectConditionStep<Record1<String>>, ResultQuery<Record1<String>>> lock) {
+      final DSLContext dsl, final UUID paymentId, final boolean lock) {
+    final SelectConditionStep<Record1<String>> select =
+        dsl.select(T_PAYMENT.PAYMENT_STATUS_TYP)
+            .from(T_PAYMENT)
+            .where(T_PAYMENT.PUBLIC_ID.eq(paymentId));
     final String status =
-        lock.apply(
-                dsl.select(T_PAYMENT.PAYMENT_STATUS_TYP)
-                    .from(T_PAYMENT)
-                    .where(T_PAYMENT.PUBLIC_ID.eq(paymentId)))
-            .fetchSingle(T_PAYMENT.PAYMENT_STATUS_TYP);
+        (lock ? select.forUpdate() : select).fetchSingle(T_PAYMENT.PAYMENT_STATUS_TYP);
     if (DECLINED.equals(status)) {
       addOne(dsl, paymentId);
     }
