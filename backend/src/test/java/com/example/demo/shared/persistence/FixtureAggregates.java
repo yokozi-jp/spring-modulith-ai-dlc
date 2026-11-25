@@ -1,5 +1,6 @@
 package com.example.demo.shared.persistence;
 
+import static com.example.demo.jooq.tables.FixtureItemDetailArchiveTable.FIXTURE_ITEM_DETAIL_ARCHIVE;
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 
@@ -20,6 +21,15 @@ final class FixtureAggregates {
       AggregateTable.of(
           FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, DETAILS);
 
+  /** 削除前の行を履歴の表に残す子。 */
+  /* package */ static final ChildTable<Record> ARCHIVED_DETAILS =
+      DETAILS.archivedTo(FIXTURE_ITEM_DETAIL_ARCHIVE);
+
+  /** 削除前の子の行を残す集約。 */
+  /* package */ static final AggregateTable<Record, Long, Item> ITEM_ARCHIVING =
+      AggregateTable.of(
+          FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, ARCHIVED_DETAILS);
+
   /** 子を持たない集約。 */
   /* package */ static final AggregateTable<Record, Long, Item> ITEM_ONLY =
       AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID);
@@ -39,6 +49,15 @@ final class FixtureAggregates {
   /** 明細番号と文言を子の列に書く、{@link #DETAILS} の全行を作る。 */
   /* package */ static ChildRows<Record> detailRows(final List<Detail> details) {
     return DETAILS.rows(
+        details,
+        (detail, set) ->
+            set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())
+                .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, detail.text()));
+  }
+
+  /** {@link #ARCHIVED_DETAILS} の全行を作る。 */
+  /* package */ static ChildRows<Record> archivedDetailRows(final List<Detail> details) {
+    return ARCHIVED_DETAILS.rows(
         details,
         (detail, set) ->
             set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())

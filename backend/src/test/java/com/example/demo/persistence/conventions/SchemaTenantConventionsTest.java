@@ -233,6 +233,15 @@ class SchemaTenantConventionsTest {
     }
 
     @Test
+    @DisplayName("K1：履歴の表（h_）は、参照先の主キーと同じ名前の列に外部キーを求めない")
+    void skipsHistoryTables() {
+      final List<ColumnRow> history =
+          List.of(new ColumnRow(TENANCY, "h_membership", USER_ID, BIGINT, "b", "", "", null, true));
+
+      assertThat(SchemaTenantConventions.foreignKeys(relations, history, List.of())).isEmpty();
+    }
+
+    @Test
     @DisplayName("K1：テナントで分ける表の単独の列の外部キーと、RLSの外の表の複合の外部キーを拒否する")
     void rejectsForeignKeysOfTheWrongShape() {
       final List<ConstraintRow> constraints =

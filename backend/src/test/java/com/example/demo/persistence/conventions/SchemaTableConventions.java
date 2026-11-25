@@ -156,6 +156,7 @@ final class SchemaTableConventions {
             .collect(Collectors.toSet());
     return columns.stream()
         .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
+        .filter(row -> !SchemaConventions.isHistoryTable(row.table()))
         .filter(row -> !isAllowedIdColumn(row, primaryKeys))
         .map(row ->
             new ConventionViolation(

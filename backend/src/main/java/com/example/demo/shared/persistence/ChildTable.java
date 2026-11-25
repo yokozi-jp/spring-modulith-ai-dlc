@@ -3,6 +3,7 @@ package com.example.demo.shared.persistence;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
@@ -10,6 +11,7 @@ import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.TableField;
+import org.jspecify.annotations.Nullable;
 
 /**
  * 集約の子のテーブルの宣言。Repository がクラスの定数として一度だけ書く（ADR-054）。
@@ -37,13 +39,18 @@ public final class ChildTable<C extends Record> {
   /** 親の中で行を同定する列。一つ以上。 */
   private final List<TableField<C, ?>> naturalKey;
 
+  /** 削除する前の行を残す履歴の表。残さない子は {@code null}。 */
+  private final @Nullable Table<?> archive;
+
   private ChildTable(
       final Table<C> table,
       final TableField<C, Long> parentKey,
-      final List<TableField<C, ?>> naturalKey) {
+      final List<TableField<C, ?>> naturalKey,
+      final @Nullable Table<?> archive) {
     this.table = table;
     this.parentKey = parentKey;
     this.naturalKey = List.copyOf(naturalKey);
+    this.archive = archive;
   }
 
   /**
@@ -66,7 +73,31 @@ public final class ChildTable<C extends Record> {
     naturalKey.add(firstKey);
     naturalKey.addAll(List.of(moreKeys));
     naturalKey.forEach(ChildTable::requireComparableType);
-    return new ChildTable<>(table, parentKey, naturalKey);
+    return new ChildTable<>(table, parentKey, naturalKey, null);
+  }
+
+  /**
+   * 子の行を削除する前に、履歴の表へ写すようにする（ADR-129）。
+   *
+   * <p>履歴の表は、子のテーブルのすべての列（共通カラムを含む）を同じ名前と型で持ち、退避のカラム（{@code archived_at}、{@code archived_by}、{@code
+   * archived_pgm_cd}、{@code archived_tx_id}）を持つ。子の主キーと自然キーに一意制約を付けず、同じ子を作り直して消しても書ける形にする。
+   *
+   * @param archive 履歴の表
+   * @throws IllegalArgumentException 子のテーブルの列か退避のカラムがない、または型が異なる場合
+   */
+  public ChildTable<C> archivedTo(final Table<?> archive) {
+    for (final Field<?> field : table.fields()) {
+      final @Nullable Field<?> archived = archive.field(field.getName());
+      if (archived == null || !field.getType().equals(archived.getType())) {
+        throw new IllegalArgumentException(
+            "archive column is missing or has an unexpected type: archive="
+                + archive.getName()
+                + ", column="
+                + field.getName());
+      }
+    }
+    CommonColumns.requireArchiveColumns(archive);
+    return new ChildTable<>(table, parentKey, naturalKey, archive);
   }
 
   /**
@@ -111,6 +142,10 @@ public final class ChildTable<C extends Record> {
               + ", type="
               + field.getType().getSimpleName());
     }
+  }
+
+  /* package */ Optional<Table<?>> archive() {
+    return Optional.ofNullable(archive);
   }
 
   /* package */ Table<C> table() {

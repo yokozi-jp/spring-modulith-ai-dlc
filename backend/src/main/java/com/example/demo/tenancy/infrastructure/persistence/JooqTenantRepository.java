@@ -1,5 +1,6 @@
 package com.example.demo.tenancy.infrastructure.persistence;
 
+import static com.example.demo.jooq.tenancy.Tables.H_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
 import static com.example.demo.jooq.tenancy.Tables.M_USER;
@@ -28,9 +29,14 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JooqTenantRepository implements TenantRepository {
 
-  /** テナントの所属。親の中の行は、利用者の内部の主キーで同定する（所属は利用者とテナントの組が一意）。 */
+  /**
+   * テナントの所属。親の中の行は、利用者の内部の主キーで同定する（所属は利用者とテナントの組が一意）。
+   *
+   * <p>所属を外すと、誰がどの役割でいつまで所属していたかが消えるため、外す前の行を h_membership に残す（ADR-129）。
+   */
   private static final ChildTable<MMembershipRecord> MEMBERSHIPS =
-      ChildTable.of(M_MEMBERSHIP, M_MEMBERSHIP.TENANT_ID, M_MEMBERSHIP.USER_ID);
+      ChildTable.of(M_MEMBERSHIP, M_MEMBERSHIP.TENANT_ID, M_MEMBERSHIP.USER_ID)
+          .archivedTo(H_MEMBERSHIP);
 
   /** テナントの集約。ルートは公開 ID で一つに決める。 */
   private static final AggregateTable<MTenantRecord, UUID, Tenant> TENANT =

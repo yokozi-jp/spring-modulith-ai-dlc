@@ -105,6 +105,17 @@ final class SchemaConventions {
   }
 
   /**
+   * 履歴の表（接頭辞{@code
+   * h_}）か。履歴の表は、削除した行を写して残すため、子の列と同じ名前の列を持ち、参照先の行が消えても残す外部キーなしの列にする（ADR-129）。P3とK1は判定しない。
+   *
+   * @param table テーブル名
+   * @return 履歴の表なら{@code true}
+   */
+  /* package */ static boolean isHistoryTable(final String table) {
+    return table.startsWith("h_");
+  }
+
+  /**
    * O1：業務スキーマに関数とプロシージャを作らない。
    *
    * @param rows 拡張機能が所有しない関数とプロシージャ

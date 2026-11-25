@@ -25,6 +25,7 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 | `tenancy.m_user`                     | マスタ         | 未定（[#672]）                                                                             | 含まない                                         |
 | `tenancy.m_user_identity`            | マスタ         | 未定（[#672]）                                                                             | 含む（`issuer_url`、`subject_code`）             |
 | `tenancy.m_membership`               | マスタ         | 未定（[#672]）                                                                             | 含まない                                         |
+| `tenancy.h_membership`               | 履歴           | 未定（[#672]）                                                                             | 含まない                                         |
 | `product.m_product`                  | マスタ         | 無期限                                                                                     | 含まない                                         |
 | `ordering.t_order`                   | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
 | `ordering.t_order_line`              | トラン         | 未定（[#671]）                                                                             | 含まない                                         |

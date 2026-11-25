@@ -4,6 +4,7 @@
 package com.example.demo.jooq.tenancy;
 
 
+import com.example.demo.jooq.tenancy.tables.HMembership;
 import com.example.demo.jooq.tenancy.tables.MMembership;
 import com.example.demo.jooq.tenancy.tables.MTenant;
 import com.example.demo.jooq.tenancy.tables.MUser;
@@ -24,6 +25,11 @@ import javax.annotation.processing.Generated;
 )
 @SuppressWarnings({ "all", "unchecked", "rawtypes", "this-escape" })
 public class Tables {
+
+    /**
+     * 所属履歴
+     */
+    public static final HMembership H_MEMBERSHIP = HMembership.H_MEMBERSHIP;
 
     /**
      * 所属

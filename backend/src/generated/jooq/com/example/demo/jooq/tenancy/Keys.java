@@ -4,10 +4,12 @@
 package com.example.demo.jooq.tenancy;
 
 
+import com.example.demo.jooq.tenancy.tables.HMembership;
 import com.example.demo.jooq.tenancy.tables.MMembership;
 import com.example.demo.jooq.tenancy.tables.MTenant;
 import com.example.demo.jooq.tenancy.tables.MUser;
 import com.example.demo.jooq.tenancy.tables.MUserIdentity;
+import com.example.demo.jooq.tenancy.tables.records.HMembershipRecord;
 import com.example.demo.jooq.tenancy.tables.records.MMembershipRecord;
 import com.example.demo.jooq.tenancy.tables.records.MTenantRecord;
 import com.example.demo.jooq.tenancy.tables.records.MUserIdentityRecord;
@@ -41,6 +43,7 @@ public class Keys {
     // UNIQUE and PRIMARY KEY definitions
     // -------------------------------------------------------------------------
 
+    public static final UniqueKey<HMembershipRecord> PK_H_MEMBERSHIP = Internal.createUniqueKey(HMembership.H_MEMBERSHIP, DSL.name("pk_h_membership"), new TableField[] { HMembership.H_MEMBERSHIP.MEMBERSHIP_HISTORY_ID }, true);
     public static final UniqueKey<MMembershipRecord> PK_M_MEMBERSHIP = Internal.createUniqueKey(MMembership.M_MEMBERSHIP, DSL.name("pk_m_membership"), new TableField[] { MMembership.M_MEMBERSHIP.MEMBERSHIP_ID }, true);
     public static final UniqueKey<MTenantRecord> PK_M_TENANT = Internal.createUniqueKey(MTenant.M_TENANT, DSL.name("pk_m_tenant"), new TableField[] { MTenant.M_TENANT.TENANT_ID }, true);
     public static final UniqueKey<MUserRecord> PK_M_USER = Internal.createUniqueKey(MUser.M_USER, DSL.name("pk_m_user"), new TableField[] { MUser.M_USER.USER_ID }, true);

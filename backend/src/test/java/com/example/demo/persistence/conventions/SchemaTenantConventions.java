@@ -194,6 +194,7 @@ final class SchemaTenantConventions {
     final Stream<ConventionViolation> missing =
         columns.stream()
             .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
+            .filter(row -> !SchemaConventions.isHistoryTable(row.table()))
             .filter(row -> primaryKeyColumns.contains(row.schema() + "." + row.column()))
             .filter(row -> !row.column().equals(primaryKeys.get(row.schema() + "." + row.table())))
             .filter(row ->

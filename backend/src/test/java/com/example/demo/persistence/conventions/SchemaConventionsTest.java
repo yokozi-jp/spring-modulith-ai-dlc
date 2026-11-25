@@ -485,6 +485,26 @@ class SchemaConventionsTest {
     }
 
     @Test
+    @DisplayName("P3：履歴の表（h_）は、子の列と同じ名前の列と退避のトレースの列を判定しない")
+    void skipsHistoryTables() {
+      assertThat(
+              SchemaTableConventions.references(
+                  List.of(relation(ITEM, "r", true, null)),
+                  List.of(
+                      new ColumnRow(
+                          ITEM,
+                          "h_item",
+                          "archived_tx_id",
+                          "character varying(32)",
+                          "b",
+                          "",
+                          "",
+                          null),
+                      new ColumnRow(ITEM, "h_item", "order_id", BIGINT, "b", "", "", null))))
+          .isEmpty();
+    }
+
+    @Test
     @DisplayName("P3：別のスキーマの主キーと同じ名前の列を、同じモジュールの参照とみなさない")
     void rejectsColumnsNamedAfterAnotherSchemasPrimaryKey() {
       assertThat(

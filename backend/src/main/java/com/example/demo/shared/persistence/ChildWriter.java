@@ -6,6 +6,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
@@ -74,15 +75,56 @@ import org.jspecify.annotations.Nullable;
     insertChildren(child, rootId, added);
   }
 
-  /** なくなった子を、自然キーの組で削除する。 */
+  /** なくなった子を、自然キーの組で削除する。履歴の表がある子は、削除の前に同じ条件の行を写す。 */
   private <C extends Record> void deleteChildren(
       final ChildTable<C> child, final long rootId, final List<List<Object>> removed) {
     final Table<C> table = child.table();
     final Condition removedKeys =
         DSL.or(removed.stream().map(naturalKey -> naturalKeyCondition(child, naturalKey)).toList());
+    final Condition condition = child.parentKey().eq(rootId).and(removedKeys);
+    final Supplier<String> target = () -> childTarget(table, rootId);
+    child
+        .archive()
+        .ifPresent(archive -> archiveChildren(table, archive, condition, removed.size(), target));
     ConflictTranslator.executeOrConflict(
-        () -> dsl.deleteFrom(table).where(child.parentKey().eq(rootId).and(removedKeys)).execute(),
-        () -> childTarget(table, rootId));
+        () -> dsl.deleteFrom(table).where(condition).execute(), target);
+  }
+
+  /**
+   * 削除する子の行を、退避の日時、者、プログラム、トレースと一緒に履歴の表へ 1 文で写す。写した行数が削除する行数と違えば、削除の前に失敗させる。
+   *
+   * <p>写す文と削除の文は同じトランザクションで実行するため、片方だけが成功しない。
+   */
+  private void archiveChildren(
+      final Table<?> table,
+      final Table<?> archive,
+      final Condition condition,
+      final int expected,
+      final Supplier<String> target) {
+    final List<Field<?>> columns = new ArrayList<>();
+    final List<Field<?>> values = new ArrayList<>();
+    for (final Field<?> field : table.fields()) {
+      columns.add(archive.field(field.getName()));
+      values.add(field);
+    }
+    commonColumns
+        .forArchive(archive)
+        .forEach((field, value) -> {
+          columns.add(field);
+          values.add(DSL.val(value, field));
+        });
+    final int archived =
+        ConflictTranslator.executeOrConflict(
+            () ->
+                dsl.insertInto(archive)
+                    .columns(columns)
+                    .select(dsl.select(values).from(table).where(condition))
+                    .execute(),
+            target);
+    if (archived != expected) {
+      throw new IllegalStateException(
+          "archived " + archived + " child rows, expected " + expected + ": " + target.get());
+    }
   }
 
   /**

@@ -110,6 +110,15 @@ public class CommonColumns {
   }
 
   /**
+   * 履歴の表が、退避のカラム（{@code archived_*}）をすべて持つことを確かめる。
+   *
+   * @throws IllegalArgumentException カラムがない、または型が異なる場合
+   */
+  /* package */ static void requireArchiveColumns(final Table<?> archive) {
+    AuditValues.fields(archive, "archived_");
+  }
+
+  /**
    * 集約のテーブルが、{@link TableWriter} の書く共通カラムをすべて持つことを確かめる。
    *
    * @throws IllegalArgumentException カラムがない、または型が異なる場合
@@ -119,6 +128,15 @@ public class CommonColumns {
     for (final String prefix : List.of("created_", "updated_")) {
       AuditValues.fields(table, prefix);
     }
+  }
+
+  /**
+   * 削除する行を写す履歴の表へ、退避のカラム（{@code archived_*}）に登録する値を返す。
+   *
+   * @param archive 履歴の表
+   */
+  /* package */ Map<Field<?>, Object> forArchive(final Table<?> archive) {
+    return toMap(audit().entries(archive, "archived_"));
   }
 
   /**
@@ -202,8 +220,8 @@ public class CommonColumns {
   private record AuditValues(Instant at, String by, String pgmCd, String txId) {
 
     /**
-     * 接頭辞（{@code created_} か {@code updated_}）の 4 列を、{@code at}、{@code by}、{@code pgm_cd}、{@code
-     * tx_id} の順で返す。
+     * 接頭辞（{@code created_}、{@code updated_}、{@code archived_} のどれか）の 4 列を、{@code at}、{@code
+     * by}、{@code pgm_cd}、{@code tx_id} の順で返す。
      */
     private static List<Field<?>> fields(final Table<?> table, final String prefix) {
       return List.of(
@@ -213,7 +231,7 @@ public class CommonColumns {
           requiredField(table, prefix + "tx_id", String.class));
     }
 
-    /** 接頭辞（{@code created_} か {@code updated_}）のカラムと値の組を返す。 */
+    /** 接頭辞（{@code created_}、{@code updated_}、{@code archived_} のどれか）のカラムと値の組を返す。 */
     private Stream<Entry<Field<?>, Object>> entries(final Table<?> table, final String prefix) {
       final List<Field<?>> fields = fields(table, prefix);
       final List<Object> values = List.of(at, by, pgmCd, txId);
