@@ -64,7 +64,7 @@ node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journey
 ```
 
 `drive.mjs` は Chromium を起動し、Keycloak の画面から `.env.test` の `E2E_USERNAME`（`test-user`）でログインしてから journey を呼ぶ。
-Playwright と E2E の補助（`frontend/apps/web/e2e/` の `environment.ts`、`payment-gateway.ts`、`orders.ts`）は、そのまま import する。
+Playwright と E2E の補助（`frontend/apps/web/e2e/` の `environment.ts`、`payment-gateway.ts`、`api.ts`、`fixtures.ts` の `uniqueCode`、画面のクラス `order-*-page.ts`）は、そのまま import する。
 代表データを読む補助は、E2E ではなくこの skill の `scripts/seeded.mjs` にある。
 `/collect` は E2E と同じく 202 で返す（compose-test に Collector がない）。
 
@@ -75,7 +75,8 @@ journey は ESM の 1 ファイルで、既定の export の関数が次を受�
 - **`webOrigin`、`idpOrigin`**：slot の SPA の origin（`http://localhost:<web のポート>`）と Keycloak の origin（`http://127.0.0.1:<Keycloak のポート>`）。journey に 5173 や 8081 を書かない
 - **`request`**：`@playwright/test` の `request`（`request.newContext({ baseURL })` で Cookie を共有しない要求を作る）
 - **`step(label, page?)`**：その時点の screenshot と ARIA snapshot を `NN-<label>.png`、`NN-<label>.aria.yml` に残す
-- **`orders`**：`e2e/orders.ts` の export すべて（操作の補助、画面の文言）と、`scripts/seeded.mjs` の export すべて（代表の注文の表、`listProducts`、`onSaleProduct`）
+- **`screensOf(page)`**：その page の画面のクラス `{ create, list, detail }`（`e2e/order-create-page.ts`、`order-list-page.ts`、`order-detail-page.ts`）。別のタブには、そのタブの page を渡して作る
+- **`orders`**：`e2e/api.ts` の `listPayments`、`readJson`、`e2e/fixtures.ts` の `uniqueCode`と、`scripts/seeded.mjs` の export すべて（代表の注文の表、`listProducts`、`onSaleProduct`）
 - **`gateway.chargeCount`**：決済代行の WireMock が、注文 ID を冪等性キーにした請求を受けた回数（`e2e/payment-gateway.ts`）
 - **`gateway.failChargesFor`**：注文 ID の請求だけを `{ kind: "status" | "delay" | "declined" }` で失敗させ、取り除く関数を返す
 - **`sql(query, options?)`**：モジュールのロールで SQL を実行し、結果の文字列を返す（`sql.log` にも残す）

@@ -1,8 +1,8 @@
 import type { APIRequestContext } from "@playwright/test";
 
+import { readJson } from "./api.ts";
 import { paymentGatewayUrl } from "./environment.ts";
 import { expect } from "./fixtures.ts";
-import { readJson } from "./orders.ts";
 
 // 決済代行の WireMock に足す失敗と拒否（ADR-072）。
 // status は応答の status、delay は成功の応答を遅らせる時間、declined は 201 の DECLINED の拒否。

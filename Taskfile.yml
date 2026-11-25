@@ -649,7 +649,7 @@ tasks:
       # e2e の補助は、Playwright の外から Node が直接 import する（検証スキルの drive.mjs）。相対の import に拡張子がないと、ここでしか壊れない。
       - |
         E2E_USERNAME=check E2E_PASSWORD=check PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:1 \
-          node --input-type=module -e 'for (const file of ["environment", "fixtures", "orders", "payment-gateway"]) await import(`./apps/web/e2e/${file}.ts`)'
+          node --input-type=module -e 'for (const file of ["environment", "fixtures", "api", "order-create-page", "order-list-page", "order-detail-page", "payment-gateway"]) await import(`./apps/web/e2e/${file}.ts`)'
 
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査

@@ -30,12 +30,13 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
 `frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/products`）で商品を作る `productFactory` を持つ。
-`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts` は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
-`task fe-check` が、この 4 つを Node で import できることを確かめる。
-`frontend/apps/web/e2e/orders.ts` は、注文の作成の画面の操作と、決済の欄の文言の確認（`expectPaymentText`）を持つ。
+`frontend/apps/web/e2e/api.ts` は、公開 API の応答の本文を読む `readJson` と、注文の決済記録を読む `listPayments` を持つ。
+`environment.ts`、`fixtures.ts`、`api.ts`、`payment-gateway.ts` と、画面のクラス（`order-create-page.ts`、`order-list-page.ts`、`order-detail-page.ts`）は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
+`task fe-check` が、この 7 つを Node で import できることを確かめる。
+画面の操作と文言は、[ページオブジェクト](#ページオブジェクト)に従い、画面ごとのクラスに置く。
 決済の欄は、確定した注文に決済記録がない間、確定から 15 秒まで 1 秒ごとに自分で読み直し、その間は処理中を出す。
 期間が過ぎても記録がなければ再投入待ちを出し、読み直しのボタンを出す。
-`expectPaymentText` は画面を読み直さず、欄の文言が変わるのを最大 30 秒待つ。
+決済の欄の文言を待つ spec は、画面を読み直さず、`OrderDetailPage` の `paymentStatus` が変わるのを `paymentTextTimeoutMs`（30 秒）まで待つ。
 再投入しないことの確認は、画面を読み直さずに読み直しのボタンを押す。
 
 業務の流れの spec は次の 2 つである。
@@ -69,7 +70,7 @@ E2E は開発用のシーダー（`LocalDataSeeder`）の代表データを使�
 - `productFactory` は、テストの page（共有の `storageState` でログインし、テナントを選んだ状態）の Cookie で、商品を登録する API（`POST /api/products`）を呼ぶ。
   CSRF の token（`__Host-XSRF-TOKEN` の値を `X-XSRF-TOKEN` に付ける）と `Idempotency-Key` は `productFactory` の中でだけ付ける。
   `page.request` は CSRF の token を自分では付けないので、spec が `page.request` で直接送る更新の要求は 403 になる（`order-payment.spec.ts` が確かめる）。
-- 他のテストと衝突しないよう、客先注文番号には `uniqueCode` で一意な値を含める。
+- 他のテストと衝突しないよう、客先注文番号には `fixtures.ts` の `uniqueCode` で一意な値を含める。
   一覧には並列のテストのデータも並ぶので、自分の商品名と客先注文番号で絞って数える。
 - 共有するのは、テナントと所属（`task e2e-up` が `task be-seed-tenancy` で入れる）と、Keycloak の利用者（`docker/keycloak/realm.json`）だけである。
   共有のデータは読むだけにし、変更しない。
@@ -126,6 +127,27 @@ setup project は、`storageState` を持たない browser context で `/oauth2/
 - Lint はルートの `frontend/vite.config.ts` の設定で `vp check` が検査する。
   Playwright Test の API に当たる vitest plugin の規則だけを `apps/web/e2e/**` で外している（[フロントエンドのLint設定](../frontend/lint-config.md#ファイルの範囲ごとの制限)）。
   `apps/web/e2e/**` からもテレメトリの SDK（`@grafana/*`）を import できない。
+
+## ページオブジェクト
+
+画面の操作と要素の探し方は、画面ごとのクラス（ページオブジェクト）に置く。
+spec は `new` せず、`fixtures.ts` の `test.extend` が注入する fixture（`orderCreatePage`、`orderListPage`、`orderDetailPage`）で受け取る。
+
+- クラスは、画面の操作のメソッドと、要素の Locator と、画面の文言を持つ。
+  文言は、その画面のクラスの中に置く。
+  Locator は、上の「書き方」のとおり role と accessible name で探す。
+- アサーションは spec に置く。
+  クラスは「何を操作するか」を持ち、「何を確かめるか」は持たない。
+  `expect` を呼ばないので、クラスは `fixtures.ts` を import しない。
+- 別のタブで同じ画面を開くときは、クラスのメソッド（`OrderDetailPage.openInNewTab`）が同じクラスの新しいインスタンスを返す。
+  spec が `new` で作らない。
+- クラスは `Page` だけを受け取り、`Page` を公開しない。
+  `page.request` や screenshot が要る spec は、`page` fixture を別に受け取る。
+- 複数の画面が使う部品（明細の表、決済の欄など）は、画面のクラスが共有するなら別のクラス（Component Object）に分ける。
+  今は、同じ部品を使う画面が 1 つなので分けていない。
+- 注文の画面以外の spec（ログイン、ログアウト、トップページ）は、`pages.ts` の関数のままである。
+  その spec を変更するときに、画面のクラスへ移す。
+- Screenplay は導入しない。spec は 7 本で、画面のクラスで足りる。
 
 ## 不安定なテスト
 

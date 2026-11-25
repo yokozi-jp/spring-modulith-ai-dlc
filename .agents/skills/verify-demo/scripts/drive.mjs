@@ -25,7 +25,18 @@ const e2e = (file) => import(pathToFileURL(join(web, "e2e", file)).href);
 // 資格情報と決済代行の URL は .env.test から e2e/environment.ts が読み、なければ止まる。
 const { chooseSeededTenant, idpOrigin, signInOnKeycloak, webOrigin } = await e2e("environment.ts");
 const { chargeRequestCount, failChargesFor } = await e2e("payment-gateway.ts");
-const orders = { ...(await e2e("orders.ts")), ...(await import("./seeded.mjs")) };
+const { listPayments, readJson } = await e2e("api.ts");
+const { uniqueCode } = await e2e("fixtures.ts");
+const { OrderCreatePage } = await e2e("order-create-page.ts");
+const { OrderListPage } = await e2e("order-list-page.ts");
+const { OrderDetailPage } = await e2e("order-detail-page.ts");
+const orders = { listPayments, readJson, uniqueCode, ...(await import("./seeded.mjs")) };
+// 画面ごとのページオブジェクト（e2e/order-*-page.ts）。page ごとに作る。
+const screensOf = (target) => ({
+  create: new OrderCreatePage(target),
+  list: new OrderListPage(target),
+  detail: new OrderDetailPage(target),
+});
 
 const [journeyArg, ...rest] = process.argv.slice(2);
 if (journeyArg === undefined) {
@@ -115,7 +126,7 @@ try {
   // ログインそのものを確かめる journey は export const login = false で自分でログインする。
   if (journey.login !== false) await login();
   await journey.default({
-    page, context, expect, step, gateway, sql, login, orders, params, webOrigin, idpOrigin,
+    page, context, expect, step, gateway, sql, login, orders, screensOf, params, webOrigin, idpOrigin,
     request,
     record: (key, value) => (result.records[key] = value),
   });

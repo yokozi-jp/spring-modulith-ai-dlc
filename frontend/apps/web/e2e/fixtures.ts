@@ -3,6 +3,9 @@ import { test as base } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 import { findCookie } from "./environment.ts";
+import { OrderCreatePage } from "./order-create-page.ts";
+import { OrderDetailPage } from "./order-detail-page.ts";
+import { OrderListPage } from "./order-list-page.ts";
 
 export interface Product {
   productId: string;
@@ -10,6 +13,11 @@ export interface Product {
   productName: string;
   unitPrice: number;
   onSale: boolean;
+}
+
+// 並列のテストと衝突しない客先注文番号。上限の 30 文字に収める。
+export function uniqueCode(prefix: string): string {
+  return `${prefix}-${crypto.randomUUID().slice(0, 18)}`;
 }
 
 async function createProduct(
@@ -42,6 +50,9 @@ async function createProduct(
 // page.route は context.route より優先されるので、spec ごとに上書きできる。
 export const test = base.extend<{
   productFactory: (options?: { onSale?: boolean; unitPrice?: number }) => Promise<Product>;
+  orderCreatePage: OrderCreatePage;
+  orderListPage: OrderListPage;
+  orderDetailPage: OrderDetailPage;
 }>({
   context: async ({ context }, provide) => {
     await context.route("**/collect", (route) => route.fulfill({ status: 202 }));
@@ -49,6 +60,15 @@ export const test = base.extend<{
   },
   productFactory: async ({ page }, provide) => {
     await provide((options) => createProduct(page, options));
+  },
+  orderCreatePage: async ({ page }, provide) => {
+    await provide(new OrderCreatePage(page));
+  },
+  orderListPage: async ({ page }, provide) => {
+    await provide(new OrderListPage(page));
+  },
+  orderDetailPage: async ({ page }, provide) => {
+    await provide(new OrderDetailPage(page));
   },
 });
 export { expect } from "@playwright/test";
