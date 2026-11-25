@@ -106,7 +106,7 @@ import org.jooq.impl.DSL;
   /**
    * 1 つのテナントの、期限を過ぎた行を {@code limit} 行まで消す。
    *
-   * <p>消す行の選び方は {@link #deleteWhere} と同じである。
+   * <p>消す行の選び方は {@link #deleteMatching} と同じである。
    *
    * @return 消した行の数
    * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
@@ -117,20 +117,20 @@ import org.jooq.impl.DSL;
       final UUID tenant,
       final Instant now,
       final int limit) {
-    return deleteWhere(dsl, keys, keys.tenant().eq(tenant).and(keys.expiresAt().le(now)), limit);
+    return deleteMatching(dsl, keys, keys.tenant().eq(tenant).and(keys.expiresAt().le(now)), limit);
   }
 
   /**
    * 全テナントの、期限を過ぎた行を {@code limit} 行まで消す。RLS の外の表だけに使う。
    *
-   * <p>消す行の選び方は {@link #deleteWhere} と同じである。
+   * <p>消す行の選び方は {@link #deleteMatching} と同じである。
    *
    * @return 消した行の数
    * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
    */
   /* package */ static int deleteExpiredInAllTenants(
       final DSLContext dsl, final IdempotencyKeyTable keys, final Instant now, final int limit) {
-    return deleteWhere(dsl, keys, keys.expiresAt().le(now), limit);
+    return deleteMatching(dsl, keys, keys.expiresAt().le(now), limit);
   }
 
   /**
@@ -139,7 +139,7 @@ import org.jooq.impl.DSL;
    * <p>消す行は {@code SELECT ... FOR UPDATE SKIP LOCKED} で選ぶ。{@link #claim}
    * が取り直している行はロックされているので飛ばし、取り直して commit した行は期限が延びているので選ばない。
    */
-  private static int deleteWhere(
+  private static int deleteMatching(
       final DSLContext dsl, final IdempotencyKeyTable keys, final Condition due, final int limit) {
     TableWriter.requireTransaction(dsl);
     return dsl.deleteFrom(keys.table())
