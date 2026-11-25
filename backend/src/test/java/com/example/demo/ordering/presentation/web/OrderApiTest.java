@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -237,20 +236,18 @@ class OrderApiTest {
   }
 
   @ParameterizedTest(name = "商品が販売終了で存在する={0}")
-  @ValueSource(booleans = {false, true})
-  @DisplayName("明細の変更で存在しない商品か販売終了の商品を指定すると 422 を返し、注文を変えない")
+  @CsvSource({
+    "false, /problems/ordering/product-not-found",
+    "true, /problems/ordering/product-discontinued"
+  })
+  @DisplayName("明細の変更で存在しない商品か販売終了の商品を指定すると、理由の type の 422 を返し、注文を変えない")
   @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 422)
-  void changeLinesWithUnavailableProductReturnsUnprocessable(final boolean exists)
-      throws Exception {
+  void changeLinesWithUnavailableProductReturnsUnprocessable(
+      final boolean exists, final String type) throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
     final String before = detailsBody(orderId);
 
-    expectProblem(
-        changeLines(orderId, exists ? discontinued : UUID.randomUUID(), 1),
-        422,
-        exists
-            ? "/problems/ordering/product-discontinued"
-            : "/problems/ordering/product-not-found");
+    expectProblem(changeLines(orderId, exists ? discontinued : UUID.randomUUID(), 1), 422, type);
 
     assertThat(detailsBody(orderId)).as("orderId=%s の 422 の後の詳細", orderId).isEqualTo(before);
   }
