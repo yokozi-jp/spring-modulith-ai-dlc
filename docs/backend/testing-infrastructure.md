@@ -17,6 +17,8 @@ tags: [convention, backend, testing, testcontainers, gradle]
 版を上げるときは、composeのファイルだけを変える。
 PostgreSQLの初期化は`docker/initdb`を、WireMockのスタブは`docker/wiremock/mappings`を使う。
 コンテナのポートは`127.0.0.1`だけで公開する。
+PostgreSQLのデータは、イメージの`VOLUME`が匿名ボリュームを作らないよう、tmpfsに置く。
+匿名ボリュームはRyukが消さず、テストを流すたびに溜まる。
 
 テストのJVMは、起動したPostgreSQLへ`gradle.properties`の`databaseSchemaTag`までのchangesetを適用する。
 `-PtestAllChangesets`を付けると、作りかけを含む全changesetを適用する（`task test-dev`）。
@@ -73,6 +75,7 @@ cd backend && ./gradlew test -PtestForks=1                # forkを1つにする
 ## 依存を足すとき
 
 - テストに新しい外部の依存が要るときは、`InfrastructureContainers`にコンテナを足し、イメージを`docker/compose-test.yml`に置く。
+  イメージが`VOLUME`を宣言するなら、そのパスをtmpfsにする（`docker image inspect <イメージ> --format '{{json .Config.Volumes}}'`で確かめる）。
 - `testkit`の外のテストクラスは、Testcontainersの型（`@Testcontainers`、`@Container`、`@ServiceConnection`、`GenericContainer`など）を使わない。
   `TestConventionsArchTest`の`containersAreStartedOnlyByTestkit`が検査する。
 - 1つのテストクラスだけが使う偽物（`PaymentGatewayClientIntegrationTest`のプロセス内のWireMockなど）は、そのクラスで起動し、`@DynamicPropertySource`で接続先を上書きしてよい。
