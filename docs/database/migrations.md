@@ -106,8 +106,14 @@ rollback:
 ## CIでの検証
 
 バックエンドCIは使い捨てPostgreSQLに対して`verifyDatabaseMigrations`を実行します。
-Liquibaseの`updateTestingRollback`によって、全changesetを適用し、同じchangesetを戻し、再び適用します。
+`update`で全changesetを適用し、`executeSql`と`rollbackToDate`で全changesetを戻し、`updateToTag`で再び適用します。
 その後に`assertSchemaTagExists`で現在のスキーマタグを確認し、通常のマイグレーションとバックエンドテストを実行します。
+
+Liquibaseの`updateTestingRollback`は使いません。
+Liquibaseは切り戻しの順序を、`databasechangelog`の`dateexecuted`、`orderexecuted`の順に並べて決めます。
+`dateexecuted`はPostgreSQLの`NOW()`で、DBを動かす機器の時計が戻ると、数msで進むchangesetの`dateexecuted`が前のchangesetより小さくなり、順序が逆になることがあります。
+順序が逆になると、依存する表やスキーマを先に消し、`column "tenant_public_id" of relation "product.m_product" does not exist`のように失敗します（[#756](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/756)）。
+`executeSql`が全changesetの`dateexecuted`を同じ値にそろえるため、切り戻しの順序は`orderexecuted`だけで決まります。
 
 この検証により、rollback定義の不足とタグchangesetの追加漏れをPull Requestで検出します。
 本番DBのデータ復元可能性までは保証しません。

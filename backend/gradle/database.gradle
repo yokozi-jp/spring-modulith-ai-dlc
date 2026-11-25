@@ -216,9 +216,39 @@ tasks.named('updateToTag') {
     }
 }
 
+// Liquibaseは、切り戻しの順序をDATEEXECUTED、ORDEREXECUTEDの順に並べて決める。
+// DATEEXECUTEDはPostgreSQLのNOW()（壁時計）で、changesetが数msで進むと時計の巻き戻りで順序が逆転し、
+// 依存する表やスキーマを先に消して失敗する（#756）。updateTestingRollbackはこの順序をDBの時計に任せるため使わない。
 tasks.named('updateTestingRollback') {
+    group = 'database migration'
+    description = '使用禁止です。verifyDatabaseMigrationsを使用してください。'
+    doFirst {
+        throw new IllegalArgumentException(
+            'updateTestingRollbackは切り戻しの順序をDBの時計に任せるため使用しません。verifyDatabaseMigrationsを使用してください。'
+        )
+    }
+}
+
+tasks.named('executeSql') {
+    configureLiquibaseDatabaseTask(delegate, 'Liquibase履歴の日時の固定')
+    description = 'verifyDatabaseMigrationsの中だけで、全changesetのDATEEXECUTEDを同じ値にそろえます。'
+}
+
+tasks.named('rollbackToDate') {
     configureLiquibaseDatabaseTask(delegate, 'Liquibase rollback検証')
-    description = '使い捨てDBでupdate、rollback、再updateを順序実行します。'
+    description = 'verifyDatabaseMigrationsの中だけで、適用済みのchangesetをすべて切り戻します。'
+}
+
+// executeSqlとrollbackToDateの引数は、verifyDatabaseMigrationsを実行するビルドだけに渡す。
+// 引数を既定にすると、単独で実行したときに本番の履歴を書き換え、全changesetを切り戻す。
+gradle.taskGraph.whenReady { graph ->
+    if (graph.hasTask(':verifyDatabaseMigrations')) {
+        liquibase.activities.main {
+            // 日時がそろうと、切り戻しの順序はORDEREXECUTEDだけで決まる。
+            sql "UPDATE ${migrationDatabaseSchema}.databasechangelog SET dateexecuted = TIMESTAMP '2000-01-01 00:00:00'"
+            date '1999-12-31'
+        }
+    }
 }
 
 tasks.named('tag') {
@@ -309,7 +339,7 @@ tasks.named('updateToTag') {
 }
 
 assertSchemaTagExists.configure {
-    mustRunAfter tasks.named('updateToTag'), tasks.named('updateTestingRollback')
+    mustRunAfter tasks.named('updateToTag')
     mustRunAfter validateCurrentSchemaTag, validateRollbackTarget, validateRollbackExecution
 }
 
@@ -375,7 +405,21 @@ def verifyDatabaseMigrations = tasks.register('verifyDatabaseMigrations') {
     group = 'verification'
     description = '現在タグの宣言と、使い捨てDBで全changesetのupdate、rollback、再update、現在タグの存在を検証します。'
     // 現在タグが最後の changelog に宣言されているかも確かめる。テストは migrateDatabase を通らないため（ADR-085）。
-    dependsOn validateCurrentSchemaTag, tasks.named('updateTestingRollback'), assertSchemaTagExists
+    // 現在タグは最後の changelog にあるため、再updateはupdateToTagで全changesetを戻す。
+    dependsOn validateCurrentSchemaTag, tasks.named('update'), tasks.named('executeSql'),
+        tasks.named('rollbackToDate'), tasks.named('updateToTag'), assertSchemaTagExists
+}
+
+tasks.named('executeSql') {
+    mustRunAfter tasks.named('update')
+}
+
+tasks.named('rollbackToDate') {
+    mustRunAfter tasks.named('executeSql')
+}
+
+tasks.named('updateToTag') {
+    mustRunAfter tasks.named('rollbackToDate')
 }
 
 tasks.named('test') {
