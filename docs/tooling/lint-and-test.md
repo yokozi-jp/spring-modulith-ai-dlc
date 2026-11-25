@@ -86,7 +86,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
   最後に、`e2e/`の`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts`をNodeで直接importでき（相対のimportに拡張子`.ts`がある）、Playwrightの外から使えることを確かめる。
 - **`task lint-e2e-seed`**：`frontend/apps/web/e2e/`（`.auth/`を除く）に`SEED-`の文字列が大文字小文字を問わずにあれば失敗する。
   ディレクトリが無いときも失敗する。
-  E2Eは開発用のシーダーの代表データを読まず、各テストがデータを作る（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-product-registration-api.md)）。
+  E2Eは開発用のシーダーの代表データを読まず、各テストがデータを作る（[ADR-130](../adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
   検査の本体は`tooling/e2e-seed-lint/e2e-seed-lint.sh`で、検出の前に`tooling/e2e-seed-lint/test.sh`が、fixtureで終了コードと出力を確かめる。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
   `packages/ui`は`includeEntryExports: true`にし、`exports`で公開した部品の未使用exportも報告する。

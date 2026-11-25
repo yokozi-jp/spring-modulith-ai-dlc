@@ -63,9 +63,10 @@ CommandHandler は他モジュールから呼ばれない。
   理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に示す。
 - 外部システムは、そのイベントを受けた自モジュールの [Listener](listener.md) が呼ぶ CommandHandler で、[外部システムのインタフェース](external-system-interface.md)を通して呼ぶ（`OrderConfirmedListener` が `ChargeOrderCommandHandler` を呼ぶ）。
   イベント出版レジストリはトランザクションアウトボックスとして働き、コミットした確定のイベントだけが決済へ渡る（[メッセージングの設計](../../integration/async-messaging-design.md)の「DB 更新とメッセージ発行の整合」）。
-- 外部システムを呼ぶ CommandHandler は、集約がすでにその操作を終えていれば（`order.isPaid()`）何もせずに Result を返し、外部システムに冪等性キー（注文 ID）を渡す。
-  外部システムの呼び出しは `update` より前に置き、呼んでいる間は行をロックしない。
-  `isPaid()` の確認は二回目の請求を省くためのもので、二重の処理は `update` の楽観的ロックで止める（[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)の「集約の楽観的ロック」）。
+- 外部システムを呼ぶ CommandHandler は、結果の行がすでにあれば何もせずに Result を返し、外部システムに冪等性キー（注文 ID）を渡す。
+  外部システムの呼び出しは結果の行の保存より前に置き、呼んでいる間は行をロックしない。
+  先読みは二回目の請求を省くためのもので、重複の判定ではない。
+  二重の処理は、決済記録の `INSERT ... ON CONFLICT DO NOTHING` のように DB が直列にする操作で止め、衝突は例外にせず処理済みとして正常に返す（[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)の「重複の判定」）。
   同じイベントは再投入で二回以上届く（[メッセージングの設計](../../integration/async-messaging-design.md)の「配信保証」、[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)）。
 - 外部システムの失敗で `FAILED` のまま残ったイベント出版は、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
   自動の再投入は定期のジョブが行う（[ADR-079](../../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
@@ -213,25 +214,32 @@ return new ConfirmOrderResult(order.id().value().toString());
 ```
 
 `ChargeOrderCommandHandler` は、`OrderConfirmedListener` から呼ばれ、確定した注文の代金を請求する（抜粋）。
-依存は `orderRepository` と `paymentGateway` の二つである。
+依存は `paymentRepository`、`paymentGateway`、`orderQueries`、`clock` である。
 
 ```java
-// com.example.demo.ordering.application.ChargeOrderCommandHandler（抜粋）
-/** 支払い済みでない注文の代金を、注文 ID を冪等性キーにして請求し、支払い済みにして保存する。 */
+// com.example.demo.payment.application.ChargeOrderCommandHandler（抜粋）
+/** 注文の決済記録がなければ、確定した注文の合計を請求して結果を決済記録に保存する。 */
 @Transactional
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
-  final Order order =
-      orderRepository
-          .findById(new OrderId(UUID.fromString(command.orderId())))
-          .orElseThrow(
-              () -> new NotFoundException("order not found: orderId=" + command.orderId()));
-  if (order.isPaid()) {
-    return new ChargeOrderResult.AlreadyRecorded(order.id().value().toString());
+  final OrderId orderId = new OrderId(UUID.fromString(command.orderId()));
+  final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
+  if (existing.isPresent()) {
+    return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
   }
-  paymentGateway.charge(order.id(), order.total());
-  order.markPaid();
-  orderRepository.update(order);
-  return new ChargeOrderResult.Charged(order.id().value().toString());
+  // ...（注文を読み、確定していなければ NotCharged を返す）
+  final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
+  final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
+  if (!paymentRepository.add(payment)) {
+    // 衝突した行はコミット済みで、READ COMMITTED の次の文から見える。
+    final Payment recorded =
+        paymentRepository
+            .findByOrderId(orderId)
+            .orElseThrow(() ->
+                new IllegalStateException(
+                    "payment was not inserted but not found: orderId=" + orderId.value()));
+    return new ChargeOrderResult.AlreadyRecorded(recorded.id().value().toString());
+  }
+  return new ChargeOrderResult.Charged(payment.id().value().toString());
 }
 ```
 
@@ -321,7 +329,7 @@ class CancelOrderCommandHandlerTest {
 - [ ] `ensureLockNo` は `findById` の直後、状態を変える操作より前に呼び、`command.expectedLockNo()` を渡す。型はコンパイルで、呼ぶ位置と渡す値はレビューで確かめる。［自分で点検］
 - [ ] 外部システムのインタフェースに依存するのは CommandHandler と Client だけにする。［ArchUnit で検査：ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients］
 - [ ] 外部システムのインタフェースに依存する CommandHandler は、イベントを受けた `application` の Listener からだけ呼び、画面から呼ばれる CommandHandler は外部システムを呼ばない。［ArchUnit で検査：ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners］
-- [ ] 外部システムを呼ぶ CommandHandler は、集約がその操作を終えていれば何もせずに Result を返し、外部システムに冪等性キーを渡す。［自分で点検］
+- [ ] 外部システムを呼ぶ CommandHandler は、結果の行がすでにあれば何もせずに Result を返し、外部システムに冪等性キーを渡す。重複の判定は DB が直列にする操作で行い、衝突は処理済みとして正常に終える。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] 現在時刻は `Instant.now(clock)` で取る。［自分で点検］
 - [ ] 業務上の失敗は[業務上の失敗の例外](business-exception.md)の型で投げる。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] 業務の状態に記録して正常に終える結果は、例外にせず Result の値で返す。［自分で点検］

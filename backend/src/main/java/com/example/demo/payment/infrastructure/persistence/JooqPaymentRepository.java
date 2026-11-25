@@ -14,6 +14,7 @@ import com.example.demo.payment.domain.model.PaymentStatus;
 import com.example.demo.shared.persistence.AggregateTable;
 import com.example.demo.shared.persistence.TableWriter;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
@@ -27,15 +28,19 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JooqPaymentRepository implements PaymentRepository {
 
-  /** 決済記録の集約。ルートは公開 ID で一つに決める。 */
+  /** 決済記録の集約。ルートは公開 ID で一つに決める。同じ注文の 2 回目の決済記録は、入れずに処理済みとする。 */
   private static final AggregateTable<TPaymentRecord, UUID, Payment> PAYMENT =
-      AggregateTable.of(
-          T_PAYMENT, T_PAYMENT.PUBLIC_ID, payment -> payment.id().value(), T_PAYMENT.PAYMENT_ID);
+      AggregateTable.ofIdempotentOn(
+          T_PAYMENT,
+          T_PAYMENT.PUBLIC_ID,
+          payment -> payment.id().value(),
+          T_PAYMENT.PAYMENT_ID,
+          List.of(T_PAYMENT.TENANT_PUBLIC_ID, T_PAYMENT.ORDER_PUBLIC_ID));
 
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
-  /** 集約を INSERT し、一意制約の違反を ConflictException に変える shared の入口。 */
+  /** 集約を INSERT する shared の入口。 */
   private final TableWriter tableWriter;
 
   /** jOOQ のコンテキストと shared の入口を受け取る。 */
@@ -52,9 +57,8 @@ class JooqPaymentRepository implements PaymentRepository {
   }
 
   @Override
-  public void add(final Payment payment) {
-    // ユニークインデックスはテナントごとの public_id（UUID v4 で衝突しない）と order_public_id だけなので、409 は注文の決済記録の重複である。
-    tableWriter.insert(
+  public boolean add(final Payment payment) {
+    return tableWriter.insert(
         PAYMENT,
         payment,
         set ->

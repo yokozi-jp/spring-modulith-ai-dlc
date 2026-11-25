@@ -256,7 +256,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
   `task e2e-up` は片付けないので、実行したら自分で片付けます。
 - CI の `E2E tests 🎭` は対象パスの変更でだけ起動し、必須チェックにはしていません。
 - `task lint-e2e-seed` は、E2E のコード（`frontend/apps/web/e2e/`）が開発用のシーダーの代表データ（`SEED-`）を名指しする箇所を検出します。
-  `task fe-check`、`task fe-verify`、Frontend CI で実行します（[ADR-129](docs/adr/ADR-129-create-e2e-data-per-test-with-product-registration-api.md)）。
+  `task fe-check`、`task fe-verify`、Frontend CI で実行します（[ADR-130](docs/adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
 - 書き方と前提は [E2E テストの方針と書き方](docs/e2e/testing-strategy.md) を参照してください。
 
 ### API 契約

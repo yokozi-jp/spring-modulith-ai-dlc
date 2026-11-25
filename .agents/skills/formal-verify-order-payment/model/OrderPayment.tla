@@ -133,8 +133,10 @@ DStart(d) ==
   /\ UNCHANGED <<orderStatus, orderLock, cmdPc, cmdLock, payments, gateway,
                  dres, launched, rpc>>
 
-\* ChargeOrderCommandHandler.handle: paymentRepository.findByOrderId.
-\* A record means return without charging; the listener ends normally.
+\* ChargeOrderCommandHandler.handle: paymentRepository.findByOrderId, a
+\* SELECT without a lock. A record means return without charging; the
+\* listener ends normally. This read only saves a second charge on a later
+\* delivery. It does not decide duplicates: DInsert does.
 DReadPayment(d) ==
   /\ dpc[d] = "readPayment"
   /\ dpc' = [dpc EXCEPT ![d] = IF Len(payments) > 0 THEN "markCompleted"
@@ -202,31 +204,36 @@ GatewayDecide ==
 
 \* PaymentGatewayClient.charge returns or throws. A reply can be lost, or
 \* the read timeout can pass while the gateway still holds the key; then
-\* the client throws. PAID -> ChargeOutcome.paid, DECLINED -> declined,
-\* REJECTED and CONCURRENT -> contractError -> ChargeOutcome.failed.
+\* the client throws, and the delivery sees TRANSIENT whatever the gateway
+\* decided. PAID -> ChargeOutcome.paid, DECLINED -> declined, REJECTED and
+\* CONCURRENT -> contractError -> ChargeOutcome.failed.
 DReply(d) ==
   /\ dpc[d] \in {"atGateway", "awaitReply"}
   /\ \/ /\ dpc[d] = "awaitReply"
         /\ dres[d] \in {"PAID", "DECLINED", "REJECTED", "CONCURRENT"}
         /\ dpc' = [dpc EXCEPT ![d] = "insert"]
-     \/ dpc' = [dpc EXCEPT ![d] = "markFailed"]
+        /\ UNCHANGED dres
+     \/ /\ dpc' = [dpc EXCEPT ![d] = "markFailed"]
+        /\ dres' = [dres EXCEPT ![d] = "TRANSIENT"]
   /\ UNCHANGED <<orderStatus, orderLock, cmdPc, cmdLock, pub, payments,
-                 gateway, dres, launched, rpc>>
+                 gateway, launched, rpc>>
 
 RecordOf(r) == IF r \in {"PAID", "DECLINED"} THEN r ELSE "FAILED"
 
-\* Payment.record, JooqPaymentRepository.add -> TableWriter.insert, then the
-\* listener transaction commits. The unique index uk_2_t_payment
-\* (tenant_public_id, order_public_id) rejects a second row of the order:
-\* ConflictException, rollback. The model has one tenant.
-\* PostgreSQL makes a concurrent INSERT wait for the other commit, so
-\* INSERT and COMMIT act as one step.
+\* Payment.record, JooqPaymentRepository.add -> INSERT ... ON CONFLICT
+\* (tenant_public_id, order_public_id) DO NOTHING on the unique index
+\* uk_2_t_payment, then the listener transaction commits. The model has one
+\* tenant. A conflicting row of a transaction still open makes the INSERT
+\* wait for that transaction to end (PostgreSQL), so INSERT and COMMIT act
+\* as one step. Zero rows inserted: ChargeOrderCommandHandler reads the
+\* committed first record and returns AlreadyRecorded, and the listener
+\* ends normally.
 DInsert(d) ==
   /\ dpc[d] = "insert"
   /\ IF Len(payments) = 0
        THEN /\ payments' = Append(payments, RecordOf(dres[d]))
             /\ dpc' = [dpc EXCEPT ![d] = "markCompleted"]
-       ELSE /\ dpc' = [dpc EXCEPT ![d] = "markFailed"]
+       ELSE /\ dpc' = [dpc EXCEPT ![d] = "markCompleted"]
             /\ UNCHANGED payments
   /\ UNCHANGED <<orderStatus, orderLock, cmdPc, cmdLock, pub, gateway, dres,
                  launched, rpc>>
@@ -361,6 +368,13 @@ ChargedOnlyIfConfirmed == gateway # "NONE" => orderStatus = "CONFIRMED"
 
 \* The publication is marked done only when the payment is recorded.
 CompletedOnlyWithRecord == pub = Archived => Len(payments) = 1
+
+\* A delivery marks the publication FAILED (or ABANDONED) only when the
+\* gateway call threw. A delivery that got the gateway's decision, such as
+\* a concurrent second delivery whose INSERT finds the first record,
+\* completes.
+FailedOnlyOnGatewayError ==
+  \A d \in D: dpc[d] = "markFailed" => dres[d] = "TRANSIENT"
 
 \* When everything has stopped, a customer whose money the gateway took
 \* has a PAID record, or operators see a FAILED or ABANDONED dead letter.

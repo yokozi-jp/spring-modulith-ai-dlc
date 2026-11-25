@@ -23,7 +23,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** 決済記録の保存と読み戻しと、同じ注文の 2 件目の保存の拒否を検証する。 */
+/** 決済記録の保存と読み戻しと、同じ注文の 2 件目を保存しないことを検証する。 */
 @DatabaseTest
 class JooqPaymentRepositoryTest {
 
@@ -85,19 +85,45 @@ class JooqPaymentRepositoryTest {
   }
 
   @Test
-  @DisplayName("同じ注文の 2 件目の保存は、種類が UNIQUE の ConflictException になる")
-  void secondPaymentOfSameOrderBecomesConflict() {
+  @DisplayName("同じ注文の 2 件目の保存は、例外にせず false を返し、1 件目の決済記録を残す")
+  void secondPaymentOfSameOrderIsNotAdded() {
     final OrderId orderId = new OrderId(UUID.randomUUID());
     final PaymentRepository repository = repository();
-    TestCommonColumns.runAs(() -> repository.add(payment(orderId, AMOUNT)));
-    final Payment duplicate = payment(orderId, AMOUNT);
+    final Payment first = payment(orderId, AMOUNT);
+    final Payment duplicate = payment(orderId, "999.00");
 
-    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository.add(duplicate)))
+    assertThat(TestCommonColumns.callAs(() -> repository.add(first))).as("1 件目").isTrue();
+    assertThat(TestCommonColumns.callAs(() -> repository.add(duplicate))).as("2 件目").isFalse();
+
+    assertThat(repository.findByOrderId(orderId))
+        .as("orderId=%s の決済記録", orderId.value())
+        .hasValueSatisfying(found -> {
+          assertThat(found.id()).isEqualTo(first.id());
+          assertThat(found.amount().amount()).isEqualByComparingTo(new BigDecimal(AMOUNT));
+        });
+  }
+
+  @Test
+  @DisplayName("別の注文でも決済記録の ID が重なる保存は、種類が UNIQUE の ConflictException になる")
+  void paymentIdCollisionBecomesConflict() {
+    final PaymentRepository repository = repository();
+    final Payment first = payment(new OrderId(UUID.randomUUID()), AMOUNT);
+    TestCommonColumns.runAs(() -> repository.add(first));
+    final Payment sameId =
+        Payment.restore(
+            first.id(),
+            new OrderId(UUID.randomUUID()),
+            first.amount(),
+            ChargeOutcome.failed(),
+            RECORDED_AT,
+            1L);
+
+    assertThatThrownBy(() -> TestCommonColumns.runAs(() -> repository.add(sameId)))
         .isInstanceOfSatisfying(
             ConflictException.class,
             conflict ->
                 assertThat(conflict.kind())
-                    .as("orderId=%s の 2 件目の保存の衝突の種類", orderId.value())
+                    .as("paymentId=%s の 2 件目の保存の衝突の種類", first.id().value())
                     .isEqualTo(ConflictException.Kind.UNIQUE));
   }
 

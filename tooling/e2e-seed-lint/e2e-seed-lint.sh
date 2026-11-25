@@ -19,7 +19,7 @@ if [ -n "$found" ]; then
   printf '%s\n' "$found" >&2
   echo "✗ E2E のコードが、開発用のシーダーの代表データ（SEED-）を名指ししています。" >&2
   echo "  E2E はシーダーを使いません。商品は productFactory（e2e/fixtures.ts）で、注文は画面か公開 API で、そのテストが作ってください。" >&2
-  echo "  規約: docs/e2e/testing-strategy.md の「テストデータ」、ADR-129" >&2
+  echo "  規約: docs/e2e/testing-strategy.md の「テストデータ」、ADR-130" >&2
   exit 1
 fi
 echo "e2e-seed-lint OK"

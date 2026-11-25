@@ -59,7 +59,7 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 
 ## テストデータ
 
-E2E は開発用のシーダー（`LocalDataSeeder`）の代表データを使わない（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-product-registration-api.md)）。
+E2E は開発用のシーダー（`LocalDataSeeder`）の代表データを使わない（[ADR-130](../adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
 各テストは、自分専用のデータを画面か公開 API で作る。
 
 - 注文は、画面か公開 API で作る。決済代行の拒否、5xx、遅延は `failChargesFor` で作る（[外部システムの偽物](#外部システムの偽物)）。

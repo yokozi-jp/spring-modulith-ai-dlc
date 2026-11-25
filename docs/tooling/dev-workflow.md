@@ -313,7 +313,7 @@ task e2e
 開発用のKeycloak（`127.0.0.1:8080`）が動いていれば、slot 0を飛ばしてslot 1以降を使う。
 `task e2e-up`がwebかbackendのポートを使用中と報告して止まったときは、そのポートを使うプロセスを止める。
 `task e2e-up`は`task be-seed-tenancy`でテナントと所属だけを入れる（[代表データを入れ直すとき](#代表データを入れ直すとき)）。
-商品は各テストが商品を登録するAPIで作る（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-product-registration-api.md)）。
+商品は各テストが商品を登録するAPIで作る（[ADR-130](../adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
 
 失敗した環境を調べるときは`E2E_KEEP_ENV=1 task e2e`で残す。
 `task e2e-up`は起動だけで片付けないので、直接実行したときは、出力のComposeプロジェクトを`-p`に渡し、`docker compose -p spring-modulith-test-<n> -f docker/compose-test.yml --profile e2e down --volumes --remove-orphans`で自分で片付ける。

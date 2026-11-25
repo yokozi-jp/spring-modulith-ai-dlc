@@ -186,8 +186,9 @@ type の一覧と、すべての type に日本語と英語の `title` がある
   同じ対応づけが Controller ごとに重複し、ログの記録が `ApiExceptionHandler` と食い違う。
 - 例外のメッセージを応答の本文に出す。
   識別子やテーブル名が利用者へ漏れ、404 で存在を隠せない。
-- `ConflictException` を捕まえて同じトランザクションで処理を続ける。
-  `23505` の後は PostgreSQL のトランザクションが中断状態になり、後の SQL がすべて失敗する。
+- 種類 `unique` か `lock` の `ConflictException` を捕まえて、同じトランザクションで処理を続ける。
+  `23505` と `55P03` の後は PostgreSQL のトランザクションが中断状態になり、後の SQL がすべて失敗する。
+  種類 `version`（`TableWriter.update` の 0 件の更新）は SQL の失敗でないため、Listener が呼ぶ CommandHandler は捕まえて読み直してよい（[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)の「重複の判定」）。
 - Spring と jOOQ の例外（`DuplicateKeyException`、`CannotAcquireLockException`）を Repository の外へ漏らす。
   Application と Domain が永続化の技術に依存し、HTTP では 500 になる。
 

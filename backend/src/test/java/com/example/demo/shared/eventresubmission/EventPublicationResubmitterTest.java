@@ -9,6 +9,7 @@ import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Ta
 import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
 import com.example.demo.shared.eventresubmission.ResubmissionProbes.ProbeListener;
 import com.example.demo.shared.eventresubmission.ResubmissionProbes.ResubmissionProbe;
+import com.example.demo.shared.events.ListenerIds;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -162,7 +163,7 @@ class EventPublicationResubmitterTest {
 
     assertThat(listenerId)
         .isEqualTo(
-            ResubmissionPolicies.listenerId(
+            ListenerIds.fromMethod(
                 ProbeListener.class.getDeclaredMethod("on", ResubmissionProbe.class)));
     assertThat(policies.nameOf(listenerId)).isEqualTo(ResubmissionProbes.PROBE_POLICY);
     assertThat(policies.nameOf("unknown.Listener.on(java.lang.Object)")).isEqualTo("default");
