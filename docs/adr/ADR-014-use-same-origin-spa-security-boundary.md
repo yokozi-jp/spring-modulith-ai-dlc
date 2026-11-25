@@ -11,6 +11,8 @@ tags: [adr, security, spa, frontend]
 
 Accepted
 
+Amended by [ADR-132](ADR-132-add-corp-and-coop-to-delivered-security-headers.md)：SPA の HTML 応答に付けるヘッダーの一覧に `Cross-Origin-Opener-Policy: same-origin` を足し、API の応答に `Cross-Origin-Resource-Policy: same-origin` を付けること。
+
 ## Date
 
 2026-09-14

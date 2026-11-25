@@ -105,6 +105,8 @@ export default defineConfig(({ mode }) => {
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
+    // ほかのオリジンのウィンドウと browsing context group を分ける（ADR-132）。
+    "Cross-Origin-Opener-Policy": "same-origin",
     // CSP の report-to が参照する endpoint（ADR-068）。default にしないので、CSP 以外の報告は送られない。
     "Reporting-Endpoints": 'csp-endpoint="/csp-report"',
   };
