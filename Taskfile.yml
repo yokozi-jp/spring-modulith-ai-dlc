@@ -289,6 +289,7 @@ tasks:
       - task: adr-lint
       - task: removed-names-test
       - task: removed-names-check
+      - task: readme-versions-check
       - task: ruleset-check
       - task: iwe-mcp-check
       - task: iwe-tools-check
@@ -321,6 +322,14 @@ tasks:
     cmds:
       - bash tooling/adr-lint/test.sh
       - node tooling/adr-lint/adr-lint.mjs
+
+  # README の技術スタック表の Backend の版が backend/build.gradle と一致するかを検査する。自己検査も同じタスクで実行する。
+  readme-versions-check:
+    internal: true
+    silent: true
+    cmds:
+      - bash tooling/readme-versions/test.sh
+      - bash tooling/readme-versions/check.sh
 
   # 削除した識別子（tooling/removed-names/names.txt）が docs、.agents、backend/src に残っていないかを検査する。
   # 規約や skill に旧名が残ると、エージェントが写して、削除した API を呼ぶ。自己検査（test.sh）は removed-names-test が実行する。
