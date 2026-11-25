@@ -30,23 +30,27 @@ DBの監視項目は[PostgreSQLの監視](../database/postgresql-monitoring.md)�
 
 ## JVMのメトリクス
 
-- **ヒープの使用量**：Young領域とOld領域を分けて測る。
+OpenTelemetryで送るメトリクスの名前は括弧内のとおりで、命名は[可観測性データの規約](../observability/conventions.md#指標)に従う。
+
+- **ヒープの使用量**（`jvm.memory.used`、`jvm.memory.limit`）：Young領域とOld領域を`jvm.memory.pool.name`で分けて測る。
   Young領域が急増してMinor GCが頻発する場合は、一時オブジェクトの過剰な生成を疑う。
   Old領域が増え続け、Full GCの後も十分に回収されない場合は、メモリリークを疑う。
-- **Metaspaceの使用量**：長時間の稼働で増え続けないかを確かめる。
-- **GCの実行時間と回数**：アプリケーションが停止する時間と頻度を、Minor GCとFull GCに分けて測る。
-- **スレッド**：スレッドの数と状態（RUNNABLE、BLOCKED、WAITINGなど）を測る。
+- **Metaspaceの使用量**（`jvm.memory.used`の`jvm.memory.pool.name`が`Metaspace`）：長時間の稼働で増え続けないかを確かめる。
+- **GCの実行時間と回数**（`jvm.gc.pause`）：アプリケーションが停止する時間と頻度を、Minor GCとFull GCに分けて測る。
+- **スレッド**（`jvm.thread.count`）：スレッドの数と状態（RUNNABLE、BLOCKED、WAITINGなど）を測る。
   仮想スレッドを使うため、プラットフォームスレッドの数と、JFRによる仮想スレッドのpinningも確かめる（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
-- **接続プール**：HikariCPの使用中の接続数、接続を待つリクエスト数、接続の取得にかかる時間。
+- **接続プール**：HikariCPの使用中の接続数（`hikaricp.connections.active`）、接続を待つリクエスト数（`hikaricp.connections.pending`）、接続の取得にかかる時間（`hikaricp.connections.acquire`）。
   仮想スレッドでは同時処理数が接続プールで制限されるため、スループットが伸びない原因の切り分けに使う。
 
 ## サービスのメトリクス
 
 利用者に直結するメトリクスとして、エンドポイントごとに次の三つ（REDメトリクス）を集める。
+三つとも`http.server.request.duration`から求め、エンドポイントは`http.route`で分ける。
 
 - **Rate**：単位時間あたりのリクエスト数。
   想定した負荷がかかっているかを確かめる。
 - **Errors**：リクエストの失敗率。
+  `http.response.status_code`が5xxの割合で求める。
   負荷の増加でエラーが増えていないかを確かめる。
 - **Duration**：リクエストの処理時間。
   エンドツーエンドだけでなく、DBのクエリや外部APIの呼び出しなど、スパンごとの時間まで分けて見られるようにする。

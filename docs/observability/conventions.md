@@ -1,8 +1,8 @@
 ---
 type: Convention
 title: 可観測性データの規約
-description: OpenTelemetry へ記録するデータ、例外の記録、ログとトレースの相関、テナントと利用者の項目、発生源で渡さない値、Collector の allowlist、本番のロググループ、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装、Collector の設定、本番収集基盤を変更するとき、フロントエンドのテレメトリに値を足すときに読む規約。
-tags: [convention, observability, opentelemetry, security]
+description: OpenTelemetry へ記録するデータ、例外の記録、ログとトレースの相関、テナントと利用者の項目、指標の名前と属性と単位、発生源で渡さない値、Collector の allowlist、本番のロググループ、保持、アクセス、本番の受け入れ条件を定め、可観測性データの実装、Collector の設定、本番収集基盤を変更するとき、フロントエンドのテレメトリに値を足すときに読む規約。
+tags: [convention, observability, opentelemetry, metrics, security]
 ---
 
 # 可観測性データの規約
@@ -12,7 +12,7 @@ tags: [convention, observability, opentelemetry, security]
 CSP 違反は、ブラウザ自身が Reporting API で同一オリジンの `/csp-report` から Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
-設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)、[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)、[ADR-110](../adr/ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md) に記録している。
+設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)、[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)、[ADR-110](../adr/ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)、[ADR-133](../adr/ADR-133-align-metrics-with-opentelemetry-semantic-conventions.md) に記録している。
 
 ## 記録
 
@@ -82,6 +82,23 @@ Controller の中の `@PreAuthorize` が拒否したときのログは、2 つ�
 - Micrometer の Observation の高い濃度の key value にだけ入れ、低い濃度の key value に入れない（理由は ADR-110）。
 - リスナーの処理の span は Spring Modulith が作る。この span には付けない。リスナーのログには `tenant.id` が付くので、ログの trace ID からたどる。
 - Micrometer Tracing の baggage（`management.tracing.baggage.*`）で伝えない。
+
+## 指標
+
+指標と span の名前と属性は、OpenTelemetry の semantic conventions に従う（[ADR-133](../adr/ADR-133-align-metrics-with-opentelemetry-semantic-conventions.md)）。
+Spring Boot の `management.observations.conventions: open-telemetry` で切り替え、自前の `ObservationConvention` を作らない。
+
+- **HTTP の受信**：Timer は `http.server.request.duration`、tag は `http.request.method`、`http.response.status_code`、`http.route`、`error.type` などである。span の要求のパスは `url.path` で、query string を含まない。
+- **JVM**：`jvm.memory.used`、`jvm.memory.limit`、`jvm.thread.count`、`jvm.class.count`、`jvm.cpu.recent_utilization` などである。
+- **Micrometer の名前のままの指標**：送信の HTTP の `http.client.requests`、GC の `jvm.gc.pause`、HikariCP の `hikaricp.connections.*`、jOOQ の `jooq.query`、アプリの Counter と Gauge。
+
+時間の単位は秒にする（`management.otlp.metrics.export.base-time-unit: seconds`）。
+`http.server.request.duration` の bucket は、semantic conventions の推奨の境界の 14 個（5ms から 10s）を `management.metrics.distribution.slo` で与え、explicit bucket の histogram で送る。
+全シグナルの resource は、起動ごとの `service.instance.id`（`${random.uuid}`）を持つ。
+Collector は指標を加工しない（「[Collector の allowlist](#collector-の-allowlist)」）。
+
+指標の tag には、値の種類が限られるものだけを置く。
+`tenant.id`、`user.id`、業務の ID、`url.path` を tag にしない（「[テナントと利用者](#テナントと利用者)」）。
 
 ## 発生源で渡さない値
 
@@ -222,7 +239,8 @@ transform と filter の `error_mode` は `ignore` にする。
   `webhook_event` の受け口が、`application/reports+json` 以外の `Content-Type`（旧形式、header なし、有効な本文の `text/plain`）に 401、正しい `Content-Type` の JSON でない本文に 200（出口には残さない）、64 KiB を超える本文と空の本文に 400、GET に 405、別のパスに 404 を返すことも確かめる。
   Collector の設定を変えたら実行する。
 - **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることを確かめる。
-  MDC の `tenant.id` と `user.id` がコンソールの JSON の入れ子の項目と LogRecord の属性に出ることと、テナントを選んだ要求の中のログと受信の span がその 2 つを持ち、`http.server.requests` の tag が持たないことも確かめる。
+  MDC の `tenant.id` と `user.id` がコンソールの JSON の入れ子の項目と LogRecord の属性に出ることと、テナントを選んだ要求の中のログと受信の span がその 2 つを持ち、`http.server.request.duration` の tag が持たないことも確かめる。
+  `http.server.request.duration` が `http.response.status_code` の tag と semantic conventions の推奨の境界の bucket を持つことと、ログとトレースの resource が同じ `service.instance.id` を持つことも確かめる。
 - **`OrderConfirmedListenerTest`**：リスナーの中のログが、イベントのテナントの `tenant.id` を持ち、発行したスレッドの MDC の `user.id` を持たないことを確かめる。
 - **`TenantContextTest`**：MDC の `tenant.id` が、入れ子の束縛から戻ると外側のテナントに戻り、束縛を出ると消えることを確かめる。
 
