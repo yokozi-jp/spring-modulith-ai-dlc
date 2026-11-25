@@ -248,7 +248,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### E2E
 
-- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration と代表データを入れ、Vite preview に対して Playwright を実行してから、backend のログを `frontend/apps/web/test-results/backend.log` に残して後片付けします。
+- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration を適用し、Vite preview と商品を作る fixture サーバーに対して Playwright を実行してから、backend のログを `frontend/apps/web/test-results/backend.log` に残して後片付けします。
 - 実行ごとに空いている slot を取り、slot ごとの Compose project とポートで動くので、複数の worktree で同時に実行できます（[compose-test の slot](docs/tooling/test-slots.md)）。
   失敗した環境を調べるときは `E2E_KEEP_ENV=1 task e2e` で残せます（CI では常に片付けます）。
 - 起動だけを行う `task e2e-up` と、backend のログを書いて秘密の混入を検査する `task e2e-collect-logs LOG=<パス>` も、単独で実行できます。

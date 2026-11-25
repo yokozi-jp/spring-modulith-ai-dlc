@@ -309,6 +309,8 @@ task e2e
 
 開発用のKeycloak（`127.0.0.1:8080`）が動いていれば、slot 0を飛ばしてslot 1以降を使う。
 `task e2e-up`がwebかbackendのポートを使用中と報告して止まったときは、そのポートを使うプロセスを止める。
+Playwrightが`http://127.0.0.1:8083/health is already used`のように止まったときは、fixtureサーバーのポート（slot 0は8083）を使うプロセスを止める。
+商品はfixtureサーバーが各テストのために作り、開発用の代表データ（`task be-seed`）は入れない（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-fixture-server.md)）。
 
 失敗した環境を調べるときは`E2E_KEEP_ENV=1 task e2e`で残す。
 `task e2e-up`は起動だけで片付けないので、直接実行したときは、出力のComposeプロジェクトを`-p`に渡し、`docker compose -p spring-modulith-test-<n> -f docker/compose-test.yml --profile e2e down --volumes --remove-orphans`で自分で片付ける。

@@ -43,13 +43,14 @@ slot ごとに Compose project とホストのポートが分かれるため、�
 slot 0 は従来のポートのままである。
 slot n（1 から 3）のポートは、`20000 + n × 1000 + slot 0 のポートの下 3 桁` である。
 
-| 用途                | 環境変数             | slot 0 | slot 1 | slot 2 | slot 3 |
-| ------------------- | -------------------- | ------ | ------ | ------ | ------ |
-| web（Vite preview） | `E2E_WEB_PORT`       | 5173   | 21173  | 22173  | 23173  |
-| backend             | `TEST_BACKEND_PORT`  | 8080   | 21080  | 22080  | 23080  |
-| Keycloak            | `TEST_KEYCLOAK_PORT` | 8081   | 21081  | 22081  | 23081  |
-| 決済代行の WireMock | `TEST_WIREMOCK_PORT` | 8082   | 21082  | 22082  | 23082  |
-| PostgreSQL          | `TEST_PG_PORT`       | 5433   | 21433  | 22433  | 23433  |
+| 用途                    | 環境変数             | slot 0 | slot 1 | slot 2 | slot 3 |
+| ----------------------- | -------------------- | ------ | ------ | ------ | ------ |
+| web（Vite preview）     | `E2E_WEB_PORT`       | 5173   | 21173  | 22173  | 23173  |
+| backend                 | `TEST_BACKEND_PORT`  | 8080   | 21080  | 22080  | 23080  |
+| Keycloak                | `TEST_KEYCLOAK_PORT` | 8081   | 21081  | 22081  | 23081  |
+| 決済代行の WireMock     | `TEST_WIREMOCK_PORT` | 8082   | 21082  | 22082  | 23082  |
+| E2E の fixture サーバー | `E2E_FIXTURE_PORT`   | 8083   | 21083  | 22083  | 23083  |
+| PostgreSQL              | `TEST_PG_PORT`       | 5433   | 21433  | 22433  | 23433  |
 
 `bash tooling/test-slot/test-slot.sh ports <n>` が、slot n の値を出す。
 `task scan-dast` が自分で使う 4173（preview）、18081（backend）、18082（ZAP の proxy）は、slot によらず固定である。
@@ -64,7 +65,7 @@ slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak h
 
 続けて、次の環境変数を export する。
 
-- `TEST_SLOT`、`COMPOSE_PROJECT_NAME`、表の 5 つのポート。
+- `TEST_SLOT`、`COMPOSE_PROJECT_NAME`、表の 6 つのポート。
 - `TEST_ENV_FILE`：slot の env ファイル（`build/test-slot/slot-<n>.env`）。
 - `SERVER_PORT`（`TEST_BACKEND_PORT` と同じ値）、`OIDC_ISSUER_URI`、`PAYMENT_GATEWAY_BASE_URL`（後の 2 つは slot の env ファイルと同じ値）。
   `task e2e`、`task e2e-up`、`task scan-dast` だけが渡す（`acquire` の第 2 引数 `web`）。

@@ -30,7 +30,7 @@ APIは絶対時刻をUTCで返し、フロントエンドが画面の要件に�
   業務タイムゾーンはIANAタイムゾーンIDの設定値から受け取り、`Clock`のゾーンやJVMの既定タイムゾーンから取らない。
   この決定は[ADR-046](../adr/ADR-046-derive-local-dates-with-configured-business-zone.md)を参照する。
 - システム時刻を供給する`Clock`は`com.example.demo.DemoApplication.clock()`の`@Bean`メソッドだけで生成し、このメソッドが`Clock.tick(Clock.systemUTC(), Duration.ofNanos(1_000))`を返す。
-- 本番、`bootRun`、`seedLocalData`のJVMには`-Duser.timezone=UTC`を設定する。テストのJVMは例外で、[テスト](#テスト)に従う。
+- 本番、`bootRun`、`seedLocalData`、E2Eのfixtureサーバー（`writeE2eFixtureArgs`が書く引数）のJVMには`-Duser.timezone=UTC`を設定する。テストのJVMは例外で、[テスト](#テスト)に従う。
 - `ZoneId.systemDefault()`や`Clock`を受け取らない`now(...)`に業務処理を依存させない。
 - APIの絶対時刻はRFC 3339形式のUTC表現で返し、UTCオフセットには常に`Z`を使う。
   `+09:00`のようなオフセット表記では返さない。
@@ -209,7 +209,7 @@ Javaの`LocalDateTime.atZone()`は、gapでは時刻を後ろへずらし、over
 - Spectralの`instant-property-date-time`と`calendar-date-property-full-date`は、名前が`At`で終わる項目に`type: string`と`format: date-time`を、`Date`で終わる項目に`type: string`と`format: date`を求める。
   検査の対象は、`.spectral.yaml`に書くとおり名前で見分ける。
 - `spring.jackson.default-leniency: false`の読み取りは、`JacksonConfigTest`が検証する。
-- JVMのタイムゾーンは、`-Duser.timezone=UTC`を`bootRun`、`seedLocalData`、コンテナの`JAVA_TOOL_OPTIONS`で固定する。
+- JVMのタイムゾーンは、`-Duser.timezone=UTC`を`bootRun`、`seedLocalData`、E2Eのfixtureサーバー、コンテナの`JAVA_TOOL_OPTIONS`で固定する。
   `test`タスクとPITは`America/New_York`にし、`JvmTimeZoneTest`が設定の外れを検出する。
 - Jacksonの`Z`付き絶対時刻表現、DBセッションのUTC固定、`Instant`の保存往復は、契約テストと統合テストで検証する。
 

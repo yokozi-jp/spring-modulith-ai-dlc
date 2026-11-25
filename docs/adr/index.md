@@ -74,7 +74,7 @@
 - [ADR-070: SQL の span を jOOQ の ExecuteListener で作り、SQL の文と値を入れない](ADR-070-record-sql-spans-with-jooq-execute-listener.md)（Proposed, 2026-10-07）
 - [ADR-071: 作業で得た学びを 5 つの層へ還元し、上の層を優先する](ADR-071-reinforce-learnings-into-five-layers.md)（Proposed, 2026-10-08）
 - [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)（Accepted, 2026-10-08）
-- [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（Accepted, Amended by ADR-107, 2026-10-08）
+- [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（Superseded by ADR-129, Amended by ADR-107, 2026-10-08）
 - [ADR-074: jscpd の閾値を、クラスの役割の定型を含む実測の 3.93% に合わせて 4.0% にする](ADR-074-raise-jscpd-threshold-for-class-role-boilerplate.md)（Superseded by ADR-106, 2026-10-09）
 - [ADR-075: 他モジュールが分岐に使う状態の意味を、状態を持つモジュールが参照の結果の boolean で返す](ADR-075-return-state-meaning-in-query-results.md)（Proposed, 2026-10-11）
 - [ADR-076: PIT を必須でない別のワークフローで変更ごとに実行し、coverage の下限に line とクラスやファイルごとの下限を加える](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md)（Proposed, 2026-10-11）
@@ -128,3 +128,4 @@
 - [ADR-126: GET と HEAD 以外のすべての業務の API に Idempotency-Key を必須にし、モジュールごとの表に Result を保存する](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)（Proposed, 2026-11-24）
 - [ADR-127: 失敗の理由の enum から problem type と title のキーを作る](ADR-127-derive-problem-types-from-failure-reasons.md)（Proposed, 2026-11-24）
 - [ADR-128: バックエンドの全体のテストを pre-push で流さず、CI に任せる](ADR-128-run-backend-tests-in-ci-not-in-pre-push.md)（Proposed, 2026-11-25）
+- [ADR-129: E2E のデータを各テストが作り、商品はホストの fixture サーバーで作る](ADR-129-create-e2e-data-per-test-with-fixture-server.md)（Proposed, 2026-11-25）
