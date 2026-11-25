@@ -41,9 +41,6 @@ class EventPublicationResubmitterBudgetTest {
   /** 設定値。 */
   @Autowired private EventPublicationResubmissionConfig.Properties properties;
 
-  /** 再投入の回数の上限。 */
-  @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
-
   /** 差し替えられる時計。 */
   @Autowired private MutableClock clock;
 
@@ -85,7 +82,6 @@ class EventPublicationResubmitterBudgetTest {
             properties,
             policies,
             meterRegistry,
-            abandon,
             ResubmissionTestSupport.noStaleCheck());
 
     resubmitter.resubmitOnce();
@@ -138,7 +134,6 @@ class EventPublicationResubmitterBudgetTest {
             properties,
             policies,
             new SimpleMeterRegistry(),
-            abandon,
             slowStaleCheck)
         .resubmitOnce();
 

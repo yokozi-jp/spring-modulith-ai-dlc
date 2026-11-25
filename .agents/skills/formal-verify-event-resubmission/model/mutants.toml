@@ -15,13 +15,13 @@ new = ''
 
 [[mutant]]
 name = "is-due-ignores-cap"
-change = "ResubmissionPolicies.isDue drops the abandon-after-attempts cap (AbandonProperties.exceeded)"
+change = "ResubmissionPolicies.isDue drops the abandon-after-attempts cap (maxResubmissionsOf)"
 config = "documented"
 invariants = ["ResubmissionsCapped"]
 
 [[mutant.edits]]
 old = '''
-                /\ inst[i].snapAttempts <= MaxResubmissions
+                /\ inst[i].snapAttempts <= MaxDue
 '''
 new = ''
 
@@ -58,3 +58,13 @@ invariants = ["InFlightNeverMarkedStale"]
 [[mutant.edits]]
 old = '''       /\ InFlightStaleness > 2 * LockAtMostFor \* isInFlightStalenessLongerThanTwiceLockAtMostFor'''
 new = '''       /\ InFlightStaleness > LockAtMostFor'''
+
+[[mutant]]
+name = "policy-one-resubmits-once"
+change = "ResubmissionPolicies.maxResubmissions returns 1 for abandon-after-attempts: 1, so the job resubmits a crashed first delivery"
+config = "policy-abandon-on-first"
+invariants = ["NoResubmissionWhenAbandonOnFirst"]
+
+[[mutant.edits]]
+old = '''MaxDue == IF PolicyAbandon = 1 THEN 0 ELSE PolicyAbandon'''
+new = '''MaxDue == PolicyAbandon'''
