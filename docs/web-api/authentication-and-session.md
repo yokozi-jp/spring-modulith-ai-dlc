@@ -159,9 +159,10 @@ method securityの拒否で投げられる`AuthorizationDeniedException`は`Acce
 ## テナントの所属の管理
 
 選んだテナントの所属の一覧、役割の変更、所属の取り外しは、`/api/current-tenant/members`の配下にあり、テナントの管理者だけが呼べる。
-`tenancy`の`TenantSecurityCustomizer`が、このパスに`hasRole("ADMIN")`を課す。
+`tenancy`の`TenancyQueryService.findMembers`、`ChangeMemberRoleCommandHandler`、`RemoveMemberCommandHandler`が、`@PreAuthorize("hasRole('ADMIN')")`で役割を確かめる（[バックエンドの層の責務](../backend/layers.md#認可)）。
 `ROLE_ADMIN`は`TenantSelectionFilter`が引き直した所属の役割から来るため、役割の変更と取り外しは、その利用者の次のリクエストから効く。
-管理者でない利用者には、`about:blank`の403を返す。
+管理者でない利用者の形の正しい要求には、`about:blank`の403を返す。
+役割はControllerが引数を検証した後に確かめるため、管理者でない利用者の要求でも、パス、本文、クエリパラメータの形の誤りは403より先に400になる。
 
 対象のテナントは、パスにもリクエストの値にも持たず、セッションで選んだテナントから取る。
 そのため、別のテナントの所属は一覧に出ず、パスに別のテナントだけに所属する利用者のIDを指定しても404になる。

@@ -35,6 +35,7 @@ jOOQ で画面ごとの射影を読まず、[Repository](repository.md) が返�
 - `@Service` を付けた package-private の `class` にし、`final` を付けない。
 - `implements <Feature>Queries` にし、public メソッドは `@Override` を付けたインタフェースのメソッドだけにする。
 - public メソッドすべてに `@Transactional(readOnly = true)` を付け、クラスには付けない。
+- public メソッドかクラスに、役割の判断として `@PreAuthorize` か `@NoRoleRequired` を付ける（[認可](../layers.md#認可)）。
 - 依存は `<Aggregate>Repository` だけにし、package-private のコンストラクタで受け取る。
 - 引数の標準型を値オブジェクトに変換して Repository を呼ぶ（`new CustomerId(criteria.customerId())`）。
 - 集約は、状態を `OrderStatus.name()`、金額を `Money.amount()` のような標準型の値にして、ルートの record に変換する。
@@ -98,7 +99,7 @@ private static String itemNameOf(final OrderSortKey key) {
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、同じモジュールの `domain.model` の集約、値オブジェクト、Repository、`@Service`、`@Transactional`、役割を確かめる `@PreAuthorize`（[認可](../layers.md#認可)）。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、同じモジュールの `domain.model` の集約、値オブジェクト、Repository、`@Service`、`@Transactional`、役割を確かめる `@PreAuthorize` と役割を問わない `shared.security` の `@NoRoleRequired`（[認可](../layers.md#認可)）。
 - **依存してはいけない型**：jOOQ の API と生成型（`DSLContext`）、`infrastructure.persistence` の型、Command、Result、CommandHandler、Presentation の型、`ApplicationEventPublisher`、外部システムのインタフェース、他モジュールの型。
 
 ## 最小の例と典型的な例
@@ -122,6 +123,7 @@ public List<OrderSummary> search(final OrderSearchCriteria criteria) {
 package com.example.demo.ordering.application;
 
 /** 注文の参照を、Repository で読んだ集約から作る。 */
+@NoRoleRequired(reason = "注文の参照はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
 @Service
 class OrderQueryService implements OrderQueries {
 
@@ -239,6 +241,7 @@ class OrderQueryServiceTest {
 - [ ] `application` に置き、同じモジュールのルートの `<Feature>Queries` を実装し、public メソッドすべてに `@Transactional(readOnly = true)` を付ける。［ArchUnit で検査：ClassRoleArchTest.queryServicesImplementModuleQueries］
 - [ ] `application` の `@Service` の名前を `QueryService` で終える。［ArchUnit で検査：ClassRoleArchTest.applicationServicesHaveRoleNames］
 - [ ] クラスに `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel］
+- [ ] public メソッドかクラスに `@PreAuthorize` か、理由を書いた `@NoRoleRequired` を付ける。［ArchUnit で検査：ProxyRulesArchTest.applicationHandlersDeclareAuthorization］
 - [ ] `@Transactional` を付けたメソッドを public にする。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] jOOQ の API と生成型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.databaseTechnologyApisAreOnlyUsedByPersistenceAdapters］
 - [ ] Presentation と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］

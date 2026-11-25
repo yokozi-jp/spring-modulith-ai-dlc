@@ -35,7 +35,7 @@ Proposed
 
 | モジュール | `allowedDependencies`                       |
 | ---------- | ------------------------------------------- |
-| `product`  | `"jooq"`                                    |
+| `product`  | `{"shared :: security", "jooq"}`            |
 | `ordering` | `{"product", "shared :: *", "jooq"}`        |
 | `payment`  | `{"ordering", "shared :: *", "jooq"}`       |
 | `tenancy`  | `{"shared :: *", "jooq"}`                   |

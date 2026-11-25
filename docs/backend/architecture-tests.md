@@ -299,6 +299,9 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
   違反フィクスチャの`ordering.presentation.web.OrderPurgeController`（Controllerに`@PreAuthorize`を付けた）で確かめる。
 - `preAuthorizeUsesOnlyRoleOrAuthorityNames`：`@PreAuthorize`の値を、`hasRole`、`hasAnyRole`、`hasAuthority`、`hasAnyAuthority`に文字列のリテラルを渡す式に限る。
   守らせる規約は[バックエンドの層の責務](layers.md#認可)に示す。
+- `applicationHandlersDeclareAuthorization`：役割の判断の宣言（`@PreAuthorize`か`@NoRoleRequired`）がないCommandHandlerとQueryServiceのpublicメソッドと、空か空白だけの`reason`の`@NoRoleRequired`を拒否する。
+  対象の範囲と守らせる規約は[バックエンドの層の責務](layers.md#認可)に示す。
+  違反フィクスチャの`ordering.application.UndeclaredRoleCommandHandler`、`UndeclaredRoleQueryService`（宣言がない）と`BlankReasonCommandHandler`（空と空白だけの`reason`）で確かめる。
 
 同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
 違反フィクスチャの`shared.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。

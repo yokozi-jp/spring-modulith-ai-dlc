@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-129: 誰が要求したかを application で確かめ、操作と操作する人の組ごとの認可の表で確かめる'
-description: 業務の規則と状態は domain、誰が要求したか（本人か、役割、見えるか）は application で確かめる決定。見える範囲は Repository の SQL で絞って見えなければ 404、役割は CommandHandler の @PreAuthorize で確かめて 403 にし、確かめ忘れは OpenAPI の operation と操作する人の組ごとの認可の表のテストで止め、認可のライブラリと方針エンジンは入れない。
+description: 業務の規則と状態は domain、誰が要求したか（本人か、役割、見えるか）は application で確かめる決定。見える範囲は Repository の SQL で絞って見えなければ 404、役割は CommandHandler の @PreAuthorize で確かめて 403 にし、CommandHandler と QueryService の public メソッドには @PreAuthorize か @NoRoleRequired で役割の判断を宣言させ、確かめ忘れは OpenAPI の operation と操作する人の組ごとの認可の表のテストで止め、認可のライブラリと方針エンジンは入れない。
 tags: [adr, backend, security, authorization, testing]
 ---
 
@@ -26,7 +26,9 @@ Proposed
 `backend/src/main` に `@EnableMethodSecurity` と `@PreAuthorize` はない。
 注文の CommandHandler は、注文を ID だけで読み（`ConfirmOrderCommandHandler`）、持ち主を確かめない。
 参照業務機能のこの割り切りは [バックエンドアーキテクチャ](../backend/architecture.md) に書いてあり、持ち主に限る認可は [#188](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/188) で扱う。
-持ち主に限る認可の #188 と、管理者の招待の [#380](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/380) は、認可をどの層で確かめるか、役割をどう確かめるか、確かめ忘れをどう止めるかの決定を待っている。
+持ち主に限る認可の #188 は、認可をどの層で確かめるか、確かめ忘れをどう止めるかの決定を待っている。
+役割で許す操作は、今は所属の管理の API（所属の一覧、役割の変更、所属の取り外し）だけである。
+利用者の招待は別のシステムが担当するため（[ADR-101](ADR-101-keep-tenants-and-roles-in-app-database.md)）、招待の API はアプリに入らない。
 
 [#315](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/315) で、`yokozi-jp/agent-software-factory`（commit `29ba897`）の ADR 0045 の認可の方針を調べ、一部を取り込むと決めた。
 向こうは、方針の関数 `authorize` が返す許可の証（`Permit`）を domain の遷移の必須の引数にし、方針の呼び忘れを型で止める。
@@ -65,6 +67,9 @@ application は `SecurityContextHolder` を読まず、利用者を引数で受�
 引数や Bean を参照する式を許すと、SQL の WHERE と役割の名前のほかに、SpEL の文字列の中にも認可の判断ができ、選択肢2 と同じく判断が分かれるためである。
 Spring Security のリファレンスも、複雑な SpEL より権限を与える形を勧める（Favor Granting Authorities Over Complicated SpEL Expressions）。
 
+所属の管理の API の役割も、`TenantSecurityCustomizer` の URL の規則をやめ、`ChangeMemberRoleCommandHandler`、`RemoveMemberCommandHandler`、`TenancyQueryService.findMembers` の `@PreAuthorize("hasRole('ADMIN')")` で確かめる。
+役割の判断を URL の規則と application の 2 か所に分けず、application の宣言だけを見れば分かるようにするためである。
+
 method security のアノテーションは `@PreAuthorize` だけを使う。
 
 - `@PostAuthorize` と `@PostFilter` は読んだ後に判断し、`@PreFilter` は受け取った値をメモリで絞るため使わない（選択肢3）。
@@ -75,9 +80,25 @@ method security のアノテーションは `@PreAuthorize` だけを使う。
 - application が依存してよい method security の型を、パッケージ `org.springframework.security.access.prepost` ではなく型 `PreAuthorize` に絞る。パッケージで許すと、同じパッケージの `@PostFilter` などが通るためである。
 - method security のアノテーションを、application のクラスだけに付ける。
 - `@PreAuthorize` の値を、役割か権限の名前を文字列のリテラルで渡す式に限る。
+- CommandHandler と QueryService の public メソッドに役割の判断の宣言を求め、`@NoRoleRequired` の空か空白だけの `reason` を拒否する（次の「役割の判断の宣言」）。
 
 Listener とバッチから呼ぶメソッドに `@PreAuthorize` を付けないことは、検査せずレビューで見る。
 Listener、ItemWriter、Tasklet は CommandHandler を 1 つ呼ぶだけなので、呼び出しの経路が 1 段で、差分から読めるためである。
+
+### 役割の判断の宣言
+
+CommandHandler と QueryService の public メソッドは、どれも役割の判断を宣言する（対象の範囲は [バックエンドの層の責務](../backend/layers.md#認可)）。
+役割で許すメソッドには `@PreAuthorize` を、役割を問わないメソッドには `shared.security` の `@NoRoleRequired` を付ける。
+`@NoRoleRequired` は実行時に何もせず、必須の `reason` に役割を問わない理由を持つ。
+
+宣言を求めるのは、認可の表のテストでは `@PreAuthorize` の付け忘れを止められないメソッドがあるためである。
+認可の表のテストは operation ごとに応答を確かめ、operation を足したときだけ、期待の書き忘れをコンパイルで止める。
+operation を通らずに呼ぶメソッド（Listener から呼ぶ `ChargeOrderCommandHandler`）と、既存の operation の後ろに足した CommandHandler や QueryService のメソッドでは、表の行が増えない。
+そのため、書いた人が役割を判断しないまま、アノテーションのないメソッドが残りうる。
+宣言を求めれば、判断していないメソッドは ArchUnit で止まり、役割を問わないと決めたメソッドは `reason` で区別できる。
+
+`reason` を求めるのは、役割を問わない判断が正しいかを、メソッドの宣言の場所でレビューできるようにするためである。
+宣言を役割を問わないメソッドの一覧のファイルに集める形は選ばない（選択肢7）。
 
 ### 応答
 
@@ -133,6 +154,7 @@ Spring Security の method security だけを使う。
 - 見えない行を SQL で読まないため、一覧の件数とページングが見える行だけで決まり、他人の行がアプリのメモリに載らない。
 - 操作を足したときの期待の書き忘れはコンパイルで、他人の id で読めて書ける漏れは Pull Request の CI で止まる。
 - 認可の判断は SQL の WHERE と method security のアノテーションにだけあり、自作の方針の関数と二重にならない。
+- 役割を判断していない CommandHandler と QueryService のメソッドは、operation の後ろにあるかを問わず ArchUnit で止まる。
 - domain が認証の型に依存しないため、domain の単体テストで認証を作らなくてよい。
 
 ### Negative
@@ -140,12 +162,12 @@ Spring Security の method security だけを使う。
 - 認可の表のテストは Spring と DB を起動し、operation の数と 5 種類の操作する人の積だけ要求を送るため、テストの時間が増える。
 - 見える範囲の条件は Repository と `<Feature>Queries` ごとに書く。条件の書き忘れは型では止まらず、認可の表のテストでだけ止まる。
 - `@PreAuthorize` を付けたメソッドは、認証のない呼び出し（Listener、バッチ）から呼ぶと拒否される。役割で許す操作を Listener からも呼ぶ必要が出たら、CommandHandler を分ける。
+- 所属の管理の API の役割の確かめが、URL の規則の `AuthorizationFilter` から、Controller の引数の検証より後に動く method security に移る。そのため、管理者でない利用者の要求でも、パス、本文、クエリパラメータの形の誤りは 403 の前に 400 になる。400 が示すのは OpenAPI で公開している入力の形だけで、所属の中身は返さない。
+- CommandHandler と QueryService を足すたびに、`@PreAuthorize` か `@NoRoleRequired` を書く手間が増える。
 
 ### Neutral
 
-- 所属の管理の API は、この ADR の前から `TenantSecurityCustomizer` の URL の規則で役割を確かめている。認可の表のテストは、どちらの仕組みで拒否しても 403 を確かめる。
 - 持ち主の表し方（作成した利用者の ID を注文に持つか）と、admin に持ち主でない注文を見せるかは、#188 で決める。#188 で、例外の一覧から #188 の組を消す。
-- #380 は、管理者だけの操作に `@PreAuthorize("hasRole('ADMIN')")` を付け、認可の表に行を足す。
 - [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) の Idempotency-Key が入ったら、認可の表のテストの書き込みの要求にキーを付ける。
 - 拒否のログは足さない。ログは利用者の ID を `user.id` で持ち、拒否の急増の検知は可観測性の送り先で扱う。
 
@@ -186,6 +208,12 @@ Spring Security の method security だけを使う。
 - **Description**：向こうの網羅のテストのように、方針の関数と domain の遷移を単体テストで網羅し、BOLA は別の結合テストで確かめる。
 - **Pros**：Spring と DB を起動しないため、テストが速い。
 - **Cons**：こちらの判断は SQL の WHERE とアノテーションにあり、単体テストでは動かない。API の結合テスト 1 つ（認可の表のテスト）にまとめる。
+
+### 選択肢7: 役割を問わないメソッドを 1 つのファイルの一覧に持つ
+
+- **Description**：役割を問わないメソッドの名前を、ArchUnit のテストの側か設定のファイルの許可の一覧に並べる。一覧にも `@PreAuthorize` もないメソッドを失敗にする。
+- **Pros**：アノテーションの型を足さずに済み、役割を問わないメソッドを 1 か所で見渡せる。
+- **Cons**：一覧が CommandHandler から離れ、メソッドの差分を読んでも判断が見えない。メソッドを改名、削除しても一覧の行が残るため、残った行を消す検査も要る。`@NoRoleRequired` の `reason` なら、判断と理由がメソッドの宣言と同じ差分に載る。
 
 ## References
 

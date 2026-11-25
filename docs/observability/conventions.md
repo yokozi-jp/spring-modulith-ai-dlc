@@ -74,7 +74,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 認証していないリクエストのログは、`user.id` も `tenant.id` も持たない。
 401 と Spring Security の entry point のログがこれにあたる。
 
-Controller の中の `@PreAuthorize` が拒否したときのログは、2 つを持つ。
+Controller から呼んだ application の `@PreAuthorize` が拒否したときのログは、2 つを持つ。
 
 トレースでは、`TenantSelectionFilter` が HTTP の受信の span にだけ、2 つを属性として付ける。
 `TenantSelectionFilter` の手前で拒否する CSRF の失敗の span は、ログと違い、どちらも持たない。

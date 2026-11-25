@@ -37,7 +37,7 @@ tags: [reference, code-review]
 - [ADR-007: セッションベース認証と OIDC Authorization Code + PKCE](../adr/ADR-007-session-based-auth-with-oidc-pkce.md)
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](../adr/ADR-014-use-same-origin-spa-security-boundary.md)
 - [ADR-015: 可観測性データを構造化し保護する](../adr/ADR-015-structure-and-protect-observability-data.md)
-- [バックエンドの層の責務の認可](../backend/layers.md#認可)：見える範囲の絞り方、`@PreAuthorize`の付け方、Listenerとバッチから呼ぶメソッドに付けていないか
+- [バックエンドの層の責務の認可](../backend/layers.md#認可)：見える範囲の絞り方、`@PreAuthorize`の付け方、Listenerとバッチから呼ぶメソッドに付けていないか、`@NoRoleRequired`の`reason`が正しいか
 - [APIの認証、セッション、権限の認可](../web-api/authentication-and-session.md#認可)：見えない対象と役割で許されない操作への応答
 - [認可の表のテスト](../backend/authorization-matrix-test.md)：operationを足した差分で、期待の表と例外の一覧を足したか
 - [ADR-129: 誰が要求したかを application で確かめ、操作と操作する人の組ごとの認可の表で確かめる](../adr/ADR-129-place-authorization-in-application-and-test-it-per-operation-and-actor.md)
