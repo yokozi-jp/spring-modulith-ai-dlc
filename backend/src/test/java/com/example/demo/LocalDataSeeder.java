@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import static com.example.demo.jooq.ordering.Tables.T_IDEMPOTENCY_KEY;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
@@ -70,9 +71,17 @@ public final class LocalDataSeeder {
     SKIPPED_NOT_MIGRATED
   }
 
-  /** 業務データの表。子から順に並べ、reset はこの順に DELETE する。modulith と tenancy と Liquibase の表は含めない。 */
+  /** 業務データの表。子から順に並べる。modulith と tenancy と Liquibase の表は含めない。 */
   /* package */ static final List<Table<?>> BUSINESS_TABLES =
       List.of(T_PAYMENT, T_ORDER_LINE, T_ORDER, M_PRODUCT);
+
+  /**
+   * reset が消す表。業務データの表と、代表データを入れない Idempotency-Key の表で、この順に DELETE する。
+   *
+   * <p>キーの表を消さないと、消した注文の作成を、同じキーの再送で返し直す（ADR-126）。
+   */
+  /* package */ static final List<Table<?>> RESET_TABLES =
+      Stream.concat(Stream.of(T_IDEMPOTENCY_KEY), BUSINESS_TABLES.stream()).toList();
 
   /** テナントと所属の表。業務データの有無によらず、毎回 {@link TenancySeeds} が足りない行だけを入れる。reset でも消さない。 */
   private static final List<Table<?>> TENANCY_TABLES = List.of(M_TENANT, M_MEMBERSHIP);
@@ -117,7 +126,7 @@ public final class LocalDataSeeder {
   /** 呼ぶ側のトランザクションの中で、モードに従って代表データを入れる。 */
   /* package */ Outcome seed(final DSLContext dsl, final Mode mode) {
     final boolean migrated =
-        Stream.concat(BUSINESS_TABLES.stream(), TENANCY_TABLES.stream())
+        Stream.concat(RESET_TABLES.stream(), TENANCY_TABLES.stream())
             .allMatch(table ->
                 AsModule.callWithoutTenant(
                     dsl,
@@ -145,7 +154,7 @@ public final class LocalDataSeeder {
             });
     if (mode == Mode.RESET) {
       tenants.forEach(tenant ->
-          BUSINESS_TABLES.forEach(
+          RESET_TABLES.forEach(
               table -> inModuleOf(dsl, tenant, table, tx -> tx.deleteFrom(table).execute())));
     }
     final List<String> nonEmpty =
