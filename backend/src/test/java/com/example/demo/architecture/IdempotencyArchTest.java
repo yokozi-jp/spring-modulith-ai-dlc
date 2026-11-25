@@ -57,7 +57,8 @@ class IdempotencyArchTest {
   /**
    * {@code Idempotency-Key} を求める HTTP メソッドの注釈。
    *
-   * <p>ponytail: {@code @RequestMapping(method = ...)} で書いたマッピングは見ない。使い始めたら、その {@code method} も判定に足す。
+   * <p>ponytail: {@code @RequestMapping(method = ...)} で書いたマッピングは見ない。使い始めたら、その {@code method}
+   * も判定に足す。
    */
   private static final List<Class<? extends Annotation>> UNSAFE_MAPPINGS =
       List.of(PostMapping.class, PutMapping.class, PatchMapping.class, DeleteMapping.class);
@@ -115,10 +116,9 @@ class IdempotencyArchTest {
                     UNSAFE_MAPPINGS.stream().anyMatch(method::isAnnotatedWith)
                         && !marksNoKey(method)
                         && !notYetIdempotent.contains(
-                            method
-                                .getFullName()
-                                .substring(basePackage.length() + 1)
-                                .split("\\(")[0])))
+                            method.getOwner().getName().substring(basePackage.length() + 1)
+                                + "."
+                                + method.getName())))
         .should(takeIdempotencyKeyAfterPathVariables(idempotencyKey))
         .allowEmptyShould(true)
         .because(
