@@ -83,8 +83,8 @@ class TableWriterTest {
   /** アプリロールで接続した jOOQ のコンテキスト。 */
   @Autowired private DSLContext dsl;
 
-  /** 行を作るときの共通カラムの値。 */
-  private CommonColumns seedColumns;
+  /** 行を作る。 */
+  private FixtureSeeds seeds;
 
   /** トランザクションの有無と読み取り専用を切り替えて呼ぶ。 */
   @Autowired private PlatformTransactionManager transactionManager;
@@ -94,8 +94,11 @@ class TableWriterTest {
 
   @BeforeEach
   void setUp() {
-    seedColumns =
-        new CommonColumns(Clock.fixed(CREATED, ZoneOffset.UTC), TracerStubs.withTraceId(TRACE_ID));
+    seeds =
+        new FixtureSeeds(
+            dsl,
+            new CommonColumns(
+                Clock.fixed(CREATED, ZoneOffset.UTC), TracerStubs.withTraceId(TRACE_ID)));
     writer =
         new TableWriter(
             dsl,
@@ -525,25 +528,12 @@ class TableWriterTest {
 
   /** {@code lock_no = 1} の行を作る。 */
   private void insertItem(final long itemId, final String name) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
-        .run(() ->
-            dsl.insertInto(FIXTURE_ITEM)
-                .set(seedColumns.forInsert(FIXTURE_ITEM))
-                .set(FIXTURE_ITEM.ITEM_ID, itemId)
-                .set(FIXTURE_ITEM.ITEM_NAME, name)
-                .execute());
+    seeds.insertItem(itemId, name);
   }
 
   /** {@code lock_no = 1} の子の行を作る。 */
   private void insertDetail(final long itemId, final int detailNo, final String text) {
-    ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
-        .run(() ->
-            dsl.insertInto(FIXTURE_ITEM_DETAIL)
-                .set(seedColumns.forInsert(FIXTURE_ITEM_DETAIL))
-                .set(FIXTURE_ITEM_DETAIL.ITEM_ID, itemId)
-                .set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detailNo)
-                .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, text)
-                .execute());
+    seeds.insertDetail(itemId, detailNo, text);
   }
 
   /** 別の人が先に更新した状態にする（版を 2 にする）。 */

@@ -1,11 +1,11 @@
 package com.example.demo.tenancy.infrastructure.persistence;
 
-import static com.example.demo.jooq.tenancy.Tables.H_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.jooq.tenancy.Tables;
 import com.example.demo.jooq.tenancy.tables.records.HMembershipRecord;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.persistence.TableWriter;
@@ -27,8 +27,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** テナントの所属の読み出しと、所属の変更の保存を検証する。 */
-// 所属の保存の場合ごとにテストを分け、生成した表を static import で読むため、PMD の上限を外す。
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.TooManyStaticImports"})
+// 所属の保存の場合ごとにテストを分けるため、メソッド数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 @DatabaseTest
 class JooqTenantRepositoryTest {
 
@@ -101,7 +101,7 @@ class JooqTenantRepositoryTest {
 
     TestCommonColumns.runAs(() -> repository().update(tenant));
 
-    final HMembershipRecord history = dsl.selectFrom(H_MEMBERSHIP).fetchSingle();
+    final HMembershipRecord history = dsl.selectFrom(Tables.H_MEMBERSHIP).fetchSingle();
     assertThat(history.getUserId()).as("外した利用者").isEqualTo(userPk(second));
     assertThat(history.getRoleTyp()).as("外す前の役割").isEqualTo(MEMBER);
     assertThat(history.getLockNo()).as("外す前のロック番号").isEqualTo(1L);

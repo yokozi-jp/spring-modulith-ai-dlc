@@ -233,10 +233,21 @@ class SchemaTenantConventionsTest {
     }
 
     @Test
-    @DisplayName("K1：履歴の表（h_）は、参照先の主キーと同じ名前の列に外部キーを求めない")
-    void skipsHistoryTables() {
+    @DisplayName("K1：archived_at を持つ履歴の表は、外部キーのない参照の列を拒否しない")
+    void skipsArchiveTables() {
       final List<ColumnRow> history =
-          List.of(new ColumnRow(TENANCY, "h_membership", USER_ID, BIGINT, "b", "", "", null, true));
+          List.of(
+              new ColumnRow(TENANCY, "h_membership", USER_ID, BIGINT, "b", "", "", null, true),
+              new ColumnRow(
+                  TENANCY,
+                  "h_membership",
+                  "archived_at",
+                  "timestamp with time zone",
+                  "b",
+                  "",
+                  "",
+                  null,
+                  true));
 
       assertThat(SchemaTenantConventions.foreignKeys(relations, history, List.of())).isEmpty();
     }

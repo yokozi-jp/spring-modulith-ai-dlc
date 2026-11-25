@@ -10,6 +10,7 @@ import org.jooq.DSLContext;
 import org.jooq.Name;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
+import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -48,7 +49,9 @@ public final class FixtureTablesExtension implements BeforeAllCallback, AfterAll
               .primaryKey(FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_NO)
               .execute();
           dsl.createTable(FIXTURE_ITEM_DETAIL_ARCHIVE)
+              .column(DSL.name("archive_id"), SQLDataType.BIGINT.generatedAlwaysAsIdentity())
               .columns(FIXTURE_ITEM_DETAIL_ARCHIVE.fields())
+              .primaryKey(DSL.name("archive_id"))
               .execute();
           dsl.query("GRANT USAGE ON SCHEMA {0} TO {1}", FIXTURE_SCHEMA, appRole).execute();
           dsl.query(

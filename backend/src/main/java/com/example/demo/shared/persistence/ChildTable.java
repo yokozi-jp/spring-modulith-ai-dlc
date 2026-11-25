@@ -40,13 +40,13 @@ public final class ChildTable<C extends Record> {
   private final List<TableField<C, ?>> naturalKey;
 
   /** 削除する前の行を残す履歴の表。残さない子は {@code null}。 */
-  private final @Nullable Table<?> archive;
+  private final @Nullable Archive archive;
 
   private ChildTable(
       final Table<C> table,
       final TableField<C, Long> parentKey,
       final List<TableField<C, ?>> naturalKey,
-      final @Nullable Table<?> archive) {
+      final @Nullable Archive archive) {
     this.table = table;
     this.parentKey = parentKey;
     this.naturalKey = List.copyOf(naturalKey);
@@ -79,26 +79,33 @@ public final class ChildTable<C extends Record> {
   /**
    * 子の行を削除する前に、履歴の表へ写すようにする（ADR-129）。
    *
-   * <p>履歴の表は、子のテーブルのすべての列（共通カラムを含む）を同じ名前と型で持ち、退避のカラム（{@code archived_at}、{@code archived_by}、{@code
-   * archived_pgm_cd}、{@code archived_tx_id}）を持つ。子の主キーと自然キーに一意制約を付けず、同じ子を作り直して消しても書ける形にする。
+   * <p>履歴の表は、子のテーブルのすべての列（共通カラムを含む）を同じ名前と Java の型で持ち、退避のカラム（{@code archived_at}、{@code
+   * archived_by}、{@code archived_pgm_cd}、{@code
+   * archived_tx_id}）を持つ。子の主キーと自然キーに一意制約を付けず、同じ子を作り直して消しても書ける形にする。
+   *
+   * <p>ponytail: 上限：列の長さと NULL の可否は比べない。子の列だけを広げて履歴の表を広げ忘れると、最初の削除の INSERT が失敗する。
    *
    * @param archive 履歴の表
    * @throws IllegalArgumentException 子のテーブルの列か退避のカラムがない、または型が異なる場合
    */
   public ChildTable<C> archivedTo(final Table<?> archive) {
-    for (final Field<?> field : table.fields()) {
-      final @Nullable Field<?> archived = archive.field(field.getName());
-      if (archived == null || !field.getType().equals(archived.getType())) {
-        throw new IllegalArgumentException(
-            "archive column is missing or has an unexpected type: archive="
-                + archive.getName()
-                + ", column="
-                + field.getName());
-      }
-    }
+    final List<Field<?>> columns =
+        table
+            .fieldStream()
+            .<Field<?>>map(
+                field -> CommonColumns.requiredField(archive, field.getName(), field.getType()))
+            .toList();
     CommonColumns.requireArchiveColumns(archive);
-    return new ChildTable<>(table, parentKey, naturalKey, archive);
+    return new ChildTable<>(table, parentKey, naturalKey, new Archive(archive, columns));
   }
+
+  /**
+   * 履歴の表と、子のテーブルの列と同じ順に並べた、履歴の表の列。
+   *
+   * @param table 履歴の表
+   * @param columns 子のテーブルの列と同じ順の、履歴の表の列
+   */
+  /* package */ record Archive(Table<?> table, List<Field<?>> columns) {}
 
   /**
    * 保存後にあるべき、この子の全行を作る。{@link TableWriter} の入口に渡す。
@@ -144,7 +151,7 @@ public final class ChildTable<C extends Record> {
     }
   }
 
-  /* package */ Optional<Table<?>> archive() {
+  /* package */ Optional<Archive> archive() {
     return Optional.ofNullable(archive);
   }
 

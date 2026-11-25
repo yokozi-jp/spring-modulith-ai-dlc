@@ -30,6 +30,9 @@ import org.springframework.stereotype.Component;
  *
  * <p>戻り値の Map は jOOQ の {@code set(Map)} にそのまま渡す。{@code patched_*} はデータパッチだけが更新するため扱わない。
  *
+ * <p>{@link #forArchive} は、削除する子の行を履歴の表へ写す {@link ChildWriter} だけが使い、{@code archived_*}
+ * の値を返す（ADR-129）。
+ *
  * <p>{@link #forInsert} は {@link TableWriter} とテストのデータ作成が INSERT で使う。{@link #forUpdate} は {@link
  * TableWriter} だけが使い、UPDATE の {@code lock_no} は {@link TableWriter} だけが書く（ADR-054）。
  *

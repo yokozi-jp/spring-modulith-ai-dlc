@@ -48,16 +48,17 @@ final class FixtureAggregates {
 
   /** 明細番号と文言を子の列に書く、{@link #DETAILS} の全行を作る。 */
   /* package */ static ChildRows<Record> detailRows(final List<Detail> details) {
-    return DETAILS.rows(
-        details,
-        (detail, set) ->
-            set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())
-                .set(FIXTURE_ITEM_DETAIL.DETAIL_TEXT, detail.text()));
+    return rowsOf(DETAILS, details);
   }
 
   /** {@link #ARCHIVED_DETAILS} の全行を作る。 */
   /* package */ static ChildRows<Record> archivedDetailRows(final List<Detail> details) {
-    return ARCHIVED_DETAILS.rows(
+    return rowsOf(ARCHIVED_DETAILS, details);
+  }
+
+  private static ChildRows<Record> rowsOf(
+      final ChildTable<Record> child, final List<Detail> details) {
+    return child.rows(
         details,
         (detail, set) ->
             set.set(FIXTURE_ITEM_DETAIL.DETAIL_NO, detail.number())

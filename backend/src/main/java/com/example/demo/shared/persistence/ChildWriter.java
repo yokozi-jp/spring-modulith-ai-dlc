@@ -1,6 +1,7 @@
 package com.example.demo.shared.persistence;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -12,6 +13,7 @@ import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.InsertValuesStepN;
 import org.jooq.Record;
+import org.jooq.Result;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
@@ -75,7 +77,7 @@ import org.jspecify.annotations.Nullable;
     insertChildren(child, rootId, added);
   }
 
-  /** なくなった子を、自然キーの組で削除する。履歴の表がある子は、削除の前に同じ条件の行を写す。 */
+  /** なくなった子を、自然キーの組で削除する。履歴の表がある子は、削除した行をそのまま履歴の表へ写す。 */
   private <C extends Record> void deleteChildren(
       final ChildTable<C> child, final long rootId, final List<List<Object>> removed) {
     final Table<C> table = child.table();
@@ -83,48 +85,42 @@ import org.jspecify.annotations.Nullable;
         DSL.or(removed.stream().map(naturalKey -> naturalKeyCondition(child, naturalKey)).toList());
     final Condition condition = child.parentKey().eq(rootId).and(removedKeys);
     final Supplier<String> target = () -> childTarget(table, rootId);
-    child
-        .archive()
-        .ifPresent(archive -> archiveChildren(table, archive, condition, removed.size(), target));
-    ConflictTranslator.executeOrConflict(
-        () -> dsl.deleteFrom(table).where(condition).execute(), target);
+    final Result<C> deleted =
+        ConflictTranslator.executeOrConflict(
+            () -> dsl.deleteFrom(table).where(condition).returning(table.fields()).fetch(), target);
+    child.archive().ifPresent(archive -> archiveRows(archive, deleted, target));
   }
 
   /**
-   * 削除する子の行を、退避の日時、者、プログラム、トレースと一緒に履歴の表へ 1 文で写す。写した行数が削除する行数と違えば、削除の前に失敗させる。
+   * 削除した行を、退避の日時、者、プログラム、トレースと一緒に、履歴の表へ 1 文の複数行の INSERT で写す。
    *
-   * <p>写す文と削除の文は同じトランザクションで実行するため、片方だけが成功しない。
+   * <p>写すのは {@code DELETE ... RETURNING} が返した行そのものなので、削除した行と写した行は一致する。削除と写しは、{@link TableWriter}
+   * が要求する同じトランザクションの中にあり、写しが失敗すると削除も戻る。
    */
-  private void archiveChildren(
-      final Table<?> table,
-      final Table<?> archive,
-      final Condition condition,
-      final int expected,
+  private void archiveRows(
+      final ChildTable.Archive archive,
+      final Result<? extends Record> deleted,
       final Supplier<String> target) {
-    final List<Field<?>> columns = new ArrayList<>();
-    final List<Field<?>> values = new ArrayList<>();
-    for (final Field<?> field : table.fields()) {
-      columns.add(archive.field(field.getName()));
-      values.add(field);
+    final Map<Field<?>, Object> archived = commonColumns.forArchive(archive.table());
+    final List<Field<?>> columns = new ArrayList<>(archive.columns());
+    columns.addAll(archived.keySet());
+    InsertValuesStepN<?> insert = dsl.insertInto(archive.table()).columns(columns);
+    for (final Record row : deleted) {
+      insert = insert.values(archivedValues(row, archived.values()));
     }
-    commonColumns
-        .forArchive(archive)
-        .forEach((field, value) -> {
-          columns.add(field);
-          values.add(DSL.val(value, field));
-        });
-    final int archived =
-        ConflictTranslator.executeOrConflict(
-            () ->
-                dsl.insertInto(archive)
-                    .columns(columns)
-                    .select(dsl.select(values).from(table).where(condition))
-                    .execute(),
-            target);
-    if (archived != expected) {
-      throw new IllegalStateException(
-          "archived " + archived + " child rows, expected " + expected + ": " + target.get());
+    final InsertValuesStepN<?> statement = insert;
+    ConflictTranslator.executeOrConflict(statement::execute, target);
+  }
+
+  /** 履歴の表への INSERT の 1 行の値を、子の列の順（削除した行の値）の後に退避のカラムの値を続けて返す。 */
+  private static List<@Nullable Object> archivedValues(
+      final Record row, final Collection<Object> archived) {
+    final List<@Nullable Object> values = new ArrayList<>();
+    for (int i = 0; i < row.size(); i++) {
+      values.add(row.get(i));
     }
+    values.addAll(archived);
+    return values;
   }
 
   /**

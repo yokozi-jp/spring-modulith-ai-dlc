@@ -485,22 +485,12 @@ class SchemaConventionsTest {
     }
 
     @Test
-    @DisplayName("P3：履歴の表（h_）は、子の列と同じ名前の列と退避のトレースの列を判定しない")
-    void skipsHistoryTables() {
+    @DisplayName("P3：履歴の表の archived_tx_id は、行を指さない列として受け入れる")
+    void acceptsArchivedTraceId() {
       assertThat(
               SchemaTableConventions.references(
                   List.of(relation(ITEM, "r", true, null)),
-                  List.of(
-                      new ColumnRow(
-                          ITEM,
-                          "h_item",
-                          "archived_tx_id",
-                          "character varying(32)",
-                          "b",
-                          "",
-                          "",
-                          null),
-                      new ColumnRow(ITEM, "h_item", "order_id", BIGINT, "b", "", "", null))))
+                  List.of(column(ITEM, "archived_tx_id", "character varying(32)"))))
           .isEmpty();
     }
 

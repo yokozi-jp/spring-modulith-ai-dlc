@@ -23,7 +23,7 @@ Proposed
 pgAudit は保守運用者の操作だけを対象にし、アプリケーションの DELETE を記録しない。
 
 規約は、物理削除する行を、誤操作からの復元や監査での参照が要件にあるときだけアーカイブテーブルへ退避するとする（[PostgreSQLのテーブル論理設計](../database/postgresql-logical-design.md#論理削除)、[ADR-113](ADR-113-forbid-logical-delete-flags.md)）。
-退避はトリガーでなくアプリケーションが書く（[PostgreSQLの時間で変わる業務データ](../database/postgresql-temporal-data.md#トリガー)）。
+退避はトリガーでなくアプリケーションが書く（[PostgreSQLのデータベースオブジェクト](../database/postgresql-database-objects.md#トリガー)）。
 
 現在の子は三つある。
 
@@ -44,9 +44,9 @@ pgAudit は保守運用者の操作だけを対象にし、アプリケーショ
 ## Decision
 
 追跡が必要な子だけ、`ChildTable.archivedTo(履歴の表)` で履歴の表を宣言する。
-`ChildWriter` は、履歴の表がある子を削除する前に、削除する行を `INSERT ... SELECT` の 1 文で履歴の表へ写す。
-写した行数が削除する行数と違えば `IllegalStateException` にし、削除の前に失敗させる。
-写す文と削除の文は、`TableWriter` が要求する同じトランザクションで実行するため、片方だけが成功しない。
+`ChildWriter` は、履歴の表がある子を `DELETE ... RETURNING` で削除し、返った行をそのまま、履歴の表へ複数行の INSERT で写す。
+写すのは削除した行そのものなので、写した行は削除した行と一致する。
+削除と写しは、`TableWriter` が要求する同じトランザクションにあり、写しが失敗すると削除も戻る。
 
 履歴の表は次の形にする。
 
@@ -56,7 +56,9 @@ pgAudit は保守運用者の操作だけを対象にし、アプリケーショ
   `deleted_at` にしないのは、論理削除のカラム名を拒否する規則 N11 に当たらないためと、この列が削除の印ではなく退避の記録だからである。
 - 子の主キーと自然キーに一意制約を付けない。同じ自然キーの子を作り直して消しても、書ける。代わりに自前の主キー（`membership_history_id`）を持つ。
 - 外部キーを張らない。親や利用者の行が後からなくなっても、履歴は残す。
-- 宣言は、列の名前と型、退避のカラムの有無を、Repository のクラスが読み込まれるときに検査し、足りなければ `IllegalArgumentException` にする。
+- 宣言は、子の列と同じ名前と Java の型の列があるか、退避のカラムがあるかを、Repository のクラスが読み込まれるときに検査し、足りなければ `IllegalArgumentException` にする。
+  列の長さと NULL の可否は比べない。子の列だけを広げて履歴の表を広げ忘れると、最初の削除の INSERT が失敗する（`ChildTable.archivedTo` の `ponytail:`）。
+- スキーマ検査は、`archived_at` を持つ表を履歴の表として、外部キーのない参照の列（K1）を拒否せず、`archived_tx_id` を行を指さない列（P3）として受け入れる。
 
 追跡する子は、次のとおり決める。
 
@@ -76,12 +78,14 @@ pgAudit は保守運用者の操作だけを対象にし、アプリケーショ
 - 追跡する子は、削除した行の内容を、退避した日時、者、処理、trace と一緒に後から引ける。
 - 退避と削除が同じトランザクションにあり、片方だけが成功しない。
 - Repository は宣言を 1 行足すだけで済み、削除の呼び出しを変えない。
-- 履歴の表の列は、宣言の検査が子の列との食い違いを起動時に止める。
+- 子の列の追加や削除と履歴の表の食い違いは、列の名前と Java の型について、宣言の検査が起動時に止める。
 
 ### Negative
 
 - 追跡する子ごとに、履歴の表の changeset と jOOQ の生成物が要る。
-- 子の列を足す changeset は、履歴の表の列も足す。足し忘れは、宣言の検査が起動時に止める。
+- 子の列を足す changeset は、履歴の表の列も足す。名前と型の足し忘れは起動時に止まり、長さと NULL の可否の食い違いは、最初の削除の失敗で分かる。
+- 追跡するのは削除だけである。役割の変更は、残る子の UPDATE なので、`updated_*` に最後の更新しか残らない。
+- 履歴の表に UPDATE と DELETE の権限が付く。アプリのロールが履歴を書き換えられるため、改ざんへの耐性はない。モジュールのロールの権限を DML に揃える規則（G5）があり、追記だけにする権限の例外は、要件が出たときに別の判断にする。
 - 履歴の表は、削除のたびに行が増える。保持期限は [#672](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/672) の対象になる。
 - 履歴の表に自動で復元する処理はない。復元は運用者が履歴を読んで行う。
 
@@ -110,7 +114,13 @@ pgAudit は保守運用者の操作だけを対象にし、アプリケーショ
 - **Pros**：psql による削除も記録できる。
 - **Cons**：トリガーを使わない規約に反する。トリガーは共通カラムの値（利用者、処理、trace）をアプリケーションから受け取れない。
 
-### 選択肢4: Repository が履歴を書く
+### 選択肢4: 削除と写しを 1 文にするか、写しを先にする
+
+- **Description**：`WITH deleted AS (DELETE ... RETURNING ...) INSERT ... SELECT` の 1 文にする。または、履歴の表への `INSERT ... SELECT` を先に実行し、同じ条件の `DELETE` を続ける。
+- **Pros**：どちらも、Java に行を持ち込まない。
+- **Cons**：1 文の CTE は、jOOQ で CTE の名前を作るのに `DSL.name` が要り、`DatabaseConventionsArchTest.nameBuildingApisAreNotUsed` が禁じている。2 文は、写した行数と削除した行数が食い違う余地を生み、確かめる処理が要る。`DELETE ... RETURNING` の行を写せば、確かめる処理が要らない。
+
+### 選択肢5: Repository が履歴を書く
 
 - **Description**：子を消す Repository のメソッドが、履歴の表へ INSERT する。
 - **Pros**：`TableWriter` を変えない。
