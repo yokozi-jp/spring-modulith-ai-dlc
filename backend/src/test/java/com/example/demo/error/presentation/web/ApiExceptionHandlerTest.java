@@ -176,7 +176,7 @@ class ApiExceptionHandlerTest {
 
   @ParameterizedTest
   @MethodSource("conflictKinds")
-  @DisplayName("ConflictException は種類ごとの type の 409 を返し、INFO で例外の型と conflict.kind を残す")
+  @DisplayName("ConflictException は種類ごとの type の 409 を返し、INFO で例外の型、type、conflict.kind を残す")
   void conflictExceptionIsLoggedAtInfo(
       final ConflictException.Kind kind, final String value, final String type) {
     final Handled handled =
@@ -199,7 +199,9 @@ class ApiExceptionHandlerTest {
     assertEquals(
         ConflictException.class.getName(), event.getThrowableProxy().getClassName(), "例外の型");
     assertEquals(
-        Map.of("http.response.status_code", 409, "conflict.kind", value), keyValues(event), "属性");
+        Map.of("http.response.status_code", 409, "problem.type", type, "conflict.kind", value),
+        keyValues(event),
+        "属性");
   }
 
   @Test
@@ -217,7 +219,8 @@ class ApiExceptionHandlerTest {
   }
 
   @Test
-  @DisplayName("BusinessRuleViolationException は理由の type の 422 を返し、ERROR と WARN ではなく INFO で例外の型を残す")
+  @DisplayName(
+      "BusinessRuleViolationException は理由の type の 422 を返し、ERROR と WARN ではなく INFO で例外の型と type を残す")
   void businessRuleViolationExceptionIsLoggedAtInfo(final CapturedOutput output) {
     final Handled handled =
         handle(handler ->
@@ -234,7 +237,10 @@ class ApiExceptionHandlerTest {
     assertNull(body.getDetail(), "detail");
     assertBusinessFailureLoggedAtInfo(output.getAll(), BusinessRuleViolationException.class);
     assertEquals(
-        Map.of("http.response.status_code", 422), keyValues(handled.events().getFirst()), "属性");
+        Map.of(
+            "http.response.status_code", 422, "problem.type", "/problems/error-fixture/rejected"),
+        keyValues(handled.events().getFirst()),
+        "属性");
   }
 
   @Test

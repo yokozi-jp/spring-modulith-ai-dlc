@@ -8,7 +8,9 @@ import com.example.demo.shared.security.TenantNotSelectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
+import java.net.URI;
 import java.util.Locale;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
@@ -43,6 +45,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
   /** 409 の種類のログの属性名（version、lock、unique）。 */
   private static final String CONFLICT_KIND = "conflict.kind";
+
+  /** 404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-125）。 */
+  private static final String PROBLEM_TYPE = "problem.type";
 
   /** Problem Details の共通フィールドを生成する。 */
   private final ApiProblemDetails problemDetails;
@@ -170,7 +175,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       if (DisconnectedClientHelper.isClientDisconnectedException(ex)) {
         log.atDebug().log("API client disconnected");
       } else {
-        logFailure(ex, statusCode);
+        logFailure(ex, statusCode, body);
       }
       // 基底クラスの WARN を重ねない。
       return null;
@@ -179,7 +184,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     // 外部との通信の "connection reset" を空の 200 にしないためである。
     // Tomcat はブラウザの切断で ClientAbortException を投げる前にレスポンスを中断済み（コミット済み）にするので、
     // 切断はコミット済みの分岐で DEBUG になり、ここへは来ない。
-    logFailure(ex, statusCode);
+    logFailure(ex, statusCode, body);
     return super.handleExceptionInternal(ex, body, headers, statusCode, request);
   }
 
@@ -209,7 +214,8 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         exception, body, new HttpHeaders(), HttpStatusCode.valueOf(body.getStatus()), request);
   }
 
-  private static void logFailure(final Exception ex, final HttpStatusCode status) {
+  private static void logFailure(
+      final Exception ex, final HttpStatusCode status, final @Nullable Object body) {
     if (status.is5xxServerError()) {
       log.atError()
           .setCause(ex)
@@ -222,6 +228,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       log.atInfo()
           .setCause(ex)
           .addKeyValue(STATUS_CODE, status.value())
+          .addKeyValue(PROBLEM_TYPE, problemType(body))
           .addKeyValue(CONFLICT_KIND, conflict.kind().name().toLowerCase(Locale.ROOT))
           .log("API conflict");
     } else if (ex instanceof NotFoundException || ex instanceof BusinessRuleViolationException) {
@@ -229,6 +236,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
       log.atInfo()
           .setCause(ex)
           .addKeyValue(STATUS_CODE, status.value())
+          .addKeyValue(PROBLEM_TYPE, problemType(body))
           .log("API business failure");
     } else if (ex instanceof MethodArgumentNotValidException
         || ex instanceof HandlerMethodValidationException
@@ -237,6 +245,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     } else {
       log.atInfo().addKeyValue(STATUS_CODE, status.value()).log("API client error");
     }
+  }
+
+  /** 本文の problem type を返す。本文が Problem Details でないか type がなければ about:blank にする。 */
+  private static String problemType(final @Nullable Object body) {
+    final @Nullable URI type = body instanceof ProblemDetail problem ? problem.getType() : null;
+    return Objects.requireNonNullElse(type, ProblemTypes.ABOUT_BLANK).toString();
   }
 
   private static boolean isCommitted(final WebRequest request) {

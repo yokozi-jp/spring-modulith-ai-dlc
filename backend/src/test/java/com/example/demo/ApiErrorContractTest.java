@@ -74,6 +74,9 @@ class ApiErrorContractTest {
   private static final AttributeKey<Long> STATUS_CODE =
       AttributeKey.longKey("http.response.status_code");
 
+  /** 404、409、422 のログの、応答の type の属性名。 */
+  private static final AttributeKey<String> PROBLEM_TYPE = AttributeKey.stringKey("problem.type");
+
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
 
@@ -382,16 +385,26 @@ class ApiErrorContractTest {
         error.getAttributes().get(AttributeKey.stringKey("exception.type")),
         "例外の型");
 
-    final Set<String> exceptionAttributes =
-        Set.of("exception.type", "exception.message", "exception.stacktrace");
+    final Set<String> businessFailureAttributes =
+        Set.of("exception.type", "exception.message", "exception.stacktrace", "problem.type");
     mockMvc
         .perform(get("/api/error-fixture/not-found?id=a").with(oidcLogin()))
         .andExpect(status().isNotFound());
-    assertLogged("API business failure", Severity.INFO, 404, exceptionAttributes);
+    assertEquals(
+        "about:blank",
+        assertLogged("API business failure", Severity.INFO, 404, businessFailureAttributes)
+            .getAttributes()
+            .get(PROBLEM_TYPE),
+        "404 の type");
     mockMvc
         .perform(get("/api/error-fixture/unprocessable").with(oidcLogin()))
         .andExpect(status().isUnprocessableContent());
-    assertLogged("API business failure", Severity.INFO, 422, exceptionAttributes);
+    assertEquals(
+        "/problems/error-fixture/rejected",
+        assertLogged("API business failure", Severity.INFO, 422, businessFailureAttributes)
+            .getAttributes()
+            .get(PROBLEM_TYPE),
+        "422 の type");
 
     mockMvc
         .perform(get("/api/error-fixture/conflict").with(oidcLogin()))
@@ -401,7 +414,14 @@ class ApiErrorContractTest {
             "API conflict",
             Severity.INFO,
             409,
-            Set.of("exception.type", "exception.message", "exception.stacktrace", "conflict.kind"));
+            Set.of(
+                "exception.type",
+                "exception.message",
+                "exception.stacktrace",
+                "problem.type",
+                "conflict.kind"));
+    assertEquals(
+        "/problems/unique-violation", conflict.getAttributes().get(PROBLEM_TYPE), "409 の type");
     assertEquals(
         "unique", conflict.getAttributes().get(AttributeKey.stringKey("conflict.kind")), "409 の種類");
     assertFalse(
