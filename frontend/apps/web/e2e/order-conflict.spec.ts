@@ -1,6 +1,6 @@
 import type { Page } from "@playwright/test";
 
-import type { Product } from "./fixture-server";
+import type { Product } from "./fixtures";
 import { expect, test } from "./fixtures";
 import {
   createOrder,

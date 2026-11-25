@@ -2,7 +2,7 @@ import type { APIRequestContext, APIResponse, Locator, Page } from "@playwright/
 
 import { expect } from "./fixtures.ts";
 
-// 注文の画面を操作する補助。商品は各テストが fixture サーバーで作る（fixtures.ts の productFactory、ADR-129）。
+// 注文の画面を操作する補助。商品は各テストが公開の API で作る（fixtures.ts の productFactory、ADR-129）。
 // 画面の文言は、spec と検証スキルの journey が同じ値を使うようここに置く。
 
 export const paymentNotYetText =
