@@ -3,6 +3,7 @@ package com.example.demo.shared.eventresubmission;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.shared.events.ListenerIds;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.OpenTelemetry;
@@ -143,7 +144,7 @@ class FailedPublicationGaugesTest {
       throws NoSuchMethodException {
     final String listenerId =
         "once".equals(listener)
-            ? ResubmissionPolicies.listenerId(
+            ? ListenerIds.fromMethod(
                 ResubmissionProbes.OnceProbeListener.class.getDeclaredMethod(
                     "on", ResubmissionProbes.OnceProbe.class))
             : listener;

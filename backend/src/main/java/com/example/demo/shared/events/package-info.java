@@ -1,6 +1,7 @@
 /**
  * イベントのリスナーが使う、失敗したイベント出版の再投入の語彙を置く（ADR-079）。リスナーの再投入の方針を指定する {@link
- * com.example.demo.shared.events.ResubmissionPolicy} である。
+ * com.example.demo.shared.events.ResubmissionPolicy} と、リスナーの ID を作る規則の {@link
+ * com.example.demo.shared.events.ListenerIds} である。
  *
  * <p>どの層からも使ってよい。業務の概念を置かず、Spring Modulith や jOOQ に依存しない。
  */

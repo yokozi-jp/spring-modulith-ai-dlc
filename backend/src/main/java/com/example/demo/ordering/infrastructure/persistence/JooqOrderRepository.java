@@ -5,6 +5,7 @@ import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 
+import com.example.demo.jooq.ordering.Tables;
 import com.example.demo.jooq.ordering.tables.records.TOrderLineRecord;
 import com.example.demo.jooq.ordering.tables.records.TOrderRecord;
 import com.example.demo.ordering.domain.model.Money;
@@ -33,9 +34,13 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JooqOrderRepository implements OrderRepository {
 
-  /** 注文の明細。親の中の行は、明細番号で同定する。 */
+  /**
+   * 注文の明細。親の中の行は、明細番号で同定する。
+   *
+   * <p>外す前の行を h_order_line に残す（ADR-131）。
+   */
   private static final ChildTable<TOrderLineRecord> LINES =
-      ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO);
+      ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, Tables.H_ORDER_LINE, T_ORDER_LINE.LINE_NO);
 
   /** 注文の集約。ルートは公開 ID で一つに決める。 */
   private static final AggregateTable<TOrderRecord, UUID, Order> ORDER =

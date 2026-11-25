@@ -2,8 +2,8 @@
 # Each edit's old text must occur exactly once in OrderPayment.tla when the edit is applied.
 
 [[mutant]]
-name = "no-unique-index"
-change = "drop uk_2_t_payment (tenant_public_id, order_public_id) from 020-rebuild-payment-tables-for-tenants.yaml"
+name = "pre-read-only-dedup"
+change = "duplicates are judged by the lock-free findByOrderId alone: uk_2_t_payment (tenant_public_id, order_public_id) is dropped from 020-rebuild-payment-tables-for-tenants.yaml and the INSERT has no conflict on it, so a concurrent second delivery adds a second row"
 config = "contract"
 invariants = ["AtMostOnePaymentRecord"]
 
@@ -16,6 +16,16 @@ new = '''
        THEN /\ payments' = Append'''
 
 [[mutant]]
+name = "conflict-raises"
+change = "JooqPaymentRepository.add drops ON CONFLICT DO NOTHING and throws ConflictException on uk_2_t_payment again (the flow before #551), so a concurrent second delivery leaves the publication FAILED"
+config = "contract"
+invariants = ["FailedOnlyOnGatewayError"]
+
+[[mutant.edits]]
+old = '''ELSE /\ dpc' = [dpc EXCEPT ![d] = "markCompleted"]'''
+new = '''ELSE /\ dpc' = [dpc EXCEPT ![d] = "markFailed"]'''
+
+[[mutant]]
 name = "timeout-recorded-as-failed"
 change = "PaymentGatewayClient.charge returns ChargeOutcome.failed() for every RestClientException"
 config = "contract"
@@ -23,23 +33,11 @@ invariants = ["RecordMatchesGateway"]
 
 [[mutant.edits]]
 old = '''
-        /\ dpc' = [dpc EXCEPT ![d] = "insert"]
-     \/ dpc' = [dpc EXCEPT ![d] = "markFailed"]'''
+     \/ /\ dpc' = [dpc EXCEPT ![d] = "markFailed"]
+        /\ dres' = [dres EXCEPT ![d] = "TRANSIENT"]'''
 new = '''
-        /\ dpc' = [dpc EXCEPT ![d] = "insert"]
-        /\ UNCHANGED dres
      \/ /\ dpc' = [dpc EXCEPT ![d] = "insert"]
         /\ dres' = [dres EXCEPT ![d] = "REJECTED"]'''
-
-[[mutant.edits]]
-old = '''
-                 gateway, dres, launched, rpc>>
-
-RecordOf'''
-new = '''
-                 gateway, launched, rpc>>
-
-RecordOf'''
 
 [[mutant]]
 name = "cancel-confirmed-order"
@@ -59,8 +57,8 @@ invariants = ["CompletedOnlyWithRecord", "ChargeNeverSilentlyLost"]
 
 [[mutant.edits]]
 old = '''
-        /\ dpc' = [dpc EXCEPT ![d] = "insert"]
-     \/ dpc' = [dpc EXCEPT ![d] = "markFailed"]'''
+     \/ /\ dpc' = [dpc EXCEPT ![d] = "markFailed"]
+        /\ dres' = [dres EXCEPT ![d] = "TRANSIENT"]'''
 new = '''
-        /\ dpc' = [dpc EXCEPT ![d] = "insert"]
-     \/ dpc' = [dpc EXCEPT ![d] = "markCompleted"]'''
+     \/ /\ dpc' = [dpc EXCEPT ![d] = "markCompleted"]
+        /\ dres' = [dres EXCEPT ![d] = "TRANSIENT"]'''

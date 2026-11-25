@@ -92,6 +92,10 @@ up() {
     echo "task e2e-up が失敗しました。ログを読んだら stack.sh down で片付けてください。" >&2
     exit "$status"
   fi
+  if ! task be-seed COMPOSE_ENV_FILE="$TEST_ENV_FILE"; then
+    echo "task be-seed が失敗しました。ログを読んだら stack.sh down で片付けてください。" >&2
+    exit 1
+  fi
 
   # setsid の中の sh が process group の先頭なので、その $$ を記録する。
   (cd "$WEB" && PIDFILE="$ROOT/$STATE/preview.pid" setsid sh -c 'echo $$ > "$PIDFILE"; exec vp preview --mode test --port "$E2E_WEB_PORT" --strictPort' > "$ROOT/$STATE/preview.log" 2>&1 < /dev/null &)

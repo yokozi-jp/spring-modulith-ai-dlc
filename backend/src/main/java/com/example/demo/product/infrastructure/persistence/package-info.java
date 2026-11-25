@@ -1,4 +1,4 @@
-/** 商品の集約を jOOQ で読む。 */
+/** 商品の集約を jOOQ で保存し、読む。 */
 @NullMarked
 package com.example.demo.product.infrastructure.persistence;
 

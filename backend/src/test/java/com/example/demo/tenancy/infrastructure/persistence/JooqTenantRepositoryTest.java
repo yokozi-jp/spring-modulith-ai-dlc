@@ -5,6 +5,8 @@ import static com.example.demo.jooq.tenancy.Tables.M_USER;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.jooq.tenancy.Tables;
+import com.example.demo.jooq.tenancy.tables.records.HMembershipRecord;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.persistence.TableWriter;
 import com.example.demo.shared.persistence.TestCommonColumns;
@@ -85,6 +87,28 @@ class JooqTenantRepositoryTest {
         .isFalse();
     assertThat(dsl.fetchExists(M_USER, M_USER.PUBLIC_ID.eq(UUID.fromString(third))))
         .as("所属を外しても、利用者の行は残る userId=%s", third)
+        .isTrue();
+  }
+
+  @Test
+  @DisplayName("所属を外すと、外す前の所属の行を、退避のカラムと一緒に h_membership へ残し、残る所属は写さない")
+  void removedMembershipIsKeptInHistory() {
+    final UUID tenantId = UUID.randomUUID();
+    final String first = joinNewUser(tenantId, ADMIN);
+    final String second = joinNewUser(tenantId, MEMBER);
+    final Tenant tenant = find(tenantId);
+    tenant.removeMember(userId(second));
+
+    TestCommonColumns.runAs(() -> repository().update(tenant));
+
+    final HMembershipRecord history = dsl.selectFrom(Tables.H_MEMBERSHIP).fetchSingle();
+    assertThat(history.getUserId()).as("外した利用者").isEqualTo(userPk(second));
+    assertThat(history.getRoleTyp()).as("外す前の役割").isEqualTo(MEMBER);
+    assertThat(history.getLockNo()).as("外す前のロック番号").isEqualTo(1L);
+    assertThat(history.getArchivedPgmCd()).as("外した処理").isNotBlank();
+    assertThat(history.getArchivedTxId()).as("外した処理の trace").isNotBlank();
+    assertThat(dsl.fetchExists(M_MEMBERSHIP, M_MEMBERSHIP.USER_ID.eq(userPk(first))))
+        .as("残る所属は本体に残る")
         .isTrue();
   }
 

@@ -80,7 +80,7 @@ class LocalDataSeederTest {
 
   @Test
   @DisplayName(
-      "空の DB の 2 つのテナントのそれぞれに、BUSINESS_TABLES のすべての表の行と、商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
+      "空の DB の 2 つのテナントのそれぞれに、履歴の表を除く BUSINESS_TABLES のすべての表の行と、商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
   void seedsRepresentativeDataOnlyWhenEmpty() {
     for (final TenantId tenant : TENANTS) {
       LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
@@ -93,6 +93,9 @@ class LocalDataSeederTest {
     for (final TenantId tenant : TENANTS) {
       assertRepresentativeData(tenant);
       for (final Table<?> table : LocalDataSeeder.BUSINESS_TABLES) {
+        if (LocalDataSeeder.HISTORY_TABLES.contains(table)) {
+          continue;
+        }
         assertThat(
                 this.<Integer>inModule(
                     tenant, AsModule.moduleOf(table), tx -> tx.fetchCount(table)))
@@ -124,6 +127,37 @@ class LocalDataSeederTest {
                 TenancySeeds.TEST_ADMIN_SUBJECT,
                 List.of("サンプル商事:ADMIN")));
     assertThat(memberships()).as("2 回目の seed の後の所属").isEqualTo(first);
+  }
+
+  @Test
+  @DisplayName("tenancy は、業務データを入れず、テナントと所属を何度入れても同じ内容にする")
+  void tenancySeedsOnlyTenantsAndMemberships() {
+    for (final TenantId tenant : TENANTS) {
+      LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
+          inModule(tenant, AsModule.moduleOf(table), tx -> tx.deleteFrom(table).execute()));
+    }
+
+    assertThat(SEEDER.seed(dsl, Mode.TENANCY)).isEqualTo(Outcome.TENANCY_SEEDED);
+    final Map<String, List<String>> first = memberships();
+    assertThat(SEEDER.seed(dsl, Mode.TENANCY)).isEqualTo(Outcome.TENANCY_SEEDED);
+
+    assertThat(first)
+        .isEqualTo(
+            Map.of(
+                TenancySeeds.TEST_USER_SUBJECT,
+                List.of("サンプル商事:MEMBER", "サンプル物産:MEMBER"),
+                TenancySeeds.TEST_ADMIN_SUBJECT,
+                List.of("サンプル商事:ADMIN")));
+    assertThat(memberships()).as("2 回目の tenancy の後の所属").isEqualTo(first);
+    for (final TenantId tenant : TENANTS) {
+      for (final Table<?> table : LocalDataSeeder.BUSINESS_TABLES) {
+        assertThat(
+                this.<Boolean>inModule(
+                    tenant, AsModule.moduleOf(table), tx -> tx.fetchExists(table)))
+            .as("テナント %s の %s の行", tenant, table)
+            .isFalse();
+      }
+    }
   }
 
   @Test

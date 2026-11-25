@@ -20,6 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * 確定した注文の代金を、注文 ID を冪等キーにして請求し、請求の結果を決済記録に保存する。
  *
+ * <p>同じ注文の 2 回目の配信は、順でも同時でも、1 回目の決済記録を返して正常に終える。重複は、注文ごとに 1 件の一意索引への {@code INSERT ... ON CONFLICT
+ * DO NOTHING} で判定する。同時の 2 回目は 1 回目のコミットを待ち、決済代行を同じ冪等キーで呼ぶことがある。
+ *
  * <p>決済代行の拒否と契約の不備も決済記録に残して正常に返し、イベント出版を COMPLETED にする。一時障害と資格情報の不備は決済代行の例外がそのまま伝わり、出版は FAILED
  * に残る（ADR-072）。
  *
@@ -54,7 +57,11 @@ public class ChargeOrderCommandHandler {
   }
 
   /**
-   * 注文の決済記録がなければ、確定した注文の合計を請求して結果を決済記録に保存する。決済記録があれば請求せずに返す。注文が確定していなければ請求せずに返す。
+   * 注文の決済記録がなければ、確定した注文の合計を請求して結果を決済記録に保存する。注文が確定していなければ請求せずに返す。
+   *
+   * <p>読んだ時点で決済記録があれば、請求せずに {@link ChargeOrderResult.AlreadyRecorded}
+   * を返す。保存しようとして同じ注文の決済記録が先にあれば、保存せずに先の決済記録の {@link ChargeOrderResult.AlreadyRecorded}
+   * を返す。先読みは外部システムの呼び出しを省くためで、重複の判定ではない。
    *
    * @throws NotFoundException
    *     注文がない場合。確定のイベントがあるのに注文がないのは内部の不変条件の違反（不具合）であり、業務の状態に記録すると隠れるため投げ、イベント出版を FAILED
@@ -63,7 +70,6 @@ public class ChargeOrderCommandHandler {
   @Transactional
   public ChargeOrderResult handle(final ChargeOrderCommand command) {
     final OrderId orderId = new OrderId(UUID.fromString(command.orderId()));
-    // 二度目の請求を避けるための先読み。並行の配信は INSERT の一意制約が ConflictException にする。
     final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
     if (existing.isPresent()) {
       return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
@@ -87,7 +93,16 @@ public class ChargeOrderCommandHandler {
     final Money amount = new Money(details.totalAmount());
     final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
     final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
-    paymentRepository.add(payment);
+    if (!paymentRepository.add(payment)) {
+      // 衝突した行はコミット済みで、READ COMMITTED の次の文から見える。
+      final Payment recorded =
+          paymentRepository
+              .findByOrderId(orderId)
+              .orElseThrow(() ->
+                  new IllegalStateException(
+                      "payment was not inserted but not found: orderId=" + orderId.value()));
+      return new ChargeOrderResult.AlreadyRecorded(recorded.id().value().toString());
+    }
     return new ChargeOrderResult.Charged(payment.id().value().toString());
   }
 }

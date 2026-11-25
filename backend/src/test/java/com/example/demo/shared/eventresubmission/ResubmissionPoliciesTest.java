@@ -3,6 +3,7 @@ package com.example.demo.shared.eventresubmission;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.shared.events.ListenerIds;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import java.time.Duration;
 import java.time.Instant;
@@ -84,7 +85,7 @@ class ResubmissionPoliciesTest {
 
     assertThat(
             policies.nameOf(
-                ResubmissionPolicies.listenerId(
+                ListenerIds.fromMethod(
                     PaymentListener.class.getDeclaredMethod("on", String.class))))
         .isEqualTo(PAYMENT);
   }
@@ -118,8 +119,7 @@ class ResubmissionPoliciesTest {
   @DisplayName("id が空なら、リスナーの ID はメソッドの完全修飾名と引数の型になる")
   void emptyIdFallsBackToQualifiedMethodNameAndParameterTypes() throws NoSuchMethodException {
     final String id =
-        ResubmissionPolicies.listenerId(
-            PaymentListener.class.getDeclaredMethod("on", String.class));
+        ListenerIds.fromMethod(PaymentListener.class.getDeclaredMethod("on", String.class));
 
     assertThat(id).isEqualTo(PaymentListener.class.getName() + ".on(java.lang.String)");
   }

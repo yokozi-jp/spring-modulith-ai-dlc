@@ -5,3 +5,5 @@
 
 export * from './productSummaryListResponse.ts';
 export * from './productSummaryResponse.ts';
+export * from './registerProductHeaders.ts';
+export * from './registerProductRequest.ts';

@@ -103,6 +103,7 @@ pre-commit:
           - name: frontend-check
             glob:
               - "frontend/**"
+              - "tooling/e2e-seed-lint/**"
             run: |
               echo "{staged_files}" >/dev/null
               task fe-check

@@ -1,16 +1,19 @@
 package com.example.demo.shared.persistence;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 import org.jooq.InsertValuesStepN;
 import org.jooq.Record;
+import org.jooq.Result;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
@@ -74,15 +77,56 @@ import org.jspecify.annotations.Nullable;
     insertChildren(child, rootId, added);
   }
 
-  /** なくなった子を、自然キーの組で削除する。 */
+  /** なくなった子を、自然キーの組で削除する。履歴の表がある子は、削除した行をそのまま履歴の表へ写す。 */
   private <C extends Record> void deleteChildren(
       final ChildTable<C> child, final long rootId, final List<List<Object>> removed) {
     final Table<C> table = child.table();
     final Condition removedKeys =
         DSL.or(removed.stream().map(naturalKey -> naturalKeyCondition(child, naturalKey)).toList());
-    ConflictTranslator.executeOrConflict(
-        () -> dsl.deleteFrom(table).where(child.parentKey().eq(rootId).and(removedKeys)).execute(),
-        () -> childTarget(table, rootId));
+    final Condition condition = child.parentKey().eq(rootId).and(removedKeys);
+    final Supplier<String> target = () -> childTarget(table, rootId);
+    final Result<C> deleted =
+        ConflictTranslator.executeOrConflict(
+            () -> dsl.deleteFrom(table).where(condition).returning(table.fields()).fetch(), target);
+    archiveRows(child.archive(), deleted, target);
+  }
+
+  /**
+   * 削除した行を、退避の日時、者、プログラム、トレースと一緒に、履歴の表へ 1 文の複数行の INSERT で写す。
+   *
+   * <p>写すのは {@code DELETE ... RETURNING} が返した行そのものなので、削除した行と写した行は一致する。返った行がなければ、INSERT を実行しない（値のない
+   * INSERT は書けない）。削除と写しは、{@link TableWriter} が要求する同じトランザクションの中にあり、写しが失敗すると削除も戻る。
+   *
+   * <p>ponytail: 上限：削除した行を 1 文で写すため、bind パラメータの上限（65535）を履歴の表の列数で割った行数を超えて一度に消すと失敗する。
+   * 子が多い集約が出たら、行を分けて INSERT する。
+   */
+  private void archiveRows(
+      final ChildTable.Archive archive,
+      final Result<? extends Record> deleted,
+      final Supplier<String> target) {
+    if (deleted.isEmpty()) {
+      return;
+    }
+    final Map<Field<?>, Object> archived = commonColumns.forArchive(archive.table());
+    final List<Field<?>> columns = new ArrayList<>(archive.columns());
+    columns.addAll(archived.keySet());
+    InsertValuesStepN<?> insert = dsl.insertInto(archive.table()).columns(columns);
+    for (final Record row : deleted) {
+      insert = insert.values(archivedValues(row, archived.values()));
+    }
+    final InsertValuesStepN<?> statement = insert;
+    ConflictTranslator.executeOrConflict(statement::execute, target);
+  }
+
+  /** 履歴の表への INSERT の 1 行の値を、子の列の順（削除した行の値）の後に退避のカラムの値を続けて返す。 */
+  private static List<@Nullable Object> archivedValues(
+      final Record row, final Collection<Object> archived) {
+    final List<@Nullable Object> values = new ArrayList<>();
+    for (int i = 0; i < row.size(); i++) {
+      values.add(row.get(i));
+    }
+    values.addAll(archived);
+    return values;
   }
 
   /**
