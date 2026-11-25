@@ -1,25 +1,24 @@
 package com.example.demo.shared.eventresubmission;
 
+import com.example.demo.shared.events.ListenerIds;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import java.lang.reflect.Method;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.StringJoiner;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.aop.framework.autoproxy.AutoProxyUtils;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
-import org.springframework.context.event.EventListener;
 import org.springframework.core.MethodIntrospector;
 import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.modulith.events.AbandonPolicy;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.core.TargetEventPublication;
 import org.springframework.stereotype.Component;
-import org.springframework.util.ClassUtils;
 
 /**
  * イベント出版を、リスナーの {@code on} に付けた {@link ResubmissionPolicy} の方針に対応づけ、再投入してよいかを決める（ADR-079）。
@@ -27,7 +26,7 @@ import org.springframework.util.ClassUtils;
  * <p>出版はリスナーの ID（{@code listener_id}、{@link TargetEventPublication#getTargetIdentifier()}）で区別する。
  * Spring Modulith 2.2.0 は、{@code TransactionalApplicationListener.getListenerId()} を ID にし、Spring
  * Framework は、注釈の {@code id} が空ならメソッドの完全修飾名と引数の型（{@code <クラス>.<メソッド>(<型>,...)}）を ID にする。 起動のときに
- * bean のメソッドを走査して同じ ID を作る。
+ * bean のメソッドを走査し、{@link ListenerIds} で同じ ID を作る。
  *
  * <p>Spring Modulith の {@link AbandonPolicy} も実装し、方針の {@code abandon-after-attempts}
  * に達した出版を、全体の上限を待たずに {@code ABANDONED} にする。 冪等でない外部システムを呼ぶリスナーを、自動で再投入させないためである。
@@ -116,7 +115,13 @@ class ResubmissionPolicies implements AbandonPolicy {
                   + " is not defined in event-publication.resubmission.policies "
                   + properties.policies().keySet());
         }
-        names.put(listenerId(method), policy.value());
+        final Optional<String> listenerId = ListenerIds.fromMethod(method);
+        if (listenerId.isEmpty()) {
+          throw new IllegalStateException(
+              "@ResubmissionPolicy must be placed on an @ApplicationModuleListener method: "
+                  + method);
+        }
+        names.put(listenerId.get(), policy.value());
       });
     }
     return names;
@@ -143,24 +148,6 @@ class ResubmissionPolicies implements AbandonPolicy {
           .log("Skipped a bean whose type cannot be resolved");
       return null;
     }
-  }
-
-  /** Spring Framework の {@code ApplicationListenerMethodAdapter} と同じ規則で、リスナーの ID を作る。 */
-  /* package */ static String listenerId(final Method method) {
-    final @Nullable EventListener listener =
-        AnnotatedElementUtils.findMergedAnnotation(method, EventListener.class);
-    if (listener == null) {
-      throw new IllegalStateException(
-          "@ResubmissionPolicy must be placed on an @ApplicationModuleListener method: " + method);
-    }
-    if (!listener.id().isEmpty()) {
-      return listener.id();
-    }
-    final StringJoiner parameters = new StringJoiner(",", "(", ")");
-    for (final Class<?> type : method.getParameterTypes()) {
-      parameters.add(type.getName());
-    }
-    return ClassUtils.getQualifiedMethodName(method) + parameters;
   }
 
   /** リスナーの ID の方針の名前。指定がなければ {@code default}。 */
