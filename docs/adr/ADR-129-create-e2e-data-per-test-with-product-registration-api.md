@@ -28,7 +28,10 @@ xUnit Test Patterns の分類では、用途の違う者が共有する General 
 この ADR がその判断である。
 
 注文、決済済み、拒否、再投入待ち、取消済みは、画面、公開 API、決済代行の WireMock（`failChargesFor`）で作れる。
-ADR-073 が代表の注文で確かめていた決済済み、拒否、再投入待ちの詳細は、既存の「作成して確定」「拒否」「5xx」と「タイムアウト」のテストが同じ表示を確かめている。
+ADR-073 が代表の注文で確かめていた詳細の表示は、各テストが自分で作った注文で確かめられる。
+決済済みと拒否は、「作成して確定」と「拒否」のテストが、確定の直後の詳細と、一覧から開いた詳細の両方で確かめる。
+一覧から開く経路は、この 2 つのテストにだけある。
+再投入待ち（`SEED-C06`）は、「5xx」と「タイムアウト」のテストが、確定の直後の詳細で確かめる。
 公開 API で作れない状態は商品だけだった。
 
 商品の登録は商品のマスタを持つ業務の操作であり、E2E のためだけの入口ではない。
@@ -36,13 +39,16 @@ ADR-073 が代表の注文で確かめていた決済済み、拒否、再投入
 認可は、業務の API を役割で分ける仕組みがバックエンドにまだ無い（業務の API は、テナントを選んだかどうかだけを見る）ため、この ADR では決めずに [#758](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/758) に分ける。
 
 ADR-073 の後に入った [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) は Proposed である。
-`OpenApiConfig` の customizer が、GET と HEAD 以外の業務の operation に必須の `Idempotency-Key` を付ける。
-サーバーがキーを検査するのは、キーの表を持つ `ordering` の更新だけで、`product` のスキーマにキーの表は無い。
+GET と HEAD 以外の業務の API は `Idempotency-Key` を必須にし、サーバーは書き込みの API を持つモジュールのスキーマのキーの表で検査する。
+商品を登録する API を足すと、`product` のスキーマにもキーの表が要る。
+
+Proposed の間に Decision を書き直した。
+Pull Request #752 のレビューを受けて、商品の登録のキーの検査を [#759](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/759) に分けず、この ADR の範囲に含めた。
 
 ## Decision
 
 E2E は開発用のシーダーを使わない。
-各テストが自分専用のデータを作り、共有するのはテナントと所属、Keycloak の利用者だけにして、それらは読むだけにする。
+各テストが自分専用のデータを作り（xUnit Test Patterns の Fresh Fixture）、共有するのはテナントと所属、Keycloak の利用者だけにして、それらは読むだけにする。
 
 - 注文は、今までどおり画面か公開 API で作る。決済代行の拒否、5xx、遅延は WireMock の `failChargesFor` で作る。
 - テナントと所属は、`task e2e-up` が `task be-seed-tenancy`（シーダーの `tenancy` のモード）で入れ、業務データを入れない。
@@ -53,9 +59,9 @@ E2E は開発用のシーダーを使わない。
   書き込みは `TableWriter` を通し、`product` のロール、テナントの RLS、共通カラムを既存の書き込みと同じ仕組みで通す。
 - 商品を登録できるのは、テナントを選んだ認証済みの利用者なら誰でもとする（注文の作成と同じ扱い）。
   ADMIN だけに制限する仕組みはこの ADR で作らず、業務の API の認可と合わせて [#758](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/758) で決める。
-- この API は `Idempotency-Key` を検査しない。
-  契約は ADR-126 の customizer が付けるとおり必須にし、Playwright の補助は契約に従ってキーを送る。
-  サーバーの検査と Result の表は [#759](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/759) で入れ、それまで `IdempotencyArchTest` の一時的に除く操作に入れる。
+- この API は、ADR-126 のとおり `Idempotency-Key` を必須にし、サーバーが検査する。
+  キーと Result は `product` のスキーマのキーの表（`product.t_idempotency_key`）に保存し、同じキーの再送には 1 回目と同じ 201 と `Location` を返す。
+  `productFactory` は、契約どおり呼ぶたびに新しいキーを送る。
 - テストのための入口を本番に作らない。
   Profile や E2E のためだけのプロパティで入口を切り替えない。
 - 商品は、Playwright の `productFactory` fixture が、ログインしてテナントを選んだ page の Cookie で `POST /api/products` を呼んで作る。
@@ -86,7 +92,6 @@ E2E は開発用のシーダーを使わない。
 
 ### Neutral
 
-- ADR-126 のサーバーの検査を入れるときに、商品の登録も対象に入る。
 - DB は実行ごとに作って捨てる。E2E は別プロセスの backend を HTTP で通り、要求ごとにコミットされるため、ロールバックは使わない。
 - Playwright は TypeScript のままにする。
 
@@ -94,11 +99,8 @@ E2E は開発用のシーダーを使わない。
 
 ### 選択肢1: 別プロセスの fixture サーバーで商品を作る
 
-- **Description**：backend のテストのソースに置く fixture サーバーを Playwright の `webServer` で起動し、HTTP で商品の行を直接入れる。
 - **Pros**：本番のコードに書き込みの API を足さない。
-- **Cons**：E2E のたびに別の JVM のプロセスを起動し、ホストにテストと同じ toolchain の Java が要る。
-  fixture サーバーは自分の HTTP の契約と、ブラウザの別のサイトからの要求を通さない境界の検査を持ち、それをテストで確かめ続ける。
-  本番の商品を登録する API で同じ商品を作れるため採らない。
+- **Cons**：E2E のたびに別の JVM を起動し、fixture サーバーの HTTP の契約と境界の検査を保守し続けることになる。本番の商品を登録する API で同じ商品を作れるため採らない。
 
 ### 選択肢2: Playwright の fixture から Node で DB に直接入れる
 
@@ -128,3 +130,6 @@ E2E は開発用のシーダーを使わない。
 - [ADR-107: 業務テーブルを RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
 - [ADR-126: GET と HEAD 以外のすべての業務の API に Idempotency-Key を必須にし、モジュールごとの表に Result を保存する](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)
 - [E2E テストの方針と書き方](../e2e/testing-strategy.md)
+- Gerard Meszaros『xUnit Test Patterns: Refactoring Test Code』（Addison-Wesley、2007）
+  - [Obscure Test](http://xunitpatterns.com/Obscure%20Test.html)（原因の General Fixture と Mystery Guest）
+  - [Fresh Fixture](http://xunitpatterns.com/Fresh%20Fixture.html)
