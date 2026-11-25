@@ -94,13 +94,16 @@ import org.jspecify.annotations.Nullable;
   /**
    * 削除した行を、退避の日時、者、プログラム、トレースと一緒に、履歴の表へ 1 文の複数行の INSERT で写す。
    *
-   * <p>写すのは {@code DELETE ... RETURNING} が返した行そのものなので、削除した行と写した行は一致する。削除と写しは、{@link TableWriter}
-   * が要求する同じトランザクションの中にあり、写しが失敗すると削除も戻る。
+   * <p>写すのは {@code DELETE ... RETURNING} が返した行そのものなので、削除した行と写した行は一致する。返った行がなければ、INSERT を実行しない（値のない
+   * INSERT は書けない）。削除と写しは、{@link TableWriter} が要求する同じトランザクションの中にあり、写しが失敗すると削除も戻る。
    */
   private void archiveRows(
       final ChildTable.Archive archive,
       final Result<? extends Record> deleted,
       final Supplier<String> target) {
+    if (deleted.isEmpty()) {
+      return;
+    }
     final Map<Field<?>, Object> archived = commonColumns.forArchive(archive.table());
     final List<Field<?>> columns = new ArrayList<>(archive.columns());
     columns.addAll(archived.keySet());
