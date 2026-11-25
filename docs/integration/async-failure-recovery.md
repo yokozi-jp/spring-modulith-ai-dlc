@@ -97,8 +97,7 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 運用者は、`FAILED` に戻して手での 1 回の再投入（`EventPublicationResubmitOnce`）で再投入するか片付ける。
 調べ方と手順は[イベント出版の再投入のログイベント](../observability/runbook-event-publication-resubmission.md)にある。
 再投入の検証は、決済の `PaymentGatewayClientIntegrationTest` が、本番の Client と手での 1 回の再投入で、一時障害の `FAILED` から試行の回数 2 の `COMPLETED` になり決済記録が 1 件になることを確かめる。
-`completion-mode: archive` で完了した出版を移す archive の表の `COMPLETED` の行は、完了から 7 日を過ぎたら 1 日 1 回の定期の実行（`EventPublicationArchiveRetentionConfig`）が消し、`ABANDONED` の行は消さない（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)）。
-消し方は[保持期限と個人データの有無の一覧](../database/table-retention-and-personal-data.md#改廃の方法)にある。
+`completion-mode: archive` で完了した出版を移す archive の表は、`COMPLETED` の行を 7 日で消し、`ABANDONED` の行を残す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)、[改廃の方法](../database/table-retention-and-personal-data.md#改廃の方法)）。
 
 ## DLQ の構成
 

@@ -31,7 +31,7 @@ tags: [architecture, integration, async, spring-modulith, resilience]
   方針に `abandon-after-attempts` がなければ、この値が全リスナーの既定になる。
 - **手での 1 回の再投入のジョブ**（`EventPublicationResubmitOnce`）：運用者が 1 回だけ起動し、同じロックを取って再投入する。対象は `all`、`policy:<名前>`、`event-type:<クラス>` で、起動時に `Target` に読む。
 - **古い出版を `FAILED` に戻す処理**（`StalePublications`）：落ちたまま残った出版を、完了していないことと状態ごとの古さを確かめる 1 文の UPDATE で `FAILED` に戻す。掃き取りがロックの中で、再投入の前に呼ぶ。Spring Modulith の `markStalePublicationsFailed` と組み込みの Staleness Monitor は使わず、その閾値を書くと起動に失敗する。
-- **archive の行の保持期限の削除**（`EventPublicationArchiveRetentionConfig`）：archive の表の `COMPLETED` の行を完了から 7 日で消し、`ABANDONED` の行を残す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)）。
+- **archive の行の保持期限の削除**（`EventPublicationArchiveRetentionConfig`）：`COMPLETED` の行を 7 日で消し、`ABANDONED` の行を残す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)、[改廃の方法](../database/table-retention-and-personal-data.md#改廃の方法)）。
 - **`in-flight-staleness`**：`PROCESSING` と `RESUBMITTED` の出版を、最後の出版か再投入の時刻から数えて `FAILED` に戻すまでの時間である。`PUBLISHED` の出版は `wait-age` で測る。
 
 ## Resilience4j との関係

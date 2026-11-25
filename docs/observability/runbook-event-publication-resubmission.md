@@ -201,7 +201,10 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 - **属性**：`exception.type`、`exception.message`、`exception.stacktrace`
 - **発生原因**：接続の pool の枯渇（`connection-timeout`）、DB の停止、`statement_timeout`。
   削除は件数を絞らない 1 つの DELETE なので、長く止めた後の最初の回は、消す行が多く `statement_timeout` を超えうる。
+  削除はロックを取らないため、ローリングデプロイなどで複数のインスタンスの回が重なると、他のインスタンスの DELETE が行のロックを持つ間に `lock_timeout` で失敗しうる。
+  この失敗は、他のインスタンスが同じ行を消すため害がない。
 - **対応**：次の回（1 日後）に同じ行を消し直すため、1 回だけなら対応しない。
+  `lock_timeout` の失敗は、毎回出るときだけ確かめる。
   続くと archive の表が増え続けるため、当日中に DB の状態を確かめる。
   `statement_timeout` で続くときは、件数を絞った DELETE に直す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md) の Negative）。
 

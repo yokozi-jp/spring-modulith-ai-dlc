@@ -24,14 +24,12 @@ Accepted
 archive の表には保持期限を設け、古い行を消す（[#542](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542)、[テーブルごとの保持期限と個人データの有無の一覧](../database/table-retention-and-personal-data.md)）。
 上限に達した出版の警報は、archive の `ABANDONED` の行の最古の経過時間の Gauge（`event.publication.failed.oldest.age{state=exhausted}`）で出す。
 
-[#542](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542) で削除を実装したとき、消し方（Spring Modulith の API、ロックを掛けないこと、起動の検査）を Decision に足した。
-
 ## Decision
 
 archive の表の保持期限の削除は、`status = 'COMPLETED'` の行だけに掛ける。
 `ABANDONED` の行は、運用者が Runbook の手順で戻すか消すまで残す（[イベント出版の再投入のログイベント](../observability/runbook-event-publication-resubmission.md)）。
 
-- 保持期限は完了から 7 日にし、1 日 1 回の定期の実行（`EventPublicationArchiveRetentionConfig`）が Spring Modulith の `CompletedEventPublications.deletePublicationsOlderThan` で消す。
+- 保持期限は完了から 7 日にし、起動の 5 分後と、その後 1 日ごとの定期の実行（`EventPublicationArchiveRetentionConfig`）が Spring Modulith の `CompletedEventPublications.deletePublicationsOlderThan` で消す。
   2.2.0 の `JdbcEventPublicationRepositoryV2` の DELETE は `COMPLETION_DATE < ? AND (STATUS = 'COMPLETED' OR STATUS IS NULL)` で、`ABANDONED` の行を消さない。
 - 同じ条件の DELETE は何度流しても結果が変わらないため、ShedLock のロックを掛けず、各インスタンスで流す。
   archive の表はモジュールに属さないため、モジュールのロールに切り替えず、`app_user` のまま消す（[#307](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/307)）。
@@ -53,6 +51,8 @@ archive の表の保持期限の削除は、`status = 'COMPLETED'` の行だけ�
   条件は Spring Modulith の SQL にあり、版を上げて条件が落ちると `EventPublicationArchiveRetentionTest` が失敗する。
 - 1 つの DELETE で期限を過ぎた行をすべて消すため、長く止めた後の最初の回は `statement_timeout` で失敗しうる。
   失敗が続いたら、件数を絞った DELETE を自分で書く。
+- この変更の前は archive の表に保持期限がなかったため、最初の回は溜まった行をすべて 1 つの DELETE で消す。
+  本番にはまだ業務データがなく（[DBのデプロイと切り戻し](../database/runbook-deploy-and-rollback.md)）、溜まった行もない。
 
 ### Neutral
 

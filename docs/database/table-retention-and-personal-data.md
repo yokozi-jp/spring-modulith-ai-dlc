@@ -53,7 +53,7 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 | `tenancy.t_idempotency_key`          | DELETE               | あり（ShedLock の定期のジョブ。[ADR-126]）        | 定期（`IDEMPOTENCY_KEY_PURGE_INTERVAL` の間隔） | `expires_at` を過ぎた行。テナントごとに回さず、全テナントの行を消す（[ADR-126]） | 自動バキュームに任せる |
 | `product.t_idempotency_key`          | DELETE               | あり（ShedLock の定期のジョブ。[ADR-126]）        | 定期（`IDEMPOTENCY_KEY_PURGE_INTERVAL` の間隔） | `expires_at` を過ぎた行。`tenancy.m_tenant` のテナントごとに消す（[ADR-126]）    | 自動バキュームに任せる |
 | `ordering.t_idempotency_key`         | DELETE               | あり（ShedLock の定期のジョブ。[ADR-126]）        | 定期（`IDEMPOTENCY_KEY_PURGE_INTERVAL` の間隔） | `expires_at` を過ぎた行。`tenancy.m_tenant` のテナントごとに消す（[ADR-126]）    | 自動バキュームに任せる |
-| `modulith.event_publication_archive` | DELETE               | あり（ロックのない定期のジョブ。[ADR-120]）       | 各インスタンスで 1 日 1 回                      | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）   | 自動バキュームに任せる |
+| `modulith.event_publication_archive` | DELETE               | あり（ロックのない定期のジョブ。[ADR-120]）       | 各インスタンスで起動の 5 分後と 1 日ごと        | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）   | 自動バキュームに任せる |
 | `modulith.spring_session`            | DELETE               | あり（Spring Session JDBC の定期削除。[ADR-111]） | 各インスタンスで毎分                            | `expiry_time` を過ぎた行                                                         | 自動バキュームに任せる |
 | `modulith.spring_session_attributes` | 外部キーのカスケード | あり                                              | `spring_session` の行の削除と同時               | 親の行の削除                                                                     | 自動バキュームに任せる |
 
@@ -63,9 +63,7 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 `failed`が続くと期限切れの行が残るが、要求は期限を過ぎた行を新しいキーとして取り直すので、業務の結果は変わらない。
 期限を過ぎて消える前の行は、要求が新しいキーとして取り直す（[HTTPメソッドの使い分け](../web-api/http-methods.md#再試行への備え)）。
 
-archiveの表の定期のジョブは、`EVENT_PUBLICATION_ARCHIVE_RETENTION_ENABLED`が`true`のときだけ動き、Spring Modulithの`CompletedEventPublications.deletePublicationsOlderThan`の1つのDELETEで消す。
-保持期限（`event-publication.archive-retention.retention`）と間隔は`application.yaml`の固定値で、件数は絞らない。
-失敗した回は、DBの失敗をWARN、予期しない例外をERRORで記録し、次の回に同じ行を消し直す（[イベント出版の再投入のログイベント](../observability/runbook-event-publication-resubmission.md#event-publication-archive-retention-failed)）。
+archiveの表の定期のジョブは`EVENT_PUBLICATION_ARCHIVE_RETENTION_ENABLED`が`true`のときだけ動き、失敗した回は次の回に同じ行を消し直す（[イベント出版の再投入のログイベント](../observability/runbook-event-publication-resubmission.md#event-publication-archive-retention-failed)）。
 
 [#671]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/671
 [#672]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/672
