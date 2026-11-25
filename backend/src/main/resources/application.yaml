@@ -229,6 +229,15 @@ event-publication:
   resubmit-once:
     # 再投入した出版の処理が終わるのを待つ上限。
     completion-timeout: PT10M
+  # 完了した出版の archive の行を保持期限で消す（ADR-120）。COMPLETED の行だけを消し、ABANDONED の行は残す。
+  archive-retention:
+    # 定期の削除を動かすか。テストは false にする。
+    enabled: ${EVENT_PUBLICATION_ARCHIVE_RETENTION_ENABLED}
+    # 以下は環境で変えないため固定値にする。
+    # COMPLETED の行を残す期間。完了の時刻から測る。定期の再投入が archive を読み戻す期間（ADR-079）以下だと起動に失敗する。
+    retention: P7D
+    # 前の回の終わりから次の回までの間隔。
+    interval: P1D
 
 # 期限を過ぎた Idempotency-Key の行の掃除（ADR-126）。ロックは event-publication.resubmission と同じ ShedLock の表で取る。
 idempotency-key:

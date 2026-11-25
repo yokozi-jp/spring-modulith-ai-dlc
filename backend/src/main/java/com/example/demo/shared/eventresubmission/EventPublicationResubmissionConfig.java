@@ -214,8 +214,8 @@ class EventPublicationResubmissionConfig {
   /**
    * 手での 1 回の再投入の対象があるとき、Web のサーバーと定期の実行を止める。
    *
-   * <p>同じイメージを 1 回だけ起動する入口であり、対象の設定 1 つで、HTTP の待ち受けと、定期の再投入と期限を過ぎた冪等性キーの掃除を動かさないようにする。
-   * 環境変数の値より優先するため、プロパティの先頭に足す。
+   * <p>同じイメージを 1 回だけ起動する入口であり、対象の設定 1 つで、HTTP の待ち受けと、定期の再投入、期限を過ぎた冪等性キーの掃除、archive
+   * の行の保持期限の削除を動かさないようにする。 環境変数の値より優先するため、プロパティの先頭に足す。
    *
    * <p>終了の前に、処理中のリスナーの完了を最大 20 秒待つ（{@link
    * EventPublicationResubmissionConfig#awaitRunningListeners}）。 処理を待つ上限を過ぎたり、他のインスタンスが出版を FAILED
@@ -243,6 +243,8 @@ class EventPublicationResubmissionConfig {
                       "event-publication.resubmission.enabled",
                       "false",
                       "idempotency-key.purge.enabled",
+                      "false",
+                      "event-publication.archive-retention.enabled",
                       "false",
                       "spring.task.execution.shutdown.await-termination",
                       "true",
