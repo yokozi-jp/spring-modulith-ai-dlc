@@ -3,10 +3,7 @@ package com.example.demo.shared.persistence;
 import static com.example.demo.jooq.tables.FixtureItemDetailArchiveTable.FIXTURE_ITEM_DETAIL_ARCHIVE;
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
-import static com.example.demo.shared.persistence.FixtureAggregates.DETAILS;
 import static com.example.demo.shared.persistence.FixtureAggregates.ITEM;
-import static com.example.demo.shared.persistence.FixtureAggregates.ITEM_ARCHIVING;
-import static com.example.demo.shared.persistence.FixtureAggregates.archivedDetailRows;
 import static com.example.demo.shared.persistence.FixtureAggregates.detail;
 import static com.example.demo.shared.persistence.FixtureAggregates.detailRows;
 import static com.example.demo.shared.persistence.FixtureAggregates.itemRoot;
@@ -150,25 +147,23 @@ class TableWriterArchiveTest {
   }
 
   @Test
-  @DisplayName("履歴の表を宣言していない子は、消しても履歴の表に写さない")
-  void undeclaredChildIsNotArchived() {
-    seeds.insertItem(1L, "root");
-    seeds.insertDetail(1L, 1, "one");
-
-    save(ITEM, 1L, 1L, detailRows(List.of()));
-
-    assertThat(dsl.fetchCount(FIXTURE_ITEM_DETAIL)).isZero();
-    assertThat(dsl.fetchCount(FIXTURE_ITEM_DETAIL_ARCHIVE)).isZero();
-  }
-
-  @Test
   @DisplayName("履歴の表に子の列か退避のカラムがなければ、宣言のときに IllegalArgumentException にする")
   void archiveWithoutRequiredColumnsIsRejected() {
-    assertThatThrownBy(() -> DETAILS.archivedTo(FIXTURE_ITEM_DETAIL))
+    assertThatThrownBy(() ->
+            ChildTable.of(
+                FIXTURE_ITEM_DETAIL,
+                FIXTURE_ITEM_DETAIL.ITEM_ID,
+                FIXTURE_ITEM_DETAIL,
+                FIXTURE_ITEM_DETAIL.DETAIL_NO))
         .as("退避のカラムがない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("archived_at");
-    assertThatThrownBy(() -> DETAILS.archivedTo(DSL.table(DSL.name("h_empty"))))
+    assertThatThrownBy(() ->
+            ChildTable.of(
+                FIXTURE_ITEM_DETAIL,
+                FIXTURE_ITEM_DETAIL.ITEM_ID,
+                DSL.table(DSL.name("h_empty")),
+                FIXTURE_ITEM_DETAIL.DETAIL_NO))
         .as("子の列がない")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column is missing or has an unexpected type");
@@ -181,7 +176,7 @@ class TableWriterArchiveTest {
 
   /** 読んだ版を指定して、子の全行を渡し、ルートを更新する。 */
   private void save(final long itemId, final long lockNo, final List<Detail> details) {
-    save(ITEM_ARCHIVING, itemId, lockNo, archivedDetailRows(details));
+    save(ITEM, itemId, lockNo, detailRows(details));
   }
 
   /** 集約と子の行を指定して、ルートを更新する。 */

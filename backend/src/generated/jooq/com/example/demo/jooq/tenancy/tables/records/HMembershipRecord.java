@@ -48,14 +48,14 @@ public class HMembershipRecord extends UpdatableRecordImpl<HMembershipRecord> {
     }
 
     /**
-     * Setter for <code>tenancy.h_membership.membership_id</code>. 削除した所属のID
+     * Setter for <code>tenancy.h_membership.membership_id</code>. 所属ID
      */
     public void setMembershipId(@NonNull Long value) {
         set(1, value);
     }
 
     /**
-     * Getter for <code>tenancy.h_membership.membership_id</code>. 削除した所属のID
+     * Getter for <code>tenancy.h_membership.membership_id</code>. 所属ID
      */
     @NonNull
     public Long getMembershipId() {

@@ -3,7 +3,6 @@ package com.example.demo.shared.persistence;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.BiConsumer;
@@ -11,7 +10,6 @@ import org.jooq.Field;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.TableField;
-import org.jspecify.annotations.Nullable;
 
 /**
  * 集約の子のテーブルの宣言。Repository がクラスの定数として一度だけ書く（ADR-054）。
@@ -39,14 +37,14 @@ public final class ChildTable<C extends Record> {
   /** 親の中で行を同定する列。一つ以上。 */
   private final List<TableField<C, ?>> naturalKey;
 
-  /** 削除する前の行を残す履歴の表。残さない子は {@code null}。 */
-  private final @Nullable Archive archive;
+  /** 削除する前の行を写す履歴の表。 */
+  private final Archive archive;
 
   private ChildTable(
       final Table<C> table,
       final TableField<C, Long> parentKey,
       final List<TableField<C, ?>> naturalKey,
-      final @Nullable Archive archive) {
+      final Archive archive) {
     this.table = table;
     this.parentKey = parentKey;
     this.naturalKey = List.copyOf(naturalKey);
@@ -54,18 +52,27 @@ public final class ChildTable<C extends Record> {
   }
 
   /**
-   * 子のテーブルを宣言する。
+   * 子のテーブルを宣言する。子の行は、削除する前に履歴の表へ写す（ADR-129）。
+   *
+   * <p>履歴の表は、子のテーブルのすべての列（共通カラムを含む）を同じ名前と Java の型で持ち、退避のカラム（{@code archived_at}、{@code
+   * archived_by}、{@code archived_pgm_cd}、{@code
+   * archived_tx_id}）を持つ。子の主キーと自然キーに一意制約を付けず、同じ子を作り直して消しても書ける形にする。
+   *
+   * <p>ponytail: 上限：列の長さと NULL の可否は、この宣言では比べない。{@code AggregateDeclarationInspectionTest} が DB
+   * のカタログで比べる。
    *
    * @param table 子のテーブル
    * @param parentKey 親の内部の主キーを持つ外部キーの列
+   * @param archive 削除する前の行を写す履歴の表
    * @param firstKey 親の中で行を同定する列
    * @param moreKeys 自然キーが複数の列のときの残りの列
-   * @throws IllegalArgumentException テーブルに共通カラムがない場合
+   * @throws IllegalArgumentException テーブルに共通カラムがない場合、履歴の表に子の列か退避のカラムがない、または型が異なる場合
    */
   @SafeVarargs
   public static <C extends Record> ChildTable<C> of(
       final Table<C> table,
       final TableField<C, Long> parentKey,
+      final Table<?> archive,
       final TableField<C, ?> firstKey,
       final TableField<C, ?>... moreKeys) {
     CommonColumns.requireAuditColumns(table);
@@ -73,22 +80,6 @@ public final class ChildTable<C extends Record> {
     naturalKey.add(firstKey);
     naturalKey.addAll(List.of(moreKeys));
     naturalKey.forEach(ChildTable::requireComparableType);
-    return new ChildTable<>(table, parentKey, naturalKey, null);
-  }
-
-  /**
-   * 子の行を削除する前に、履歴の表へ写すようにする（ADR-129）。
-   *
-   * <p>履歴の表は、子のテーブルのすべての列（共通カラムを含む）を同じ名前と Java の型で持ち、退避のカラム（{@code archived_at}、{@code
-   * archived_by}、{@code archived_pgm_cd}、{@code
-   * archived_tx_id}）を持つ。子の主キーと自然キーに一意制約を付けず、同じ子を作り直して消しても書ける形にする。
-   *
-   * <p>ponytail: 上限：列の長さと NULL の可否は比べない。子の列だけを広げて履歴の表を広げ忘れると、最初の削除の INSERT が失敗する。
-   *
-   * @param archive 履歴の表
-   * @throws IllegalArgumentException 子のテーブルの列か退避のカラムがない、または型が異なる場合
-   */
-  public ChildTable<C> archivedTo(final Table<?> archive) {
     final List<Field<?>> columns =
         table
             .fieldStream()
@@ -151,8 +142,8 @@ public final class ChildTable<C extends Record> {
     }
   }
 
-  /* package */ Optional<Archive> archive() {
-    return Optional.ofNullable(archive);
+  /* package */ Archive archive() {
+    return archive;
   }
 
   /* package */ Table<C> table() {

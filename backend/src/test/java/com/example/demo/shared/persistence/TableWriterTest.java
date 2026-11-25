@@ -1,5 +1,6 @@
 package com.example.demo.shared.persistence;
 
+import static com.example.demo.jooq.tables.FixtureItemDetailArchiveTable.FIXTURE_ITEM_DETAIL_ARCHIVE;
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static com.example.demo.shared.persistence.FixtureAggregates.DETAILS;
@@ -190,8 +191,12 @@ class TableWriterTest {
         .as("集約")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
-    assertThatThrownBy(
-            () -> ChildTable.<Record>of(NO_LOCK_TABLE, FIXTURE_ITEM.ITEM_ID, FIXTURE_ITEM.ITEM_ID))
+    assertThatThrownBy(() ->
+            ChildTable.<Record>of(
+                NO_LOCK_TABLE,
+                FIXTURE_ITEM.ITEM_ID,
+                FIXTURE_ITEM_DETAIL_ARCHIVE,
+                FIXTURE_ITEM.ITEM_ID))
         .as("子")
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("column=lock_no");
@@ -202,7 +207,10 @@ class TableWriterTest {
   void incomparableNaturalKeyTypeIsRejected() {
     assertThatThrownBy(() ->
             ChildTable.<Record>of(
-                FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.CREATED_AT))
+                FIXTURE_ITEM_DETAIL,
+                FIXTURE_ITEM_DETAIL.ITEM_ID,
+                FIXTURE_ITEM_DETAIL_ARCHIVE,
+                FIXTURE_ITEM_DETAIL.CREATED_AT))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("natural key column must be");
   }
@@ -462,7 +470,10 @@ class TableWriterTest {
   void childNaturalKeyMatchingTwoRowsIsRejected() {
     final ChildTable<Record> byText =
         ChildTable.of(
-            FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
+            FIXTURE_ITEM_DETAIL,
+            FIXTURE_ITEM_DETAIL.ITEM_ID,
+            FIXTURE_ITEM_DETAIL_ARCHIVE,
+            FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
     final AggregateTable<Record, Long, Item> aggregate =
         AggregateTable.of(
             FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, byText);

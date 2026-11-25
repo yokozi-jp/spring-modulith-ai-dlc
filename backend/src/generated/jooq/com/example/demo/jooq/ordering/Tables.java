@@ -4,6 +4,7 @@
 package com.example.demo.jooq.ordering;
 
 
+import com.example.demo.jooq.ordering.tables.HOrderLine;
 import com.example.demo.jooq.ordering.tables.TOrder;
 import com.example.demo.jooq.ordering.tables.TOrderLine;
 
@@ -22,6 +23,11 @@ import javax.annotation.processing.Generated;
 )
 @SuppressWarnings({ "all", "unchecked", "rawtypes", "this-escape" })
 public class Tables {
+
+    /**
+     * 注文明細履歴
+     */
+    public static final HOrderLine H_ORDER_LINE = HOrderLine.H_ORDER_LINE;
 
     /**
      * 注文

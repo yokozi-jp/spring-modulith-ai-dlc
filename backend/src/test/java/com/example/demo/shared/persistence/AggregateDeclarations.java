@@ -51,7 +51,10 @@ public final class AggregateDeclarations {
                 qualified(aggregate.table()),
                 aggregate.children().stream()
                     .map(child ->
-                        new DeclaredChild(qualified(child.table()), child.parentKey().getName()))
+                        new DeclaredChild(
+                            qualified(child.table()),
+                            child.parentKey().getName(),
+                            qualified(child.archive().table())))
                     .toList()))
         .toList();
   }

@@ -11,24 +11,18 @@ import org.jooq.Record;
 /** {@link TableWriter} のテストが使う、テスト専用のテーブルの集約の宣言。 */
 final class FixtureAggregates {
 
-  /** 子の行。親の中の行は、明細番号で同定する。 */
+  /** 子の行。親の中の行は、明細番号で同定する。削除前の行は履歴の表に写す。 */
   /* package */ static final ChildTable<Record> DETAILS =
       ChildTable.of(
-          FIXTURE_ITEM_DETAIL, FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_NO);
+          FIXTURE_ITEM_DETAIL,
+          FIXTURE_ITEM_DETAIL.ITEM_ID,
+          FIXTURE_ITEM_DETAIL_ARCHIVE,
+          FIXTURE_ITEM_DETAIL.DETAIL_NO);
 
   /** 子を持つ集約。ルートの一意の列と内部の主キーは、同じ item_id にする。 */
   /* package */ static final AggregateTable<Record, Long, Item> ITEM =
       AggregateTable.of(
           FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, DETAILS);
-
-  /** 削除前の行を履歴の表に残す子。 */
-  /* package */ static final ChildTable<Record> ARCHIVED_DETAILS =
-      DETAILS.archivedTo(FIXTURE_ITEM_DETAIL_ARCHIVE);
-
-  /** 削除前の子の行を残す集約。 */
-  /* package */ static final AggregateTable<Record, Long, Item> ITEM_ARCHIVING =
-      AggregateTable.of(
-          FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, ARCHIVED_DETAILS);
 
   /** 子を持たない集約。 */
   /* package */ static final AggregateTable<Record, Long, Item> ITEM_ONLY =
@@ -49,11 +43,6 @@ final class FixtureAggregates {
   /** 明細番号と文言を子の列に書く、{@link #DETAILS} の全行を作る。 */
   /* package */ static ChildRows<Record> detailRows(final List<Detail> details) {
     return rowsOf(DETAILS, details);
-  }
-
-  /** {@link #ARCHIVED_DETAILS} の全行を作る。 */
-  /* package */ static ChildRows<Record> archivedDetailRows(final List<Detail> details) {
-    return rowsOf(ARCHIVED_DETAILS, details);
   }
 
   private static ChildRows<Record> rowsOf(

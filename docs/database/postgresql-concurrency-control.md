@@ -108,11 +108,11 @@ RETURNING order_id;
 保存後にあるべき子の全行を渡す置き換えのため、子の一部だけを渡すと残りを削除する。
 宣言した子を渡さない呼び出しと、自然キーが`null`か重複する呼び出しは、SQLを実行する前に`IllegalArgumentException`にする。
 
-削除した子の内容を後から引く必要がある子は、`ChildTable.archivedTo`で履歴の表（`h_`）を宣言する。
+すべての子は、`ChildTable.of`の引数に履歴の表（`h_`）を渡して宣言する。
 手順2の削除は`DELETE ... RETURNING`で行い、返った行を共通カラムごと履歴の表へ複数行のINSERTで写して、`archived_at`、`archived_by`、`archived_pgm_cd`、`archived_tx_id`を登録する。
 写すのは削除した行そのものなので、写した行は削除した行と一致する。
 削除と写しは同じトランザクションにあり、写しが失敗すると削除も戻る。
-履歴の表は、子の列と同じ名前の列を持ち、一意制約と外部キーを持たない（[ADR-129](../adr/ADR-129-archive-removed-child-rows-in-table-writer.md)）。
+履歴の表は、子の列と同じ名前と型の列を持ち、一意制約と外部キーを持たない。カタログとの食い違いは`AggregateDeclarationInspectionTest`が止める（[ADR-129](../adr/ADR-129-archive-removed-child-rows-in-table-writer.md)）。
 親の物理削除の入口を足すときは、親と一緒に消える子も同じ宣言で履歴の表へ写す。
 
 ### jOOQの楽観的ロックの機能

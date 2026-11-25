@@ -85,7 +85,7 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 1. 退職、既読、有効期間切れ、廃盤、承認状態のように、業務上の意味を持つカラムで表す。
 2. 本当に削除する要件なら物理削除し、誤操作からの復元や監査での参照が要件にあるときだけアーカイブテーブルへ退避する。
 
-集約の子を`TableWriter.update`で削除するときの退避は、`ChildTable.archivedTo`で宣言する（[ADR-129](../adr/ADR-129-archive-removed-child-rows-in-table-writer.md)）。
+集約の子を`TableWriter.update`で削除するときの退避は、すべての子が`ChildTable.of`の引数に履歴の表を渡して宣言し、宣言のない子は書けない（[ADR-129](../adr/ADR-129-archive-removed-child-rows-in-table-writer.md)）。
 法令や契約でアーカイブなしの削除が求められる場合は、退避しない。
 理由は[ADR-113](../adr/ADR-113-forbid-logical-delete-flags.md)に示す。
 

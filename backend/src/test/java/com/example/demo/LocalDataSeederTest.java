@@ -80,7 +80,7 @@ class LocalDataSeederTest {
 
   @Test
   @DisplayName(
-      "空の DB の 2 つのテナントのそれぞれに、BUSINESS_TABLES のすべての表の行と、商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
+      "空の DB の 2 つのテナントのそれぞれに、履歴の表を除く BUSINESS_TABLES のすべての表の行と、商品 5 件、注文 6 件、決済 2 件を入れ、2 回目は何も入れない")
   void seedsRepresentativeDataOnlyWhenEmpty() {
     for (final TenantId tenant : TENANTS) {
       LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
@@ -93,6 +93,9 @@ class LocalDataSeederTest {
     for (final TenantId tenant : TENANTS) {
       assertRepresentativeData(tenant);
       for (final Table<?> table : LocalDataSeeder.BUSINESS_TABLES) {
+        if (LocalDataSeeder.HISTORY_TABLES.contains(table)) {
+          continue;
+        }
         assertThat(
                 this.<Integer>inModule(
                     tenant, AsModule.moduleOf(table), tx -> tx.fetchCount(table)))

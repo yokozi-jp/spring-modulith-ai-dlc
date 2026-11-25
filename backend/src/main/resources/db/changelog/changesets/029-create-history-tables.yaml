@@ -1,0 +1,434 @@
+databaseChangeLog:
+  - changeSet:
+      id: 029-create-history-tables
+      author: system
+      comment: >-
+        子の行を削除する前の内容を残す履歴の表を作る（#609、ADR-129）。
+        所属（tenancy.m_membership）、IdP 識別（tenancy.m_user_identity）、注文明細（ordering.t_order_line）の履歴である。
+        アプリケーションが、ChildWriter の削除と同じトランザクションで書く（トリガーは使わない）。
+        元の表の列（共通カラムを含む）は削除前の値のまま写し、退避の日時、者、プログラム、トレースを archived_* に持つ。
+        元の行や親の行が後から消えても残すため、一意制約と外部キーは張らない。
+        h_order_line はテナントで分ける表なので、元の表と同じ行レベルセキュリティを付ける。
+        権限は 014 と 012 の既定の権限（ALTER DEFAULT PRIVILEGES）でモジュールのロールに付く。
+      preConditions:
+        - dbms:
+            type: postgresql
+      changes:
+        - createTable:
+            tableName: h_membership
+            schemaName: tenancy
+            remarks: 所属履歴
+            columns:
+              - column:
+                  name: membership_history_id
+                  type: bigint
+                  remarks: 所属履歴ID
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_h_membership
+              - column:
+                  name: membership_id
+                  type: bigint
+                  remarks: 所属ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: bigint
+                  remarks: 利用者ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_id
+                  type: bigint
+                  remarks: テナントID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role_typ
+                  type: varchar(10)
+                  remarks: 役割区分
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  remarks: 作成日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  remarks: 作成者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  remarks: 作成プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  remarks: 作成トレースID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  remarks: 更新日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  remarks: 更新者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  remarks: 更新プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  remarks: 更新トレースID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  remarks: ロック番号
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+                  remarks: データパッチ日時
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+                  remarks: データパッチ作業者
+              - column:
+                  name: patched_id
+                  type: integer
+                  remarks: データパッチ課題番号
+              - column:
+                  name: archived_at
+                  type: timestamptz
+                  remarks: 退避日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_by
+                  type: varchar(64)
+                  remarks: 退避者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_pgm_cd
+                  type: varchar(64)
+                  remarks: 退避プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_tx_id
+                  type: varchar(32)
+                  remarks: 退避トレースID
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: h_user_identity
+            schemaName: tenancy
+            remarks: IdP識別履歴
+            columns:
+              - column:
+                  name: user_identity_history_id
+                  type: bigint
+                  remarks: IdP識別履歴ID
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_h_user_identity
+              - column:
+                  name: user_identity_id
+                  type: bigint
+                  remarks: IdP識別ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: bigint
+                  remarks: 利用者ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: issuer_url
+                  type: varchar(255)
+                  remarks: IdP識別の発行者（iss）
+                  constraints:
+                    nullable: false
+              - column:
+                  name: subject_code
+                  type: varchar(255)
+                  remarks: IdP識別のサブジェクト（sub）
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  remarks: 作成日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  remarks: 作成者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  remarks: 作成プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  remarks: 作成トレースID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  remarks: 更新日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  remarks: 更新者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  remarks: 更新プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  remarks: 更新トレースID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  remarks: ロック番号
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+                  remarks: データパッチ日時
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+                  remarks: データパッチ作業者
+              - column:
+                  name: patched_id
+                  type: integer
+                  remarks: データパッチ課題番号
+              - column:
+                  name: archived_at
+                  type: timestamptz
+                  remarks: 退避日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_by
+                  type: varchar(64)
+                  remarks: 退避者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_pgm_cd
+                  type: varchar(64)
+                  remarks: 退避プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_tx_id
+                  type: varchar(32)
+                  remarks: 退避トレースID
+                  constraints:
+                    nullable: false
+        - createTable:
+            tableName: h_order_line
+            schemaName: ordering
+            remarks: 注文明細履歴
+            columns:
+              - column:
+                  name: order_line_history_id
+                  type: bigint
+                  remarks: 注文明細履歴ID
+                  autoIncrement: true
+                  generationType: ALWAYS
+                  constraints:
+                    primaryKey: true
+                    primaryKeyName: pk_h_order_line
+              - column:
+                  name: order_line_id
+                  type: bigint
+                  remarks: 注文明細ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: tenant_public_id
+                  type: uuid
+                  remarks: テナント公開ID
+                  defaultValueComputed: current_setting('app.current_tenant')::uuid
+                  constraints:
+                    nullable: false
+              - column:
+                  name: order_id
+                  type: bigint
+                  remarks: 注文ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: line_no
+                  type: integer
+                  remarks: 明細番号
+                  constraints:
+                    nullable: false
+              - column:
+                  name: product_public_id
+                  type: uuid
+                  remarks: 商品公開ID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_count
+                  type: integer
+                  remarks: 注文数量
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ordered_unit_price_jpy
+                  type: numeric(12,2)
+                  remarks: 注文単価（円）
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  remarks: 作成日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: varchar(64)
+                  remarks: 作成者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_pgm_cd
+                  type: varchar(64)
+                  remarks: 作成プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_tx_id
+                  type: varchar(32)
+                  remarks: 作成トレースID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  remarks: 更新日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_by
+                  type: varchar(64)
+                  remarks: 更新者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_pgm_cd
+                  type: varchar(64)
+                  remarks: 更新プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_tx_id
+                  type: varchar(32)
+                  remarks: 更新トレースID
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lock_no
+                  type: bigint
+                  remarks: ロック番号
+                  constraints:
+                    nullable: false
+              - column:
+                  name: patched_at
+                  type: timestamptz
+                  remarks: データパッチ日時
+              - column:
+                  name: patched_by
+                  type: varchar(64)
+                  remarks: データパッチ作業者
+              - column:
+                  name: patched_id
+                  type: integer
+                  remarks: データパッチ課題番号
+              - column:
+                  name: archived_at
+                  type: timestamptz
+                  remarks: 退避日時
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_by
+                  type: varchar(64)
+                  remarks: 退避者
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_pgm_cd
+                  type: varchar(64)
+                  remarks: 退避プログラムコード
+                  constraints:
+                    nullable: false
+              - column:
+                  name: archived_tx_id
+                  type: varchar(32)
+                  remarks: 退避トレースID
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: |
+              ALTER TABLE ordering.h_order_line ENABLE ROW LEVEL SECURITY;
+              ALTER TABLE ordering.h_order_line FORCE ROW LEVEL SECURITY;
+              CREATE POLICY tenant_isolation ON ordering.h_order_line AS PERMISSIVE FOR ALL TO PUBLIC USING (tenant_public_id = current_setting('app.current_tenant')::uuid);
+      rollback:
+        - dropTable:
+            tableName: h_membership
+            schemaName: tenancy
+        - dropTable:
+            tableName: h_user_identity
+            schemaName: tenancy
+        - dropTable:
+            tableName: h_order_line
+            schemaName: ordering

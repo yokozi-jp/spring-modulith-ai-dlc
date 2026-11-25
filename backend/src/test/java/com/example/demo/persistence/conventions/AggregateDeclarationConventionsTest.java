@@ -18,6 +18,9 @@ class AggregateDeclarationConventionsTest {
   /** 注文の明細のテーブル。 */
   private static final String LINE = "ordering.t_order_line";
 
+  /** 注文の明細の履歴の表。 */
+  private static final String ARCHIVE = "ordering.h_order_line";
+
   /** 明細から注文への外部キー。テナントの列との複合である。 */
   private static final ConstraintRow LINE_TO_ORDER =
       new ConstraintRow(
@@ -32,7 +35,7 @@ class AggregateDeclarationConventionsTest {
 
   /** 明細を注文の子として正しく宣言した集約。 */
   private static final DeclaredAggregate DECLARED =
-      new DeclaredAggregate(ORDER, List.of(new DeclaredChild(LINE, "order_id")));
+      new DeclaredAggregate(ORDER, List.of(new DeclaredChild(LINE, "order_id", ARCHIVE)));
 
   private static List<String> keys(final List<ConventionViolation> violations) {
     return violations.stream().map(ConventionViolation::key).toList();
@@ -62,7 +65,7 @@ class AggregateDeclarationConventionsTest {
   @DisplayName("AG2：parentKey が外部キーの列でなければ拒否する")
   void rejectsParentKeyOutsideForeignKey() {
     final List<DeclaredAggregate> mutated =
-        List.of(new DeclaredAggregate(ORDER, List.of(new DeclaredChild(LINE, "line_no"))));
+        List.of(new DeclaredAggregate(ORDER, List.of(new DeclaredChild(LINE, "line_no", ARCHIVE))));
 
     assertThat(
             keys(AggregateDeclarationConventions.check(mutated, List.of(LINE_TO_ORDER), List.of())))

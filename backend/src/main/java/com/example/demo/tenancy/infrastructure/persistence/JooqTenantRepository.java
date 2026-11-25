@@ -35,8 +35,7 @@ class JooqTenantRepository implements TenantRepository {
    * <p>所属を外すと、誰がどの役割でいつまで所属していたかが消えるため、外す前の行を h_membership に残す（ADR-129）。
    */
   private static final ChildTable<MMembershipRecord> MEMBERSHIPS =
-      ChildTable.of(M_MEMBERSHIP, M_MEMBERSHIP.TENANT_ID, M_MEMBERSHIP.USER_ID)
-          .archivedTo(H_MEMBERSHIP);
+      ChildTable.of(M_MEMBERSHIP, M_MEMBERSHIP.TENANT_ID, H_MEMBERSHIP, M_MEMBERSHIP.USER_ID);
 
   /** テナントの集約。ルートは公開 ID で一つに決める。 */
   private static final AggregateTable<MTenantRecord, UUID, Tenant> TENANT =

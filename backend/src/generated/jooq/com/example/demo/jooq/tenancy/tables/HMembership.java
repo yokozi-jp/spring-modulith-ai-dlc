@@ -72,9 +72,9 @@ public class HMembership extends TableImpl<HMembershipRecord> {
     public final TableField<HMembershipRecord, Long> MEMBERSHIP_HISTORY_ID = createField(DSL.name("membership_history_id"), SQLDataType.BIGINT.nullable(false).generatedAlwaysAsIdentity(), this, "所属履歴ID");
 
     /**
-     * The column <code>tenancy.h_membership.membership_id</code>. 削除した所属のID
+     * The column <code>tenancy.h_membership.membership_id</code>. 所属ID
      */
-    public final TableField<HMembershipRecord, Long> MEMBERSHIP_ID = createField(DSL.name("membership_id"), SQLDataType.BIGINT.nullable(false), this, "削除した所属のID");
+    public final TableField<HMembershipRecord, Long> MEMBERSHIP_ID = createField(DSL.name("membership_id"), SQLDataType.BIGINT.nullable(false), this, "所属ID");
 
     /**
      * The column <code>tenancy.h_membership.user_id</code>. 利用者ID

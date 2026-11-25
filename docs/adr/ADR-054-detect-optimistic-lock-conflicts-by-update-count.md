@@ -89,7 +89,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   競合の例外は `shared.concurrency` の `ConflictException` で、`TableWriter` が自分で投げる。
 - 書き込みは、開いていて読み取り専用ではないトランザクションの中でだけ行う。そうでなければ、SQL を実行する前に `IllegalStateException` にする。
   ルートの行ロックが子の書き込みを守るのは、同じトランザクションの中だけだからである。
-- 子の削除の前に行を履歴の表へ写す宣言（`ChildTable.archivedTo`）は、[ADR-129](ADR-129-archive-removed-child-rows-in-table-writer.md)で決める。
+- 子の削除の前に行を履歴の表へ写す宣言（`ChildTable.of` の履歴の表の引数）は、[ADR-129](ADR-129-archive-removed-child-rows-in-table-writer.md)で決める。
 - 版を比べない UPDATE と DELETE の入口と、集約ルートの物理削除の入口は、今は持たない。
   本番の呼び出しがなく、`Condition` を受け取る入口は、版の比べ忘れと子の絞り込み忘れの抜け道になるためである。
   在庫の引き当てのように版を比べない更新が必要になったとき、この ADR を更新して、集約と一意の列で行を指し、件数の意味を結果の型で返す入口を足す。

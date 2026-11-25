@@ -1,5 +1,6 @@
 package com.example.demo.tenancy.infrastructure.persistence;
 
+import static com.example.demo.jooq.tenancy.Tables.H_USER_IDENTITY;
 import static com.example.demo.jooq.tenancy.Tables.M_USER;
 import static com.example.demo.jooq.tenancy.Tables.M_USER_IDENTITY;
 
@@ -23,11 +24,16 @@ import org.springframework.stereotype.Repository;
 @Repository
 class JooqUserRepository implements UserRepository {
 
-  /** 利用者の IdP の識別。親の中の行は、発行者と識別子の組で同定する。 */
+  /**
+   * 利用者の IdP の識別。親の中の行は、発行者と識別子の組で同定する。
+   *
+   * <p>外す前の行を h_user_identity に残す（ADR-129）。
+   */
   private static final ChildTable<MUserIdentityRecord> IDENTITIES =
       ChildTable.of(
           M_USER_IDENTITY,
           M_USER_IDENTITY.USER_ID,
+          H_USER_IDENTITY,
           M_USER_IDENTITY.ISSUER_URL,
           M_USER_IDENTITY.SUBJECT_CODE);
 

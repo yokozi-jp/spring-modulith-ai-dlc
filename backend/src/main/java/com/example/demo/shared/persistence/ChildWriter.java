@@ -88,7 +88,7 @@ import org.jspecify.annotations.Nullable;
     final Result<C> deleted =
         ConflictTranslator.executeOrConflict(
             () -> dsl.deleteFrom(table).where(condition).returning(table.fields()).fetch(), target);
-    child.archive().ifPresent(archive -> archiveRows(archive, deleted, target));
+    archiveRows(child.archive(), deleted, target);
   }
 
   /**
