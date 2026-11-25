@@ -28,7 +28,7 @@ tags: [architecture, backend, spring-modulith, shared-module]
 - 操作しているテナントの語彙を `shared.tenancy` に置き、このパッケージも `@NamedInterface("tenancy")` で公開する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   置く型は、テナントの `public_id` を包む `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、呼び出しの間だけテナントを `ScopedValue` に束縛する `TenantContext` である。
   `TenantId` は `tenancy` の `domain.model` も使い、テナントの ID を表す型を 1 つにする。
-  `TenantContext.call` で束縛を切り替えてよいのは、リクエストの filter（`tenancy` の `TenantSelectionFilter`）、`TenantListenerAspect`、`shared.batch` の `TenantPartitionAspect` だけである。
+  `TenantContext.call` で束縛を切り替えてよいのは、リクエストの filter（`tenancy` の `TenantSelectionFilter`）、`TenantListenerAspect`、期限を過ぎた冪等性キーを消す `shared.persistence` の `IdempotencyKeyPurge`、`shared.batch` の `TenantPartitionAspect` だけである。
   テナントの値と規則は `tenancy` に置き、`shared.tenancy` は、どのテナントを操作しているかを運ぶ語彙と、リスナーでテナントを束縛する `TenantListenerAspect` だけを持つ。
 - 業務のバッチの追いつきの Runner（`CatchUpJobRunner`）、partition のテナントを束縛する Aspect（`TenantPartitionAspect`）、Job の期間の規則（`JobPeriodRule`）を `shared.batch` に置き、このパッケージも `@NamedInterface("batch")` で公開する（[ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md)）。
   `JobPeriodRule` 以外のクラスは package-private にする。
@@ -38,6 +38,8 @@ tags: [architecture, backend, spring-modulith, shared-module]
   同じキーの処理中は、`shared.concurrency` の `ConflictException` の種類 `IDEMPOTENCY_IN_PROGRESS` で表す。
   `Idempotency` の実装 `JooqIdempotency` は、キーの表を jOOQ で読むため `shared.persistence` に置き、キーの行の書き込みは同じパッケージの `IdempotencyKeyWriter` が行う。
   キーの表は、起動のときに jOOQ のカタログからモジュールごとに引き、呼び出し中の CommandHandler の `*_pgm_cd` のモジュールで選ぶ。
+  期限を過ぎたキーの行を消す定期のジョブ `IdempotencyKeyPurge` も `shared.persistence` に置き、行の削除は `IdempotencyKeyWriter` が行う。
+  ジョブは、RLS で分けるモジュールの表を `tenancy.m_tenant` のテナントを 1 つずつ束縛して消し、どのモジュールの表もそのモジュールのロールのトランザクションで消す（[DB接続情報とロール分離](../database/connections.md#モジュールのロール)）。
   ヘッダーから `IdempotencyKey` の引数を作る resolver は、HTTP の型を使うため、ベースパッケージ直下の `IdempotencyKeyConfig` に置く。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。

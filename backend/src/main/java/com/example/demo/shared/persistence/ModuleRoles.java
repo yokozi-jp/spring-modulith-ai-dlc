@@ -59,6 +59,22 @@ public final class ModuleRoles {
   }
 
   /**
+   * モジュールのロールで動かすトランザクションの名前を返す。{@link #roleFor} は、この名前からそのモジュールのロールを引く。
+   *
+   * <p>CommandHandler の外から、モジュールの表をそのモジュールのロールで読み書きする共通処理（{@code IdempotencyKeyPurge}）が使う。
+   *
+   * @param module {@link #MODULES} のモジュールの名前
+   * @param operation 名前の末尾に付ける処理の名前
+   * @throws IllegalArgumentException モジュールが {@link #MODULES} にない場合
+   */
+  /* package */ static String transactionNameIn(final String module, final String operation) {
+    if (!MODULES.contains(module)) {
+      throw new IllegalArgumentException("module has no role: " + module);
+    }
+    return BASE_PACKAGE + module + "." + operation;
+  }
+
+  /**
    * トランザクションの名前のモジュールが、{@link #TENANT_SCOPED_MODULES} に含まれるか。
    *
    * @param transactionName {@code TransactionDefinition#getName()}。名前がなければ {@code null}

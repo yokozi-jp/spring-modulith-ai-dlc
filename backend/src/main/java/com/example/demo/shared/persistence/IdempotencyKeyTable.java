@@ -19,6 +19,7 @@ import org.jooq.Table;
  * のモジュールから引く。
  *
  * @param table キーの表
+ * @param id 主キーの列
  * @param tenant テナントの列
  * @param user 利用者の列
  * @param key キーの列
@@ -29,6 +30,7 @@ import org.jooq.Table;
  */
 /* package */ record IdempotencyKeyTable(
     Table<?> table,
+    Field<Long> id,
     Field<UUID> tenant,
     Field<UUID> user,
     Field<UUID> key,
@@ -63,6 +65,7 @@ import org.jooq.Table;
     CommonColumns.requireAuditColumns(table);
     return new IdempotencyKeyTable(
         table,
+        CommonColumns.requiredField(table, "idempotency_key_id", Long.class),
         CommonColumns.requiredField(table, "tenant_public_id", UUID.class),
         CommonColumns.requiredField(table, "user_public_id", UUID.class),
         CommonColumns.requiredField(table, "idempotency_key", UUID.class),

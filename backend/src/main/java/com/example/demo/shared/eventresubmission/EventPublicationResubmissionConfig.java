@@ -40,6 +40,7 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.type.AnnotatedTypeMetadata;
 import org.springframework.modulith.events.core.Staleness;
 import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -185,16 +186,37 @@ class EventPublicationResubmissionConfig {
    *
    * <p>有効かどうかを決めるのはこの条件だけで、{@link Properties} には持たない。 Boot の束ね方は {@code yes} や {@code 1}
    * も真と読むが、この条件は {@code true}（大文字小文字を問わない）だけを真とするためである。
+   *
+   * <p>{@code @EnableScheduling} はアプリのすべての {@code @Scheduled} を動かし、ほかの定期のジョブ（{@code
+   * IdempotencyKeyPurgeConfig}）も付けるため、{@code @Scheduled} はこの条件付きの構成に置き、{@link
+   * EventPublicationResubmitter} には置かない。
    */
   @Configuration(proxyBeanMethods = false)
   @EnableScheduling
   @ConditionalOnBooleanProperty("event-publication.resubmission.enabled")
-  /* package */ static class Scheduling {}
+  /* package */ static class Scheduling {
+
+    /** 失敗した出版を再投入するジョブ。 */
+    private final EventPublicationResubmitter resubmitter;
+
+    /* package */ Scheduling(final EventPublicationResubmitter resubmitter) {
+      this.resubmitter = resubmitter;
+    }
+
+    /** 前の回の終わりから {@code interval} を空けて、再投入を 1 回動かす。 */
+    @Scheduled(
+        fixedDelayString = "${event-publication.resubmission.interval}",
+        initialDelayString = "${event-publication.resubmission.interval}")
+    /* package */ void resubmitOnce() {
+      resubmitter.resubmitOnce();
+    }
+  }
 
   /**
    * 手での 1 回の再投入の対象があるとき、Web のサーバーと定期の実行を止める。
    *
-   * <p>同じイメージを 1 回だけ起動する入口であり、対象の設定 1 つで、HTTP の待ち受けと定期の再投入を動かさないようにする。 環境変数の値より優先するため、プロパティの先頭に足す。
+   * <p>同じイメージを 1 回だけ起動する入口であり、対象の設定 1 つで、HTTP の待ち受けと、定期の再投入と期限を過ぎた冪等性キーの掃除を動かさないようにする。
+   * 環境変数の値より優先するため、プロパティの先頭に足す。
    *
    * <p>終了の前に、処理中のリスナーの完了を最大 20 秒待つ（{@link
    * EventPublicationResubmissionConfig#awaitRunningListeners}）。 処理を待つ上限を過ぎたり、他のインスタンスが出版を FAILED
@@ -220,6 +242,8 @@ class EventPublicationResubmissionConfig {
                       "spring.main.web-application-type",
                       "none",
                       "event-publication.resubmission.enabled",
+                      "false",
+                      "idempotency-key.purge.enabled",
                       "false",
                       "spring.task.execution.shutdown.await-termination",
                       "true",

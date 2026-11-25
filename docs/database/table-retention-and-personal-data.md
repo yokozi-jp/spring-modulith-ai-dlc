@@ -44,15 +44,18 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 改廃を実行するテーブルと、実装を決めたテーブルだけを書く。
 ここにないテーブルは、改廃の仕組みがまだない。
 
-| テーブル                             | 改廃方法             | 自動化                                            | 実行のタイミング                  | 改廃の条件                                                                                                                                                      | `ANALYZE` と `VACUUM`  |
-| ------------------------------------ | -------------------- | ------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
-| `tenancy.t_idempotency_key`          | DELETE               | なし（[#540] で実装する）                         | 定期（ShedLock のジョブ）         | `expires_at` を過ぎた行。全テナントの行を 1 つの文で消す（[ADR-126]）                                                                                           | 自動バキュームに任せる |
-| `ordering.t_idempotency_key`         | DELETE               | なし（[#540] で実装する）                         | 定期（ShedLock のジョブ）         | `expires_at` を過ぎた行。テナントごとに消す（[ADR-126]）                                                                                                        | 自動バキュームに任せる |
-| `modulith.event_publication_archive` | DELETE               | なし（[#542] で実装する）                         | 1 日 1 回                         | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）                                                                                  | 自動バキュームに任せる |
-| `modulith.spring_session`            | DELETE               | あり（Spring Session JDBC の定期削除。[ADR-111]） | 各インスタンスで毎分              | `expiry_time` を過ぎた行                                                                                                                                        | 自動バキュームに任せる |
-| `modulith.spring_session_attributes` | 外部キーのカスケード | あり                                              | `spring_session` の行の削除と同時 | 親の行の削除                                                                                                                                                    | 自動バキュームに任せる |
+| テーブル                             | 改廃方法             | 自動化                                            | 実行のタイミング                                | 改廃の条件                                                                       | `ANALYZE` と `VACUUM`  |
+| ------------------------------------ | -------------------- | ------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------- |
+| `tenancy.t_idempotency_key`          | DELETE               | あり（ShedLock の定期のジョブ。[ADR-126]）        | 定期（`IDEMPOTENCY_KEY_PURGE_INTERVAL` の間隔） | `expires_at` を過ぎた行。テナントごとに回さず、全テナントの行を消す（[ADR-126]） | 自動バキュームに任せる |
+| `ordering.t_idempotency_key`         | DELETE               | あり（ShedLock の定期のジョブ。[ADR-126]）        | 定期（`IDEMPOTENCY_KEY_PURGE_INTERVAL` の間隔） | `expires_at` を過ぎた行。`tenancy.m_tenant` のテナントごとに消す（[ADR-126]）    | 自動バキュームに任せる |
+| `modulith.event_publication_archive` | DELETE               | なし（[#542] で実装する）                         | 1 日 1 回                                       | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）   | 自動バキュームに任せる |
+| `modulith.spring_session`            | DELETE               | あり（Spring Session JDBC の定期削除。[ADR-111]） | 各インスタンスで毎分                            | `expiry_time` を過ぎた行                                                         | 自動バキュームに任せる |
+| `modulith.spring_session_attributes` | 外部キーのカスケード | あり                                              | `spring_session` の行の削除と同時               | 親の行の削除                                                                     | 自動バキュームに任せる |
 
-[#540]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540
+冪等性キーの表の定期のジョブは、`IDEMPOTENCY_KEY_PURGE_ENABLED`が`true`のときだけ動き、1つのDELETEで`idempotency-key.purge.batch-size`の行まで消し、消し残しは同じ回で繰り返し消す。
+ロックを取れたインスタンスだけが消し、実行の回数を`idempotency.key.purge.runs`（`outcome`は`completed`、`skipped`、`failed`）、消した行の数を`idempotency.key.purged`に数える。
+期限を過ぎて消える前の行は、要求が新しいキーとして取り直す（[HTTPメソッドの使い分け](../web-api/http-methods.md#再試行への備え)）。
+
 [#542]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542
 [#671]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/671
 [#672]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/672

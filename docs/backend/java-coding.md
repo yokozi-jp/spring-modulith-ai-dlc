@@ -113,6 +113,8 @@ Spring は、戻り値の型が `void` と `Future` 以外の `@Async` のメソ
 結果や失敗を呼び出し元で扱うときは、`CompletableFuture` を返す。
 
 `@Scheduled` のメソッドは、引数のない `void` のメソッドにし、`private` と `final` にしない。
+定期のジョブの `@Scheduled` は、ジョブを有効にする設定が真のときだけ作る構成（`@ConditionalOnBooleanProperty` の `@Configuration`）に置き、常に作る Bean に置かない。
+`@EnableScheduling` はアプリのすべての `@Scheduled` を動かすため、別のジョブを有効にしただけで、無効にしたジョブが動くからである。
 スケジューラは、`@Scheduled` のメソッドの戻り値を呼び出し元に返す値として使わず、`Publisher` に変換できない型の戻り値は捨てる。
 Reactor がクラスパスにあるいまの構成では、スケジューラは `Mono` などの `Publisher` を返すメソッドを登録のときに一度だけ呼び、返した `Publisher` を実行のたびに購読する（[Spring Framework, Scheduled](https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/scheduling/annotation/Scheduled.html)）。
 戻り値の型でメソッドの呼ばれ方が変わるため、戻り値は `void` に限る。

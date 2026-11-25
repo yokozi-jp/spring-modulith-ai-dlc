@@ -3,15 +3,18 @@ package com.example.demo.shared.persistence;
 import com.example.demo.shared.concurrency.ConflictException;
 import java.time.Instant;
 import java.util.function.Supplier;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 import org.jooq.Table;
+import org.jooq.impl.DSL;
 
 /**
- * モジュールのスキーマの {@code Idempotency-Key} の行を書く（ADR-126）。{@link JooqIdempotency} だけが使う。
+ * モジュールのスキーマの {@code Idempotency-Key} の行を書き、期限を過ぎた行を消す（ADR-126）。{@link JooqIdempotency} と {@link
+ * IdempotencyKeyPurge} だけが使う。
  *
- * <p>共通カラムと SQLSTATE の変換は {@link TableWriter} と同じ共通処理で行う。どの文も、テナントの列を呼び出し側が渡した値で書き、条件に入れる。RLS
- * のないスキーマの表でも、別のテナントの行に当たらないようにするためである。
+ * <p>共通カラムと SQLSTATE の変換は {@link TableWriter} と同じ共通処理で行う。要求の文は、テナントの列を呼び出し側が渡した値で書き、条件に入れる。RLS
+ * のないスキーマの表でも、別のテナントの行に当たらないようにするためである。期限を過ぎた行を消す文だけは、テナントの条件を呼び出し側が選ぶ。
  */
 /* package */ final class IdempotencyKeyWriter {
 
@@ -97,6 +100,36 @@ import org.jooq.Table;
       throw new IllegalStateException(
           "claimed idempotency key matched " + rows + " rows: " + target.get());
     }
+  }
+
+  /**
+   * 期限を過ぎた行を、{@code limit} 行まで消す。
+   *
+   * <p>消す行は {@code SELECT ... FOR UPDATE SKIP LOCKED} で選ぶ。{@link #claim}
+   * が取り直している行はロックされているので飛ばし、取り直して commit した行は期限が延びているので選ばない。
+   *
+   * @param scope 消す行のテナントの条件。RLS の外の表で全テナントの行を消すときは {@link DSL#noCondition()}
+   * @return 消した行の数
+   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
+   */
+  /* package */ static int deleteExpired(
+      final DSLContext dsl,
+      final IdempotencyKeyTable keys,
+      final Condition scope,
+      final Instant now,
+      final int limit) {
+    TableWriter.requireTransaction(dsl);
+    return dsl.deleteFrom(keys.table())
+        .where(
+            keys.id()
+                .in(
+                    DSL.select(keys.id())
+                        .from(keys.table())
+                        .where(scope.and(keys.expiresAt().le(now)))
+                        .limit(limit)
+                        .forUpdate()
+                        .skipLocked()))
+        .execute();
   }
 
   /** 例外のメッセージに入れる、キーの表の名前とキー。 */

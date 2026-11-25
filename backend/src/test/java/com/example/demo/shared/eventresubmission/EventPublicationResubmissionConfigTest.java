@@ -36,6 +36,7 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
 import org.springframework.context.ApplicationContext;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.support.SpringFactoriesLoader;
@@ -47,6 +48,7 @@ import org.springframework.modulith.events.config.EventPublicationAutoConfigurat
 import org.springframework.modulith.events.core.EventPublicationRepository;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.config.FixedDelayTask;
 import org.springframework.scheduling.config.ScheduledTask;
 import org.springframework.scheduling.config.ScheduledTaskHolder;
@@ -120,7 +122,7 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("enabled が true なら定期の実行を 1 つ登録する")
   void enabledRegistersScheduling() {
-    runner
+    runnerWithResubmitter()
         .withPropertyValues(ENABLED + "=true")
         .run(context ->
             assertThat(context)
@@ -139,6 +141,15 @@ class EventPublicationResubmissionConfigTest {
           assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofMinutes(1));
           assertThat(tasks.getFirst().getRunnable().toString()).contains("resubmitOnce");
         });
+  }
+
+  @Test
+  @DisplayName("enabled が false なら、ほかの定期のジョブが @EnableScheduling を付けても、再投入のタスクを登録しない")
+  void disabledDoesNotRegisterResubmitOnceWhenAnotherJobEnablesScheduling() {
+    scheduledRunner()
+        .withPropertyValues(DISABLED)
+        .withUserConfiguration(AnotherScheduledJob.class)
+        .run(context -> assertThat(fixedDelayTasks(context)).as("固定の遅延のタスク").isEmpty());
   }
 
   @Test
@@ -192,6 +203,12 @@ class EventPublicationResubmissionConfigTest {
             .hasRootCauseInstanceOf(BindValidationException.class)
             .rootCause()
             .hasMessageContaining("spring.modulith.events.staleness.published, processing and"));
+  }
+
+  /** 定期の実行が呼ぶジョブを mock で足した runner。初回の遅延の間にタスクは動かないため、ジョブは呼ばれない。 */
+  private ApplicationContextRunner runnerWithResubmitter() {
+    return runner.withBean(
+        EventPublicationResubmitter.class, () -> Mockito.mock(EventPublicationResubmitter.class));
   }
 
   /** 定期の実行を有効にし、定期の再投入を足した runner。初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。 */
@@ -389,6 +406,7 @@ class EventPublicationResubmissionConfigTest {
 
     assertThat(once.getProperty("spring.main.web-application-type")).isEqualTo("none");
     assertThat(once.getProperty(ENABLED)).isEqualTo("false");
+    assertThat(once.getProperty("idempotency-key.purge.enabled")).isEqualTo("false");
     assertThat(once.getProperty(AWAIT_TERMINATION)).isEqualTo("true");
     assertThat(once.getProperty(AWAIT_TERMINATION_PERIOD)).isEqualTo("20s");
     assertThat(normal.getProperty("spring.main.web-application-type")).isNull();
@@ -521,7 +539,7 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("定期の実行を有効にしても、@Async の Listener は concurrency-limit を持つ applicationTaskExecutor で動く")
   void schedulingKeepsAsyncListenersOnTheApplicationTaskExecutor() {
-    runner
+    runnerWithResubmitter()
         .withConfiguration(
             AutoConfigurations.of(
                 TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
@@ -550,6 +568,11 @@ class EventPublicationResubmissionConfigTest {
                 .as("%s の起動の失敗", property)
                 .hasRootCauseInstanceOf(BindValidationException.class));
   }
+
+  /** 期限を過ぎた冪等性キーの掃除のように、定期のタスクを持たずに @EnableScheduling だけを付ける別の定期のジョブ。 */
+  @Configuration(proxyBeanMethods = false)
+  @EnableScheduling
+  /* package */ static class AnotherScheduledJob {}
 
   /** 設定にない方針の名前を指定したリスナー。 */
   // 受信メソッドは on と命名する規約のため。

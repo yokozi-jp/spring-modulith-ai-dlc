@@ -1,6 +1,7 @@
 package com.example.demo.shared.persistence;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.DemoApplication;
 import com.example.demo.jooq.DefaultCatalog;
@@ -56,6 +57,20 @@ class ModuleRolesTest {
   @DisplayName("業務の表を持つモジュールの名前だけが、テナントを要する")
   void requiresTenantOnlyForBusinessModules(final String transactionName, final boolean required) {
     assertThat(ModuleRoles.requiresTenant(transactionName)).isEqualTo(required);
+  }
+
+  @Test
+  @DisplayName("モジュールのロールで動かすトランザクションの名前は、そのモジュールのロールを引き、モジュールでない名前は作らない")
+  void transactionNameInResolvesModuleRole() {
+    for (final String module : ModuleRoles.MODULES) {
+      final String name = ModuleRoles.transactionNameIn(module, "IdempotencyKeyPurge");
+      assertThat(ModuleRoles.roleFor(name)).as(name).contains(ModuleRoles.roleOf(module));
+      assertThat(ModuleRoles.requiresTenant(name))
+          .as(name)
+          .isEqualTo(ModuleRoles.TENANT_SCOPED_MODULES.contains(module));
+    }
+    assertThatThrownBy(() -> ModuleRoles.transactionNameIn("modulith", "IdempotencyKeyPurge"))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test

@@ -298,7 +298,9 @@ class ClassRoleArchTest {
   /* package */ static final ArchRule moduleListenerEventsAreTenantScoped =
       moduleListenerEventsAreTenantScopedRule(BASE_PACKAGE);
 
-  /** {@code TenantContext.call} を呼ぶクラスを、{@code TenantSelectionFilter} とリスナーの Aspect に限る。 */
+  /**
+   * {@code TenantContext.call} を呼ぶクラスを、{@code TenantSelectionFilter}、リスナーの Aspect、期限を過ぎたキーの掃除に限る。
+   */
   @ArchTest
   /* package */ static final ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspect =
       tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(BASE_PACKAGE);
@@ -541,11 +543,11 @@ class ClassRoleArchTest {
   }
 
   /**
-   * {@code TenantContext.call} を呼べるクラスを、{@code TenantSelectionFilter} と {@code
-   * TenantListenerAspect} の 2 つに限る規則を組み立てる。
+   * {@code TenantContext.call} を呼べるクラスを、{@code TenantSelectionFilter}、{@code
+   * TenantListenerAspect}、{@code IdempotencyKeyPurge} の 3 つに限る規則を組み立てる。
    *
-   * <p>{@code call} は呼び出しの間のテナントを切り替える。認証の権限だけを元にする filter と、イベントのテナントだけを元にする Aspect
-   * 以外から呼ぶと、ほかのテナントの行へ触れる。メソッド参照も検出する。
+   * <p>{@code call} は呼び出しの間のテナントを切り替える。認証の権限だけを元にする filter、イベントのテナントだけを元にする Aspect、{@code
+   * tenancy.m_tenant} のテナントを 1 つずつ束縛して期限を過ぎたキーを消すジョブ以外から呼ぶと、ほかのテナントの行へ触れる。メソッド参照も検出する。
    */
   /* package */ static ArchRule tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(
       final String basePackage) {
@@ -553,7 +555,8 @@ class ClassRoleArchTest {
     final Set<String> allowedCallers =
         Set.of(
             basePackage + ".tenancy.presentation.web.TenantSelectionFilter",
-            basePackage + ".shared.tenancy.TenantListenerAspect");
+            basePackage + ".shared.tenancy.TenantListenerAspect",
+            basePackage + ".shared.persistence.IdempotencyKeyPurge");
     return noClasses()
         .that(
             DescribedPredicate.describe(
@@ -571,7 +574,8 @@ class ClassRoleArchTest {
                 + "別のテナントの行を読み書きできるため。"
                 + "直し方：業務の処理は TenantContext.current() で読むだけにする。"
                 + "束縛は tenancy の TenantSelectionFilter がセッションで選んだテナントを、"
-                + "TenantListenerAspect がイベントのテナントを行う。"
+                + "TenantListenerAspect がイベントのテナントを、"
+                + "IdempotencyKeyPurge が期限を過ぎたキーを消すテナントを行う。"
                 + "新しい入口が要るときは、この規則の許可先と ADR-105 を先に変える。"
                 + "規約：docs/backend/shared-module.md、"
                 + ADR_105);
