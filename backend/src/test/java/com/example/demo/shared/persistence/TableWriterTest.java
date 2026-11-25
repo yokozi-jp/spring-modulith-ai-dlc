@@ -28,6 +28,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.jooq.DSLContext;
 import org.jooq.Record;
@@ -407,6 +408,48 @@ class TableWriterTest {
   }
 
   @Test
+  @DisplayName("insertIfAbsent は衝突がなければ、ルートと子を insert と同じく書いて true を返す")
+  void insertIfAbsentWritesRootAndChildren() {
+    final boolean inserted =
+        callInUseCase(() ->
+            writer.insertIfAbsent(
+                ITEM,
+                itemRoot(1L, 1L),
+                List.of(FIXTURE_ITEM.ITEM_ID),
+                set -> set.set(FIXTURE_ITEM.ITEM_NAME, "new"),
+                detailRows(List.of(detail(1, "one")))));
+
+    assertThat(inserted).isTrue();
+    final Record row = item(1L);
+    assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("new");
+    assertThat(row.get(FIXTURE_ITEM.LOCK_NO)).isEqualTo(1L);
+    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).isEqualTo(PGM_CD);
+    assertThat(details(1L)).isEqualTo(Map.of(1, "one"));
+  }
+
+  @Test
+  @DisplayName("insertIfAbsent は衝突の対象の列に同じ値の行があれば、例外にせず false を返し、ルートも子も書かない")
+  void insertIfAbsentSkipsConflictingRootAndChildren() {
+    insertItem(1L, "first");
+
+    final boolean inserted =
+        callInUseCase(() ->
+            writer.insertIfAbsent(
+                ITEM,
+                itemRoot(1L, 1L),
+                List.of(FIXTURE_ITEM.ITEM_ID),
+                set -> set.set(FIXTURE_ITEM.ITEM_NAME, "second"),
+                detailRows(List.of(detail(1, "one")))));
+
+    // 例外にならないので、トランザクションは中断されず、続けて読める。
+    assertThat(inserted).isFalse();
+    final Record row = item(1L);
+    assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("first");
+    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).isEqualTo(SEED_PGM_CD);
+    assertThat(details(1L)).as("入れなかったルートの子").isEmpty();
+  }
+
+  @Test
   @DisplayName("一意制約の違反ではない SQLSTATE（サブクエリが複数行を返す 21000）は、競合の例外にせずそのまま投げる")
   void cardinalityViolationIsNotConflict() {
     insertItem(1L, "one");
@@ -563,6 +606,11 @@ class TableWriterTest {
         .from(FIXTURE_ITEM_DETAIL)
         .where(FIXTURE_ITEM_DETAIL.ITEM_ID.eq(itemId))
         .fetchMap(FIXTURE_ITEM_DETAIL.DETAIL_NO, FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
+  }
+
+  /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のある処理を実行する。 */
+  private static <T> T callInUseCase(final Supplier<T> call) {
+    return ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get);
   }
 
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のない処理を実行する。 */

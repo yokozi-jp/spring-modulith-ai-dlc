@@ -6,14 +6,19 @@ import com.example.demo.shared.failure.NotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.InsertReturningStep;
+import org.jooq.InsertSetMoreStep;
 import org.jooq.Record;
 import org.jooq.Record1;
 import org.jooq.Result;
 import org.jooq.Table;
+import org.jooq.TableField;
 import org.springframework.stereotype.Component;
 
 /**
@@ -24,8 +29,9 @@ import org.springframework.stereotype.Component;
  * も受け取らず、ルートの条件、版の条件、子の外部キーの条件は、宣言から {@code TableWriter} が作る。
  *
  * <p>{@link #update} は、ルートの行を {@code 一意の列 AND lock_no = 期待値}
- * で更新して版を進める。ルートの行ロックの下で、子を差分（削除、更新、追加）で書く。{@link #insert} は、ルートを書いてから子を複数行の INSERT で書く。ルートの内部の主キーは
- * {@code RETURNING} で受けるため、Repository は読み直さない。
+ * で更新して版を進める。ルートの行ロックの下で、子を差分（削除、更新、追加）で書く。{@link #insert} は、ルートを書いてから子を複数行の INSERT で書く。{@link
+ * #insertIfAbsent} は、指定した一意索引の衝突を例外にせず、入れなかったことを返す。ルートの内部の主キーは {@code RETURNING} で受けるため、Repository
+ * は読み直さない。
  *
  * <p>共通カラム、版の加算、件数の判定、{@code 55P03}（種類 {@code LOCK}）と {@code 23505}（種類 {@code UNIQUE}）の {@link
  * ConflictException} への変換は、すべてここで行う。変換は例外の型ではなく SQLSTATE で決める。どの入口も、読み取り専用ではない、開いているトランザクションの中で呼ぶ。
@@ -75,12 +81,39 @@ public class TableWriter {
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final ChildRows<?>... childRows) {
-    requireTransaction();
-    final List<ChildRows<?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
-    final long id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
-    for (final ChildRows<?> childRow : rows) {
-      children.insertAll(id, childRow);
-    }
+    insertAggregate(aggregate, root, rootColumns, childRows, step -> step);
+  }
+
+  /**
+   * 集約を INSERT する。{@code conflictTarget} の一意索引に同じ値の行があれば、例外にせず何も書かずに {@code false} を返す。
+   *
+   * <p>{@code INSERT ... ON CONFLICT (conflictTarget) DO NOTHING} で書く。同じ値の行を書いて未コミットのトランザクションがあれば、
+   * そのトランザクションの終わりまで待ち、コミットされれば {@code false} を返す。入れなかったときは子を書かない。ほかの一意制約の違反は {@link #insert} と同じく
+   * {@link ConflictException} にする。
+   *
+   * @param aggregate 集約の宣言
+   * @param root 新しい集約ルート
+   * @param conflictTarget 衝突を許す一意索引の列。索引の列とちょうど同じ組にする（テナントの列を含む）
+   * @param rootColumns ルートの業務の列の値。ルートの一意の列と内部の主キーは書けない
+   * @param childRows 宣言した子すべての行（{@link ChildTable#rows}）
+   * @return 入れたら {@code true}、{@code conflictTarget} の衝突で入れなかったら {@code false}
+   * @throws IllegalArgumentException {@link #insert} と同じ場合
+   * @throws IllegalStateException {@link #insert} と同じ場合
+   * @throws ConflictException {@code conflictTarget} 以外の一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを
+   *     {@code lock_timeout} までに取れない場合（種類は {@code LOCK}）。原因は持たない
+   */
+  public <R extends Record, K, A extends Versioned> boolean insertIfAbsent(
+      final AggregateTable<R, K, A> aggregate,
+      final A root,
+      final List<? extends TableField<R, ?>> conflictTarget,
+      final Consumer<ColumnValues<R>> rootColumns,
+      final ChildRows<?>... childRows) {
+    return insertAggregate(
+        aggregate,
+        root,
+        rootColumns,
+        childRows,
+        step -> step.onConflict(conflictTarget).doNothing());
   }
 
   /**
@@ -159,22 +192,38 @@ public class TableWriter {
     }
   }
 
-  /** ルートを INSERT し、RETURNING で受けた内部の主キーを返す。 */
-  private <R extends Record, K> long insertRoot(
+  /** ルートを書き、入れたときだけ子を書く。{@link #insert} と {@link #insertIfAbsent} の共通の手順。 */
+  private <R extends Record, K, A extends Versioned> boolean insertAggregate(
+      final AggregateTable<R, K, A> aggregate,
+      final A root,
+      final Consumer<ColumnValues<R>> rootColumns,
+      final ChildRows<?>[] childRows,
+      final Function<InsertSetMoreStep<R>, InsertReturningStep<R>> onConflict) {
+    requireTransaction();
+    final List<ChildRows<?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
+    final Optional<Long> id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns, onConflict);
+    id.ifPresent(inserted -> rows.forEach(childRow -> children.insertAll(inserted, childRow)));
+    return id.isPresent();
+  }
+
+  /** ルートを INSERT し、RETURNING で受けた内部の主キーを返す。衝突で入れなかったら空を返す。 */
+  private <R extends Record, K> Optional<Long> insertRoot(
       final AggregateTable<R, K, ?> aggregate,
       final K key,
-      final Consumer<ColumnValues<R>> rootColumns) {
+      final Consumer<ColumnValues<R>> rootColumns,
+      final Function<InsertSetMoreStep<R>, InsertReturningStep<R>> onConflict) {
     final Table<R> table = aggregate.table();
     final ColumnValues<R> values = collect(aggregate, rootColumns);
     return ConflictTranslator.executeOrConflict(
         () ->
-            dsl.insertInto(table)
-                .set(aggregate.key(), key)
-                .set(values.values())
-                .set(commonColumns.forInsert(table))
+            onConflict
+                .apply(
+                    dsl.insertInto(table)
+                        .set(aggregate.key(), key)
+                        .set(values.values())
+                        .set(commonColumns.forInsert(table)))
                 .returningResult(aggregate.id())
-                .fetchSingle()
-                .value1(),
+                .fetchOptional(Record1::value1),
         () -> "table=" + table.getName() + ", key=" + key);
   }
 

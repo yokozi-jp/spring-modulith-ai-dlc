@@ -14,6 +14,7 @@ import com.example.demo.payment.domain.model.PaymentStatus;
 import com.example.demo.shared.persistence.AggregateTable;
 import com.example.demo.shared.persistence.TableWriter;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jooq.DSLContext;
@@ -35,7 +36,7 @@ class JooqPaymentRepository implements PaymentRepository {
   /** SQL を組み立てて実行する jOOQ のコンテキスト。 */
   private final DSLContext dsl;
 
-  /** 集約を INSERT し、一意制約の違反を ConflictException に変える shared の入口。 */
+  /** 集約を INSERT する shared の入口。 */
   private final TableWriter tableWriter;
 
   /** jOOQ のコンテキストと shared の入口を受け取る。 */
@@ -52,11 +53,12 @@ class JooqPaymentRepository implements PaymentRepository {
   }
 
   @Override
-  public void add(final Payment payment) {
-    // ユニークインデックスはテナントごとの public_id（UUID v4 で衝突しない）と order_public_id だけなので、409 は注文の決済記録の重複である。
-    tableWriter.insert(
+  public boolean add(final Payment payment) {
+    // 衝突を許すのは uk_2_t_payment（注文ごとに 1 件）だけ。public_id の衝突は ConflictException のまま投げる。
+    return tableWriter.insertIfAbsent(
         PAYMENT,
         payment,
+        List.of(T_PAYMENT.TENANT_PUBLIC_ID, T_PAYMENT.ORDER_PUBLIC_ID),
         set ->
             set.set(T_PAYMENT.ORDER_PUBLIC_ID, payment.orderId().value())
                 .set(T_PAYMENT.CHARGED_AMOUNT_JPY, payment.amount().amount())
