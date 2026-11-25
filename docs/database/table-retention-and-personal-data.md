@@ -36,7 +36,7 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 | `ordering.h_order_line`              | 履歴           | 未定（[#671]）                                                                             | 含まない                                         |
 | `payment.t_payment`                  | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
 | `modulith.event_publication`         | フレームワーク | 完了するまで。完了すると archive へ移る                                                    | 含まない                                         |
-| `modulith.event_publication_archive` | フレームワーク | `COMPLETED` は 7 日（[#542] で実装するまでは無期限）。`ABANDONED` は運用者が戻すか消すまで | 含まない                                         |
+| `modulith.event_publication_archive` | フレームワーク | `COMPLETED` は完了から 7 日（[ADR-120]）。`ABANDONED` は運用者が戻すか消すまで             | 含まない                                         |
 | `modulith.shedlock`                  | フレームワーク | 無期限（ジョブごとの 1 行を更新し続ける）                                                  | 含まない                                         |
 | `modulith.spring_session`            | フレームワーク | セッションの有効期限まで                                                                   | 含まない                                         |
 | `modulith.spring_session_attributes` | フレームワーク | セッションの有効期限まで                                                                   | 含む（`attribute_bytes`。直列化した `OidcUser`） |
@@ -53,7 +53,7 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 | `tenancy.t_idempotency_key`          | DELETE               | あり（ShedLock の定期のジョブ。[ADR-126]）        | 定期（`IDEMPOTENCY_KEY_PURGE_INTERVAL` の間隔） | `expires_at` を過ぎた行。テナントごとに回さず、全テナントの行を消す（[ADR-126]） | 自動バキュームに任せる |
 | `product.t_idempotency_key`          | DELETE               | あり（ShedLock の定期のジョブ。[ADR-126]）        | 定期（`IDEMPOTENCY_KEY_PURGE_INTERVAL` の間隔） | `expires_at` を過ぎた行。`tenancy.m_tenant` のテナントごとに消す（[ADR-126]）    | 自動バキュームに任せる |
 | `ordering.t_idempotency_key`         | DELETE               | あり（ShedLock の定期のジョブ。[ADR-126]）        | 定期（`IDEMPOTENCY_KEY_PURGE_INTERVAL` の間隔） | `expires_at` を過ぎた行。`tenancy.m_tenant` のテナントごとに消す（[ADR-126]）    | 自動バキュームに任せる |
-| `modulith.event_publication_archive` | DELETE               | なし（[#542] で実装する）                         | 1 日 1 回                                       | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）   | 自動バキュームに任せる |
+| `modulith.event_publication_archive` | DELETE               | あり（ロックのない定期のジョブ。[ADR-120]）       | 各インスタンスで 1 日 1 回                      | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）   | 自動バキュームに任せる |
 | `modulith.spring_session`            | DELETE               | あり（Spring Session JDBC の定期削除。[ADR-111]） | 各インスタンスで毎分                            | `expiry_time` を過ぎた行                                                         | 自動バキュームに任せる |
 | `modulith.spring_session_attributes` | 外部キーのカスケード | あり                                              | `spring_session` の行の削除と同時               | 親の行の削除                                                                     | 自動バキュームに任せる |
 
@@ -63,7 +63,10 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 `failed`が続くと期限切れの行が残るが、要求は期限を過ぎた行を新しいキーとして取り直すので、業務の結果は変わらない。
 期限を過ぎて消える前の行は、要求が新しいキーとして取り直す（[HTTPメソッドの使い分け](../web-api/http-methods.md#再試行への備え)）。
 
-[#542]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542
+archiveの表の定期のジョブは、`EVENT_PUBLICATION_ARCHIVE_RETENTION_ENABLED`が`true`のときだけ動き、Spring Modulithの`CompletedEventPublications.deletePublicationsOlderThan`の1つのDELETEで消す。
+保持期限（`event-publication.archive-retention.retention`）と間隔は`application.yaml`の固定値で、件数は絞らない。
+失敗した回は、DBの失敗をWARN、予期しない例外をERRORで記録し、次の回に同じ行を消し直す（[イベント出版の再投入のログイベント](../observability/runbook-event-publication-resubmission.md#event-publication-archive-retention-failed)）。
+
 [#671]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/671
 [#672]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/672
 [ADR-111]: ../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md

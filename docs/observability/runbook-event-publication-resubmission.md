@@ -1,7 +1,7 @@
 ---
 type: Runbook
 title: イベント出版の再投入のログイベント
-description: 失敗したイベント出版の定期の再投入（EventPublicationResubmitter）、回数の上限での諦め（Spring Modulith の abandon-after-attempts）、手での 1 回の再投入（EventPublicationResubmitOnce）が出す ERROR と WARN の運用定義と、上限に達した出版の調べ方、戻し方、手での再投入、片付け、自動の再投入の停止、メトリクスと警報の見方を定める。そのログやメトリクスに対応するとき、再投入の設定を変えるときに使う。
+description: 失敗したイベント出版の定期の再投入（EventPublicationResubmitter）、回数の上限での諦め（Spring Modulith の abandon-after-attempts）、手での 1 回の再投入（EventPublicationResubmitOnce）、archive の行の保持期限の削除が出す ERROR と WARN の運用定義と、上限に達した出版の調べ方、戻し方、手での再投入、片付け、自動の再投入の停止、メトリクスと警報の見方を定める。そのログやメトリクスに対応するとき、再投入の設定を変えるときに使う。
 tags: [runbook, observability, logging, operations, integration, spring-modulith]
 ---
 
@@ -172,6 +172,8 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 - **対応**：`incomplete` が 0 でなければ、リスナーの ERROR で原因を確かめ、直してから起動し直す。
   リスナーの ERROR がなければ、archive の表のその出版の `id` の `status` を確かめる。
   `COMPLETED` なら完了しており、`ABANDONED` なら回数の上限を超えてまた失敗した。
+  archive の `COMPLETED` の行は完了から 7 日で消え、`ABANDONED` の行は消えない（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)）。
+  7 日より後に確かめて、どちらの表にもなく、運用者も消していなければ、完了している。
   `FAILED` に残っていれば同じ対象で起動し直す。
   完了した出版と `ABANDONED` の出版は `FAILED` に残らないため、同じ対象で起動し直しても重ねて処理しない。
   `remaining` だけが 0 でなければ、同じ対象でもう一度起動する。
@@ -190,6 +192,29 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
   ロックを取れないときは、`event.publication.resubmission.runs{outcome=completed}` が増えているかで定期のジョブが動いていることを確かめ、`modulith.shedlock` の `locked_by` と `lock_until` を読む。
   ShedLock は行を作ったことをメモリに覚えるため、行を消さない。
   運用者が起動したジョブの結果なので、監視の通知は要らない。
+
+## Event publication archive retention failed
+
+- **event 名**：`Event publication archive retention failed`
+- **レベル**：`WARN`
+- **事象**：archive の表の、完了から 7 日を過ぎた `COMPLETED` の行の削除が DB の例外で失敗し、その回は行を消さなかった。
+- **属性**：`exception.type`、`exception.message`、`exception.stacktrace`
+- **発生原因**：接続の pool の枯渇（`connection-timeout`）、DB の停止、`statement_timeout`。
+  削除は件数を絞らない 1 つの DELETE なので、長く止めた後の最初の回は、消す行が多く `statement_timeout` を超えうる。
+- **対応**：次の回（1 日後）に同じ行を消し直すため、1 回だけなら対応しない。
+  続くと archive の表が増え続けるため、当日中に DB の状態を確かめる。
+  `statement_timeout` で続くときは、件数を絞った DELETE に直す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md) の Negative）。
+
+## Event publication archive retention crashed
+
+- **event 名**：`Event publication archive retention crashed`
+- **レベル**：`ERROR`
+- **事象**：archive の表の保持期限の削除が、DB の例外以外の予期しない実行時の例外で失敗し、その回は行を消さなかった。
+- **属性**：`exception.type`、`exception.message`、`exception.stacktrace`
+- **発生原因**：コードの不具合、Spring Modulith の版を上げたあとの挙動の変化。
+- **対応**：例外の型とスタックトレースで原因を特定し、直してデプロイする。
+  直すまで archive の表は増えるが、業務の結果と再投入は変わらない。
+- **通知**：`ERROR` のため通知する。
 
 ## 上限に達した出版の調べ方
 
