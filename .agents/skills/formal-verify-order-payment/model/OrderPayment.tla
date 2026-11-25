@@ -285,13 +285,11 @@ DCrash(d) ==
 (* marks stale publications FAILED and then resubmits.                     *)
 
 \* FailedPublicationSweep, inside the resubmission lock, calls
-\* DefaultEventPublicationRegistry.markStalePublicationsFailed: findByStatus
-\* for PUBLISHED, PROCESSING, RESUBMITTED, keeps the rows whose
-\* last_resubmission_date (getLastPublicationDate) is older than
-\* Properties.staleness, then markFailed by id without
-\* checking the status again. The model has no time, and the row can change
-\* between the find and the update, so any existing row that is not FAILED
-\* may become FAILED at any time.
+\* StalePublications.markFailed: one UPDATE that sets FAILED on the rows that
+\* are not completed, are PUBLISHED, PROCESSING or RESUBMITTED, and whose
+\* last_resubmission_date is older than the threshold of the status. The
+\* model has no time, so it over-approximates: any existing row that is not
+\* FAILED may become FAILED at any time.
 Stale ==
   /\ pub \in {"PUBLISHED", "PROCESSING", "RESUBMITTED"}
   /\ pub' = "FAILED"
