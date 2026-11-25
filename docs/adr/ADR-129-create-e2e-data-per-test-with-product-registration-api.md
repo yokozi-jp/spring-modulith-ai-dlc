@@ -55,7 +55,7 @@ E2E は開発用のシーダーを使わない。
   ADMIN だけに制限する仕組みはこの ADR で作らず、業務の API の認可と合わせて [#758](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/758) で決める。
 - この API は `Idempotency-Key` を検査しない。
   契約は ADR-126 の customizer が付けるとおり必須にし、Playwright の補助は契約に従ってキーを送る。
-  サーバーの検査は ADR-126 の実装に任せ、それまで `IdempotencyArchTest` の一時的に除く操作に入れる。
+  サーバーの検査と Result の表は [#759](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/759) で入れ、それまで `IdempotencyArchTest` の一時的に除く操作に入れる。
 - テストのための入口を本番に作らない。
   Profile や E2E のためだけのプロパティで入口を切り替えない。
 - 商品は、Playwright の `productFactory` fixture が、ログインしてテナントを選んだ page の Cookie で `POST /api/products` を呼んで作る。
