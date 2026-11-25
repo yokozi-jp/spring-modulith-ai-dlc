@@ -33,7 +33,7 @@ tags: [runbook, backend, spring-modulith]
 機能モジュールを足すときは、パッケージの外も直す。
 足し忘れたときに止まるものを、直す場所ごとに示す。
 
-- API の operation を足したら、認可の表の `AuthorizationOperation` に定数を足し、期待の表の `switch` に行を足す（[認可の表](architecture-tests.md#認可の表)）。定数を足し忘れると、認可の表のテストが契約との不一致で失敗する。期待を足し忘れると、コンパイルで止まる。
+- API の operation を足したら、[認可の表のテスト](authorization-matrix-test.md#操作を足すときに直す場所)の操作と期待の表に足す。足し忘れると、認可の表のテストの spec との一致の検査か、コンパイルが失敗する。
 - DB のスキーマを持つときは、`backend/gradle/database.gradle` の `databaseSchemas` にスキーマ名を足す。足し忘れると、jOOQ の型が生成されず、コンパイルで止まる。
 - DB のスキーマを持つときは、Liquibase の changeset に、`CREATE SCHEMA` とアプリのロールへの `GRANT` を書く（[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)）。足し忘れると、SQL が `permission denied for schema` で失敗する。
 - `ArchitectureMetricsReportTest` の `MAX_GLOBAL_RELATIVE_VISIBILITY` を、公開の型が増えた分だけ見直す。公開の型が増えて上限を超えると、アーキテクチャテストが止まる。

@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: バックエンドのアーキテクチャテスト
-description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装、規則名、規則を確かめるフィクスチャ、失敗メッセージの形、解析対象、プロキシの規則が検出しない書き方、認可の表のテストを示し、規約違反の検出方法を確認するとき、ArchUnitの規則を追加するとき、検査の失敗を直すとき、認可の表に操作を足すときに読むリファレンス。
+description: Spring Modulith、ArchUnit、PMD、Error Proneでバックエンド規約を検査する実装、規則名、規則を確かめるフィクスチャ、失敗メッセージの形、解析対象、プロキシの規則が検出しない書き方を示し、規約違反の検出方法を確認するとき、ArchUnitの規則を追加するとき、検査の失敗を直すときに読むリファレンス。
 tags: [reference, backend, testing, archunit, spring-modulith]
 ---
 
@@ -11,6 +11,7 @@ Spring ModulithとArchUnitはモジュール境界、依存方向、配置、禁
 PMDとError Proneはソースまたはコンパイル時に判定する規約を検査する。
 DBの規約は、changesetの静的検査と`pg_catalog`のスキーマ検査でも検査する。
 ArchUnitとPMDの失敗メッセージは、理由、直し方、規約の文書のパスを示す。
+SpringとDBを起動して操作と操作する人の組ごとに認可を確かめるテストは、[認可の表のテスト](authorization-matrix-test.md)に示す。
 
 ## 検査クラス
 
@@ -67,7 +68,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java.lang..`、`java.util..`、`java.math..`、`java.time..`、`org.jspecify..`、`lombok..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy.TenantId`だけに依存する。`shared.tenancy.TenantContext`は、ScopedValueの暗黙の文脈で引数に現れない入力になるため許さない。
   許可の一覧で止めるため、外部システムのSDKや生成型も、Spring、jOOQ、JPA、Jacksonの型と同じく落ちる。
   Lombokは`lombok..`を許す。
-- `applicationDependsOnlyOnAllowedTypes`：`application`は、このアプリケーションの型のほかに、`java..`、`org.jspecify..`、`lombok.Generated`、`org.slf4j..`、`org.springframework.stereotype..`、`org.springframework.transaction.annotation..`、`org.springframework.modulith.events..`、`org.springframework.context`（パッケージ直下）、`org.springframework.security.access.prepost`（パッケージ直下。`@PreAuthorize`など）だけに依存する。
+- `applicationDependsOnlyOnAllowedTypes`：`application`は、このアプリケーションの型のほかに、`java..`、`org.jspecify..`、`lombok.Generated`、`org.slf4j..`、`org.springframework.stereotype..`、`org.springframework.transaction.annotation..`、`org.springframework.modulith.events..`、`org.springframework.context`（パッケージ直下）、`org.springframework.security.access.prepost.PreAuthorize`（型だけ）だけに依存する。
+  method securityのほかのアノテーションを使わない理由は[バックエンドの層の責務](layers.md#認可)に示す。
 - `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java.lang..`、`java.util..`、`java.math..`、`java.time..`、`org.jspecify..`、`lombok..`、Domainの型、`shared.failure`の例外、`shared.tenancy.TenantId`、`@Service`だけに依存する。
 - `domainServicesAreAnnotatedWithService`：`domain.service`のトップレベルのクラスに`@Service`を付ける。
 - `servicesResideInApplicationOrDomainService`：`@Service`を付けた型は`application`か`domain.service`に置く。
@@ -293,8 +295,10 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
   違反フィクスチャの`ordering.application.OrderReporter`で確かめる。
   規則はBeanのクラス自身が宣言したメソッドだけを見るため、親クラスで宣言した`final`のメソッドは検出しない。
 - `methodSecurityAnnotationsAreOnlyOnApplicationClasses`：`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`を、クラスか宣言したメソッドに、直接かメタアノテーションとして持つクラスは、階層に`application`を含むパッケージ（`..application..`）に置く。
-  守らせる規約は[バックエンドの層の責務](layers.md#application)に示す。
+  守らせる規約は[バックエンドの層の責務](layers.md#認可)に示す。
   違反フィクスチャの`ordering.presentation.web.OrderPurgeController`（Controllerに`@PreAuthorize`を付けた）で確かめる。
+- `preAuthorizeUsesOnlyRoleOrAuthorityNames`：`@PreAuthorize`の値を、`hasRole`、`hasAnyRole`、`hasAuthority`、`hasAnyAuthority`に文字列のリテラルを渡す式に限る。
+  守らせる規約は[バックエンドの層の責務](layers.md#認可)に示す。
 
 同じクラスの`pointcutsNarrowTargetsWithWithin`は、AspectJのadviceと`@Pointcut`の式（`value`と`pointcut`）に`within(`があることを検査する。
 違反フィクスチャの`shared.persistence.SlowPgmCdAspect`で確かめ、規約どおりのフィクスチャの`PgmCdAspect`を誤検出しないことも確かめる。
@@ -464,30 +468,6 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 規約の例外は、理由を付けて`ChangesetLint.ALLOWLIST`と`SchemaConventions.ALLOWLIST`に載せる。
 何も抑止しない項目は違反として報告する。
 changesetの検査は`modulith`スキーマを、スキーマ検査は`modulith`と`liquibase`のスキーマを、業務テーブルの規則から除く。
-
-## 認可の表
-
-`com.example.demo.AuthorizationMatrixTest`は、操作と操作する人の組ごとに、応答が認可の期待どおりかを確かめる（[ADR-129](../adr/ADR-129-place-authorization-in-application-and-test-it-per-operation-and-actor.md)）。
-SpringとDBを起動し、MockMvcで実際のSecurity filter chainを通す。
-見える範囲と役割の規約は[APIの認証、セッション、権限](../web-api/authentication-and-session.md#認可)に示す。
-
-- **操作**：`AuthorizationOperation`の定数。commitした`openapi/openapi.yaml`のoperationと一致することを、`ApiContractCoverageTest`と同じくswagger-coreでspecを読んで確かめる。
-- **操作する人**：`AuthorizationActor`の定数。持ち主、同じテナントの別のmember、同じテナントのadminで持ち主でない人、別のテナントのmemberの4つである。
-- **期待の表**：`AuthorizationExpectations`に、`AuthorizationOperation`の`switch`式で書き、`default`を書かない。定数を足すと、期待を足すまでコンパイルが失敗する。期待は本番の方針から作らない。
-- **期待の結果**：`AuthorizationOutcome`の`ALLOWED`（成功）、`HIDDEN`（存在しないときと同じ応答）、`FORBIDDEN`（403）、`UNPROCESSABLE`（422）である。一覧は見えない注文でも200で空を返すので、404ではなく`HIDDEN`で表す。
-
-拒否を期待する組では、次を確かめる。
-
-- `HIDDEN`を期待する組では、応答が存在しないときと同じstatusと本文になる（`traceId`は除く）。パスにidを持つ操作と、名前が`id`か`Id`で終わるqueryの引数を持つ操作は、ランダムなidで同じ要求を送った応答と比べる。idの選び方は、Spectralの`public-id-uuid`と同じである。idを持たない一覧は、対象を作る前の応答と比べる。
-- 書き込みの操作では、業務のスキーマの行の中身が変わらない。
-
-期待と違ってよい組は、理由とIssueの番号を付けて例外の一覧に書く。
-理由が空の例外と、specにない操作の例外があると、テストが失敗する。
-期待どおりに戻った組が例外に残っているときも失敗する。
-理由のIssueで直したら、その組を例外の一覧から消す。
-
-判定は`AuthorizationJudgment`が持つ。
-`AuthorizationJudgmentTest`が、テストの側のfixtureのController（持ち主で絞らないGETと、404を返すが他人の行を書き換えるPUT）でも動かし、違反を検出することを確かめる。
 
 ## テストコード
 

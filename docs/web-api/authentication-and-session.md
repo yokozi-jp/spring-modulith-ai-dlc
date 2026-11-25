@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: APIの認証、セッション、権限
-description: ブラウザとシステム間連携のAPI認証、ログインの後のテナントの選択、ログアウト、セッションとCSRFのCookieの属性、ロールの管理場所、見える範囲の絞り方と役割の確かめ方を定める規約。APIの認証方式、セッション設定、CSRFのCookieを変更するとき、テナントを選ぶ前に呼ぶAPIを足すとき、対向システムへAPIを公開するとき、権限の判定を実装するときに読む。
+description: ブラウザとシステム間連携のAPI認証、ログインの後のテナントの選択、ログアウト、セッションとCSRFのCookieの属性、ロールの管理場所、見えない対象と役割で許されない操作への応答を定める規約。APIの認証方式、セッション設定、CSRFのCookieを変更するとき、テナントを選ぶ前に呼ぶAPIを足すとき、対向システムへAPIを公開するとき、権限の判定を実装するときに読む。
 tags: [convention, web-api, security, auth, future-arch-guidelines]
 ---
 
@@ -149,26 +149,12 @@ IdPのレルムの役割とグループは使わない。
 
 ## 認可
 
-見える範囲は読むときのSQLで絞り、見えなければ404にする。
-役割で許す操作はmethod securityの`@PreAuthorize`で確かめ、許されなければ403にする。
-確かめる層と利用者のIDの渡し方は[バックエンドの層の責務](../backend/layers.md#application)に、理由は[ADR-129](../adr/ADR-129-place-authorization-in-application-and-test-it-per-operation-and-actor.md)にある。
+見えない対象への要求は、存在しない対象と同じ404にする。
+一覧は見えない行を含めずに200を返す。
+見えるが役割で許されない操作は、`about:blank`の403にする。
+method securityの拒否で投げられる`AuthorizationDeniedException`は`AccessDeniedException`の派生で、`ApiExceptionHandler`が403にする。
 
-見える範囲は、次のとおり絞る。
-
-- Repositoryと`<Feature>Queries`は、Applicationが渡した利用者のIDをjOOQのWHEREに入れ、見えない行を空で返す。
-- CommandHandlerとQueryServiceは、空なら`NotFoundException`を投げる。`ApiExceptionHandler`が404にするため、存在しないidと同じ応答になる。
-- 一覧も同じ条件でSQLで絞る。`@PostFilter`と`@PostAuthorize`で読んだ後に絞らない。
-- 決済記録の見える範囲は、注文の見える範囲に従う。
-
-役割は、次のとおり確かめる。
-
-- `SecurityConfig`の`@EnableMethodSecurity`がmethod securityを有効にする。
-- `@PreAuthorize`には、`@PreAuthorize("hasRole('ADMIN')")`のように役割か権限の名前だけを書き、引数やBeanを参照するSpELを書かない。
-- 拒否で投げられる`AuthorizationDeniedException`は`AccessDeniedException`の派生で、`ApiExceptionHandler`が`about:blank`の403にする。
-- Listenerとバッチから呼ぶメソッドには付けない。認証のない呼び出しは拒否される。
-- 所属の管理のAPIは、method securityではなくURLの規則で役割を確かめている（[テナントの所属の管理](#テナントの所属の管理)）。
-
-操作と操作する人の組ごとの期待は、[認可の表](../backend/architecture-tests.md#認可の表)のテストが確かめる。
+ステータスの選び方は[HTTPステータスコードの選択](status-codes.md)に、見える範囲の絞り方と役割の確かめ方は[バックエンドの層の責務](../backend/layers.md#認可)に示す。
 
 ## テナントの所属の管理
 

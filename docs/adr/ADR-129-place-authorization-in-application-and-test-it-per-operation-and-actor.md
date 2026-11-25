@@ -38,50 +38,83 @@ Spring Security のリファレンスは、アノテーションのないメソ�
 
 ## Decision
 
+規約の本文は [バックエンドの層の責務](../backend/layers.md#認可) に、テストの詳細は [認可の表のテスト](../backend/authorization-matrix-test.md) にある。
+この ADR は、決めたことと理由だけを書く。
+
 ### 線引き
 
 業務の規則と状態は domain で確かめる。
 誰が要求したか（本人か、役割、見えるか）は application で確かめる。
 domain のメソッドは、`Authentication` と `AppUserPrincipal` を受け取らない。
 業務の規則が人に依るとき（申請した人と承認する人を分ける規則など）は、domain のメソッドが利用者の ID を値で受け取り、不変条件として確かめる。
+人に依る規則は値の比較で足り、認証の型を domain に持ち込む理由がないためである。
 
 ### 見える範囲
 
-Controller は、`@AuthenticationPrincipal` で受け取った `AppUserPrincipal` の `userId()` を、Command と検索条件に入れる。
-CommandHandler と QueryService は、その ID を Repository と `<Feature>Queries` に渡す。
-Repository は、その ID を jOOQ の WHERE に入れ、見えない行を空で返す。
-CommandHandler と QueryService は、空なら `NotFoundException` を投げ、`ApiExceptionHandler` が 404 にする。
-一覧も同じ条件で SQL で絞り、`@PostFilter` と `@PostAuthorize` は使わない。
+見える範囲は、application が渡した利用者の ID を Repository と `<Feature>Queries` の SQL の WHERE に入れて絞り、見えなければ `NotFoundException` で 404 にする。
+今の CommandHandler は、行がなければ `NotFoundException` を投げるため、見えない行を空で返せば同じ経路で 404 になる。
+一覧も SQL で絞り、読んだ後に絞らない（選択肢3）。
+application は `SecurityContextHolder` を読まず、利用者を引数で受け取る。
+現在時刻の `Clock` と同じく、テストで差し替えられるようにするためである。
 決済記録の見える範囲は、注文の見える範囲に従う。
-application は `SecurityContextHolder` を読まない。
-現在時刻の `Clock` と同じく、利用者を引数で受け取り、テストで差し替えられるようにする。
 
 ### 役割
 
-役割で許す操作は、CommandHandler の `handle`（参照なら QueryService の public メソッド）に、`@PreAuthorize("hasRole('ADMIN')")` のように役割か権限の名前だけを書く。
-`SecurityConfig` に `@EnableMethodSecurity` を付けて有効にする。
-引数や Bean を参照する SpEL は書かない。
-method security のアノテーション（`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`）は、各モジュールの `application` のクラスだけに付け、ArchUnit の規則で検査する。
+役割で許す操作は、application の `@PreAuthorize` で確かめ、`SecurityConfig` の `@EnableMethodSecurity` で有効にする。
+`@PreAuthorize` の値は、役割か権限の名前を渡す式に限る。
+引数や Bean を参照する式を許すと、SQL の WHERE と役割の名前のほかに、SpEL の文字列の中にも認可の判断ができ、選択肢2 と同じく判断が分かれるためである。
+Spring Security のリファレンスも、複雑な SpEL より権限を与える形を勧める（Favor Granting Authorities Over Complicated SpEL Expressions）。
+
+method security のアノテーションは `@PreAuthorize` だけを使う。
+
+- `@PostAuthorize` と `@PostFilter` は読んだ後に判断し、`@PreFilter` は受け取った値をメモリで絞るため使わない（選択肢3）。
+- `@Secured` と JSR-250 の `@RolesAllowed` は使わない。`@EnableMethodSecurity` は既定で `securedEnabled` と `jsr250Enabled` が false のため、付けても黙って効かない。役割の確かめは `@PreAuthorize` で足り、有効にする理由もない。
+
+次を ArchUnit で検査する。
+
+- application が依存してよい method security の型を、パッケージ `org.springframework.security.access.prepost` ではなく型 `PreAuthorize` に絞る。パッケージで許すと、同じパッケージの `@PostFilter` などが通るためである。
+- method security のアノテーションを、application のクラスだけに付ける。
+- `@PreAuthorize` の値を、役割か権限の名前を文字列のリテラルで渡す式に限る。
+
+Listener とバッチから呼ぶメソッドに `@PreAuthorize` を付けないことは、検査せずレビューで見る。
+Listener、ItemWriter、Tasklet は CommandHandler を 1 つ呼ぶだけなので、呼び出しの経路が 1 段で、差分から読めるためである。
 
 ### 応答
 
 見えなければ 404、見えるが許されなければ 403 にする。
 これは [HTTPステータスコードの選択](../web-api/status-codes.md) の今の規約と同じで、規約は変えない。
-method security の拒否で投げる `AuthorizationDeniedException` は `AccessDeniedException` の派生なので、`ApiExceptionHandler` が `about:blank` の 403 にする。
+method security の拒否で投げる `AuthorizationDeniedException` は `AccessDeniedException` の派生なので、今の `ApiExceptionHandler` のまま `about:blank` の 403 になる。
 
 ### 確かめ忘れの止め方
 
 操作と操作する人の組ごとに期待を書いた認可の表のテストで止める。
-テストは Spring と DB を起動した MockMvc の結合テストにし、行を commit した `openapi/openapi.yaml` の operation、列を操作する人の種類にする。
-操作する人は、持ち主、同じテナントの別の member、同じテナントの admin で持ち主でない人、別のテナントの member の 4 種類にする。
+テストは Spring と DB を起動した MockMvc の結合テストにする。
+見える範囲は SQL に、役割はアノテーションにあり、どちらも Spring と DB を通さないと動かないためである（選択肢6）。
 
-- テストの側の操作の enum と spec の operation が一致することを、`ApiContractCoverageTest` と同じく swagger-core で spec を読んで確かめる。
-- 期待の表は、操作の enum の `switch` 式で書き、`default` を書かない。操作を足すと、期待の足し忘れがコンパイルで止まる。
+- 行は commit した `openapi/openapi.yaml` の operation にし、テストの側の操作の enum と過不足なく一致することを確かめる。operation を足したときに表から漏れないためである。
+- 期待の表は操作の enum の `switch` 式で書き、`default` を書かない。操作を足すと、期待の足し忘れがコンパイルで止まる。
 - 期待は本番の方針から作らない。作ると、本番の判断を同じ本番の判断と比べるだけになる。
-- 拒否を期待する組では、id を持つ操作の応答が、存在しない id で叩いたときと同じ status と本文になることを確かめる。id を持つ操作は、パスに id を持つ操作と、名前が `id` か `Id` で終わる query の引数を持つ操作で、Spectral の `public-id-uuid` と同じ選び方にする。query を見ないと、注文の id を `orderId` で受け取る `GET /api/payments` が抜ける。
-- 拒否を期待する書き込みの組では、業務のスキーマの行の中身が変わらないことも確かめる。
-- 期待と違ってよい組は、理由と Issue の番号付きの例外の一覧に書く。理由が空の例外と、spec にない操作の例外は失敗にする。#188 が入るまでの、同じテナントの別の利用者が注文と決済記録に触れる組が、この一覧に載る。
+- 見えないことを期待する組では、応答が、存在しない対象への応答と同じ status と本文になることを確かめる。比べる相手は、id を持つ操作では 404、id を持たない一覧では 200 でなければならない。比べる相手も 403 や 500 で失敗していると、同じ応答どうしで通ってしまうためである。
+- id を持つ操作は、パスの id に加えて、名前が `id` か `Id` で終わる query の引数で選ぶ。query を見ないと、注文の id を `orderId` で受け取る `GET /api/payments` が抜ける。
+- 拒否を期待する書き込みの組では、業務のスキーマの行の中身が変わらないことも確かめる。404 を返しても他人の行を書き換える実装を、応答だけでは見分けられないためである。
+- 許す組では、status に加えて本文も確かめる。200 で別のテナントの行を返す一覧や、持ち主の行が抜けた一覧は、status だけでは見分けられないためである。
 - 判定の部分を、テストの側の fixture の Controller（持ち主で絞らない GET と、404 を返すが他人の行を書き換える PUT）でも動かし、違反を検出することを確かめる。
+
+操作する人は、持ち主、同じテナントの別の member、同じテナントの admin で持ち主でない人、別のテナントの member、別のテナントの admin の 5 種類にする。
+[#568](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/568) では別のテナントの admin を除く 4 種類としたが、レビューで別のテナントの admin を足した。
+所属の管理の API は ADMIN だけが呼べるため、別のテナントの member は、対象が見えるかを確かめる前に 403 になる。
+別のテナントの admin がいないと、`/api/current-tenant/members/{userId}` に別のテナントの利用者の ID を渡したときに見えないことを確かめられない。
+
+期待と違ってよい組は、理由と Issue の番号に加えて、今の結果を持つ例外の一覧に書く。
+
+- 理由が空の例外と、spec にない操作の例外は失敗にする。
+- 例外の組は、今の結果と違う形で壊れたら失敗にする。例外の組を判定から外すと、許していた組が 500 になるような別の壊れ方を見逃すためである。
+- 例外の組が期待どおりになったら失敗にする。直した後に例外が残ると、後で同じ組が戻っても止まらないためである。
+
+[#188](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/188) が入るまでの、同じテナントの別の利用者が注文と決済記録に触れる組が、この一覧に載る。
+Issue の #568 では、別のテナントの組も [#363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363) で載せるとしたが、載せない。
+別のテナントの業務の行は RLS で読めず（[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）、別のテナントの組は今も期待どおりになるためである。
+期待と違う別のテナントの組が出たときだけ、その組を載せる。
 
 ### ライブラリ
 
@@ -104,7 +137,7 @@ Spring Security の method security だけを使う。
 
 ### Negative
 
-- 認可の表のテストは Spring と DB を起動し、operation の数と 4 種類の操作する人の積だけ要求を送るため、テストの時間が増える。
+- 認可の表のテストは Spring と DB を起動し、operation の数と 5 種類の操作する人の積だけ要求を送るため、テストの時間が増える。
 - 見える範囲の条件は Repository と `<Feature>Queries` ごとに書く。条件の書き忘れは型では止まらず、認可の表のテストでだけ止まる。
 - `@PreAuthorize` を付けたメソッドは、認証のない呼び出し（Listener、バッチ）から呼ぶと拒否される。役割で許す操作を Listener からも呼ぶ必要が出たら、CommandHandler を分ける。
 
@@ -161,6 +194,7 @@ Spring Security の method security だけを使う。
 - [バックエンドの層の責務](../backend/layers.md)
 - [APIの認証、セッション、権限](../web-api/authentication-and-session.md)
 - [バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)
+- [認可の表のテスト](../backend/authorization-matrix-test.md)
 - [HTTPステータスコードの選択](../web-api/status-codes.md)
 - [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-077](ADR-077-check-contract-test-coverage-per-response-status.md)、[ADR-101](ADR-101-keep-tenants-and-roles-in-app-database.md)、[ADR-105](ADR-105-bind-tenant-to-request-and-event-context.md)、[ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
 - `yokozi-jp/agent-software-factory`（commit `29ba897`）の `docs/adr/0045-authorization-policy-in-application-with-permit-token.md`、`docs/domain-model/authorization.md`、`apps/api/test/bola.ts`、`apps/api/test/bola-fixtures.ts`

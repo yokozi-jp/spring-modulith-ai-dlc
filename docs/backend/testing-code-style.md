@@ -40,9 +40,15 @@ MockMvcでログインした利用者として呼ぶテストは、`testkit`の`
 `oidcLogin()`の既定の利用者は`AppUserPrincipal`でないため、書き込みで共通カラムが例外にする（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）。
 `TestConventionsArchTest`が検査する。
 
-`AppUsers.oidcLogin()`は、テストのテナント（`AppUsers.TENANT_ID`）を選んだMEMBERの利用者にする。
-別のテナントや役割で呼ぶときは、`AppUsers.inTenant(<テナントのID>, <役割>)`を使う。別の利用者で呼ぶときは`AppUsers.inTenant(<利用者のID>, <テナントのID>, <役割>)`を使う。
-バックエンドはリクエストのたびに所属を引き直し、所属のない権限を外すため、どちらもリクエストを送る前にDBへ利用者、テナント、所属の行を入れる（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
+`AppUsers.oidcLogin()`は、テストの利用者（`AppUsers.USER_ID`）を、テストのテナント（`AppUsers.TENANT_ID`）を選んだMEMBERにする。
+ほかの利用者、テナント、役割で呼ぶときは、次を使う。
+
+- `AppUsers.inTenant(<利用者のID>, <テナントのID>, <役割>)`：利用者をテナントに役割で所属させ、そのテナントを選んだ後の利用者にする。
+- `AppUsers.selectedTenant(<利用者のID>, <テナントのID>, <役割>)`：DBの所属を書かずに、役割の権限でテナントを選んだ後の利用者にする。リクエストの権限とDBの所属が食い違う状態を作るときに使う。
+- `AppUsers.beforeTenantSelection(<利用者のID>)`：テナントを選ぶ前の利用者にする。DBの利用者と所属を書かない。
+
+バックエンドはリクエストのたびに所属を引き直し、所属のない権限を外す（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
+このため、`oidcLogin()`と`inTenant`は、リクエストを送る前にDBへ利用者、テナント、所属の行を入れる。
 `Authentication`の権限に`ROLE_MEMBER`などを手で足しても、テナントを選んだ状態にはならず、業務のAPIは403になる。
 
 リクエストもリスナーも通らずに、テナントを持つイベントを発行するCommandHandlerを直接呼ぶテストは、テストクラスに`testkit`の`BindTestTenantExtension`を付け、`AsTenant.TENANT`を束縛して呼ぶ。

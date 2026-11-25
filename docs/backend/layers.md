@@ -54,19 +54,11 @@ Domain Service は Repository を使ってよく、イベントの発行、外�
 
 [`<UseCase>Command`](class-roles/command.md) と [`<UseCase>Result`](class-roles/result.md) は、Java の標準型だけを持つ record として `application` に置く。
 
-`application` は、このアプリケーションの型のほかに、標準型、`org.jspecify..`、`org.slf4j..`、Spring の `@Service` などのアノテーションと `ApplicationEventPublisher`、役割を確かめる `@PreAuthorize` などの method security のアノテーション（`org.springframework.security.access.prepost`）だけに依存させる。
+`application` は、このアプリケーションの型のほかに、標準型、`org.jspecify..`、`org.slf4j..`、Spring の `@Service` などのアノテーションと `ApplicationEventPublisher`、役割を確かめる `@PreAuthorize` だけに依存させる。
 外部システムの SDK や生成した型は使わない（一覧の正本は[ArchUnit の規則](architecture-tests.md)）。
 Spring Web、Spring の HTTP、Servlet の型にも依存させない。業務上の失敗は `shared.failure` の例外で表し、HTTP のステータスへの対応づけは `error` の `ApiExceptionHandler` が行う。
 
 CommandHandler は別の CommandHandler を呼ばない。
-
-誰が要求したか（本人か、役割、見えるか）は、Application で確かめる（[ADR-129](../adr/ADR-129-place-authorization-in-application-and-test-it-per-operation-and-actor.md)）。
-利用者の ID は、Controller が `@AuthenticationPrincipal` で受け取った `AppUserPrincipal` の `userId()` を、Command と検索条件に入れて渡す。
-CommandHandler と QueryService は、その ID を Repository と `<Feature>Queries` に渡す。
-Application は `SecurityContextHolder` を読まず、利用者を引数で受け取る。
-役割で許す操作は、CommandHandler の `handle`（参照なら QueryService の public メソッド）に `@PreAuthorize` を付けて確かめる。
-method security のアノテーション（`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`）は、Application のクラスだけに付ける。
-見える範囲の絞り方と `@PreAuthorize` に書く式は、[APIの認証、セッション、権限](../web-api/authentication-and-session.md#認可)に従う。
 
 トランザクション境界は次のメソッドに置く。
 
@@ -77,6 +69,36 @@ method security のアノテーション（`@PreAuthorize`、`@PostAuthorize`、
 クラス単位の `@Transactional` は付けない。
 
 Application は Presentation と Infrastructure の実装へ依存させない。
+
+### 認可
+
+誰が要求したか（本人か、役割、見えるか）は、Application で確かめる（[ADR-129](../adr/ADR-129-place-authorization-in-application-and-test-it-per-operation-and-actor.md)）。
+見える範囲は利用者の ID で SQL を絞り、役割は `@PreAuthorize` で確かめる。
+
+見える範囲は、利用者の ID を次のとおり渡して絞る。
+
+- Controller は、`@AuthenticationPrincipal` で受け取った `AppUserPrincipal` の `userId()` を、Command と検索条件に入れる。
+- CommandHandler と QueryService は、その ID を Repository と `<Feature>Queries` に渡す。`SecurityContextHolder` は読まない。
+- Repository と `<Feature>Queries` は、その ID を jOOQ の WHERE に入れ、見えない行を空で返す。
+- CommandHandler と QueryService は、空なら `NotFoundException` を投げる。`ApiExceptionHandler` が 404 にするため、存在しない id と同じ応答になる。
+- 一覧も同じ条件で SQL で絞る。`@PostFilter` と `@PostAuthorize` で、読んだ後に絞らない。
+
+役割は、method security で次のとおり確かめる。
+
+- 役割で許す操作は、CommandHandler の `handle`（参照なら QueryService の public メソッド）に `@PreAuthorize` を付ける。
+- `@PreAuthorize` の値には、`hasRole`、`hasAnyRole`、`hasAuthority`、`hasAnyAuthority` に役割か権限の名前を文字列のリテラルで渡す式だけを書く（`@PreAuthorize("hasRole('ADMIN')")`）。引数や Bean を参照する SpEL は書かない。
+- Listener とバッチから呼ぶメソッドには付けない。認証のない呼び出しは拒否される。役割で許す操作を Listener やバッチからも呼ぶときは、CommandHandler を分ける。
+- method security のアノテーションは `@PreAuthorize` だけを使う。`@PostAuthorize`、`@PreFilter`、`@PostFilter` は使わない。
+- `@Secured` と `@RolesAllowed` も使わない。`SecurityConfig` は `@EnableMethodSecurity` を既定の属性で付けているため、この 2 つは付けても効かない。
+
+次の検査が、この規約を確かめる（[バックエンドのアーキテクチャテスト](architecture-tests.md)）。
+
+- `applicationDependsOnlyOnAllowedTypes` は、method security の型のうち `@PreAuthorize` だけを Application に許す。
+- `methodSecurityAnnotationsAreOnlyOnApplicationClasses` は、method security のアノテーションを Application の外のクラスに付けると失敗する。
+- `preAuthorizeUsesOnlyRoleOrAuthorityNames` は、`@PreAuthorize` の値の形を確かめる。
+- 見える範囲の絞り忘れと `@PreAuthorize` の付け忘れは、[認可の表のテスト](authorization-matrix-test.md)が止める。
+
+Listener とバッチから呼ぶメソッドに `@PreAuthorize` を付けていないかは、検査がなく、レビューで見る。
 
 ## Presentation
 
