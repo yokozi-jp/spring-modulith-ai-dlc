@@ -1,6 +1,7 @@
 package com.example.demo.product.presentation.web;
 
 import com.example.demo.product.application.RegisterProductCommand;
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Digits;
@@ -26,8 +27,9 @@ public record RegisterProductRequest(
     @NotNull @Pattern(regexp = "^(ON_SALE|DISCONTINUED)$") @Schema(example = "ON_SALE")
         String salesStatus) {
 
-  /** Command へ変換する。 */
-  public RegisterProductCommand toCommand() {
-    return new RegisterProductCommand(productCode, productName, unitPrice, salesStatus);
+  /** ヘッダーの冪等性キーと合わせて Command へ変換する。 */
+  public RegisterProductCommand toCommand(final IdempotencyKey idempotencyKey) {
+    return new RegisterProductCommand(
+        productCode, productName, unitPrice, salesStatus, idempotencyKey);
   }
 }

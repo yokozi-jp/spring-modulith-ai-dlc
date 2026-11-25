@@ -4,6 +4,7 @@ import com.example.demo.product.ProductQueries;
 import com.example.demo.product.application.RegisterProductCommandHandler;
 import com.example.demo.product.application.RegisterProductResult;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -45,6 +46,7 @@ class ProductController {
    *
    * <p>登録した商品の URI を Location に入れて返す。商品コードが既にあれば 409 を返す。
    *
+   * @param idempotencyKey 登録の操作ごとにクライアントが採番したキー
    * @param request 登録する商品の内容
    * @return 本文のない 201 の応答
    */
@@ -59,8 +61,9 @@ class ProductController {
   @ApiResponse(responseCode = "409", ref = "#/components/responses/ConflictProblem")
   @PostMapping
   /* package */ ResponseEntity<Void> register(
+      final IdempotencyKey idempotencyKey,
       @Valid @RequestBody final RegisterProductRequest request) {
-    final RegisterProductResult result = registerProduct.handle(request.toCommand());
+    final RegisterProductResult result = registerProduct.handle(request.toCommand(idempotencyKey));
     final URI location =
         ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{productId}")
