@@ -102,7 +102,7 @@ public interface OrderQueries {
 ```java
 // com.example.demo.inventory.application.ReserveStockCommandHandler（抜粋）
 /** 注文の明細の数量で在庫を引き当てる。 */
-@NoRoleRequired(reason = "注文のイベントの Listener から呼ぶ。認証がない")
+@NoRoleRequired(NoRoleRequired.Basis.CALLED_WITHOUT_AUTHENTICATION)
 @Transactional
 public ReserveStockResult handle(final ReserveStockCommand command) {
   final OrderDetails order =

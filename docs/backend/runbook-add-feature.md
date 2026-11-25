@@ -23,8 +23,7 @@ tags: [runbook, backend, spring-modulith]
 3. `domain.model` に集約、Entity、値オブジェクト、`<Aggregate>Repository`、外部システムのインタフェースを置く。
 4. 集約にも値オブジェクトにも置けない業務規則を、`domain.service` の Domain Service に置く。
 5. `application` に、状態を変えるユースケースごとの `<UseCase>Command`、`<UseCase>CommandHandler`、`<UseCase>Result` と、`<Feature>QueryService` を置く。他モジュールのイベントを受けるとき、外部システムを呼ぶときは、`<Event>Listener` も置く。
-   CommandHandler の `handle` と QueryService の public メソッドには、役割で許すなら `@PreAuthorize` を、役割を問わないなら理由を書いた `@NoRoleRequired(reason = ...)` を付ける（[認可](layers.md#認可)）。
-   どちらもないと `ProxyRulesArchTest` の `applicationHandlersDeclareAuthorization` が失敗する。
+   CommandHandler の `handle` と QueryService の public メソッドに、役割の判断を宣言する（[認可](layers.md#認可)）。
 6. `presentation.web` に `<Aggregate>Controller`、`<UseCase>Request`、`<QueryResult>Response` を置く。Javadoc とアノテーションは [OpenAPIのアノテーションとJavadoc](../web-api/openapi-annotations.md) に従い、契約と生成物の更新は [APIを変更する](../web-api/runbook-api-change.md) の手順で行う。
 7. `infrastructure.persistence` に `Jooq<Aggregate>Repository` を、`infrastructure.client` に `<ExternalSystem>Client` を置く。
 8. 作成した各 Java パッケージへ `@NullMarked` の `package-info.java` を追加する。

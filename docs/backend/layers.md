@@ -83,30 +83,41 @@ Application は Presentation と Infrastructure の実装へ依存させない�
 - CommandHandler と QueryService は、空なら `NotFoundException` を投げる。`ApiExceptionHandler` が 404 にするため、存在しない id と同じ応答になる。
 - 一覧も同じ条件で SQL で絞る。`@PostFilter` と `@PostAuthorize` で、読んだ後に絞らない。
 
-Application の、名前が `CommandHandler` か `QueryService` で終わるクラスの、static でない public メソッドは、どれも役割の判断を宣言する。
-宣言は、`@PreAuthorize` か `@NoRoleRequired` を、メソッドかクラスに付けて行う。
-クラスに付けたものは、そのクラスのすべての public メソッドの宣言になる。
+Application の、名前が `CommandHandler` か `QueryService` で終わるクラスが宣言した、static でない public メソッドは、どれも役割の判断を宣言する。
+継承したメソッド、interface の default メソッド、名前がこの 2 つで終わらないクラスのメソッドは、宣言の検査の対象にならない。
+Listener のクラスも対象外で、役割の判断のアノテーションを付けない。
+宣言は、`@PreAuthorize` か `@NoRoleRequired` の一方をメソッドに付けて行う。
+`@PreAuthorize` はクラスにも付けられ、そのクラスのすべての public メソッドの宣言になる。
+`@NoRoleRequired` はメソッドにだけ付ける。
 
 役割は、method security で次のとおり確かめる。
 
 - 役割で許す操作は、CommandHandler の `handle`（参照なら QueryService の public メソッド）に `@PreAuthorize` を付ける。
-- 役割を問わない操作には、`shared.security` の `@NoRoleRequired` を付ける。`@NoRoleRequired` は実行時に何もせず、役割を確かめないと決めたことだけを表す。
-- `@NoRoleRequired` の `reason` には、役割を問わずに呼んでよい理由を書く（見える範囲を SQL やテナントで絞る、ログインの処理から呼ぶ、Listener から呼ぶ）。空や空白だけの `reason` は書かない。
+- 役割を問わない操作には、`shared.security` の `@NoRoleRequired` を付け、役割を問わずに呼んでよい根拠を `NoRoleRequired.Basis` の定数で渡す。`@NoRoleRequired` は実行時に何もしない。
+- 1 つのメソッドに `@PreAuthorize` と `@NoRoleRequired` を両方付けない。`@PreAuthorize` を付けたクラスのメソッドにも `@NoRoleRequired` を付けない。
 - `@PreAuthorize` の値には、`hasRole`、`hasAnyRole`、`hasAuthority`、`hasAnyAuthority` に役割か権限の名前を文字列のリテラルで渡す式だけを書く（`@PreAuthorize("hasRole('ADMIN')")`）。引数や Bean を参照する SpEL は書かない。
 - `RoleHierarchy` は設定していないため、`ADMIN` は `MEMBER` を含まない。両方に許すときは `hasAnyRole('MEMBER', 'ADMIN')` と書く。
-- Listener とバッチから呼ぶメソッドには、`@PreAuthorize` ではなく `@NoRoleRequired` を付ける。`@PreAuthorize` を付けると、認証のない呼び出しは拒否される。役割で許す操作を Listener やバッチからも呼ぶときは、CommandHandler を分ける。
+- Listener とバッチから呼ぶメソッドには、`@PreAuthorize` ではなく、`CALLED_WITHOUT_AUTHENTICATION` を渡した `@NoRoleRequired` を付ける。`@PreAuthorize` を付けると、認証のない呼び出しは拒否される。役割で許す操作を Listener やバッチからも呼ぶときは、CommandHandler を分ける。
 - method security のアノテーションは `@PreAuthorize` だけを使う。`@PostAuthorize`、`@PreFilter`、`@PostFilter` は使わない。
 - `@Secured` と `@RolesAllowed` も使わない。`SecurityConfig` は `@EnableMethodSecurity` を既定の属性で付けているため、この 2 つは付けても効かない。
+
+`NoRoleRequired.Basis` の定数は次の 4 つである。
+
+- `TENANT_SCOPED`：見える範囲を RLS でテナントに絞り、テナントの全員に許す。
+- `CALLER_PASSES_OWN_USER_ID`：呼び出し側が本人の利用者の ID を渡し、SQL がその ID で絞る。
+- `CALLED_WITHOUT_AUTHENTICATION`：Listener など、認証のない呼び出しから呼ぶ。
+- `BEFORE_LOGIN_COMPLETES`：ログインの途中で呼ぶ。役割もテナントもまだない。
 
 次の検査が、この規約を確かめる（[バックエンドのアーキテクチャテスト](architecture-tests.md)）。
 
 - `applicationDependsOnlyOnAllowedTypes` は、method security の型のうち `@PreAuthorize` だけを Application に許す。
 - `methodSecurityAnnotationsAreOnlyOnApplicationClasses` は、method security のアノテーションを Application の外のクラスに付けると失敗する。
 - `preAuthorizeUsesOnlyRoleOrAuthorityNames` は、`@PreAuthorize` の値の形を確かめる。
-- `applicationHandlersDeclareAuthorization` は、役割の判断の宣言がないメソッドと、空や空白だけの `reason` を見つけると失敗する。
-- 見える範囲の絞り忘れと、役割の判断の誤り（管理者だけに許す操作に `@NoRoleRequired` を付けたなど）は、[認可の表のテスト](authorization-matrix-test.md)が止める。
+- `applicationHandlersDeclareAuthorization` は、役割の判断の宣言がないメソッドを見つけると失敗する。
+- `authorizationIsDeclaredOnlyOnce` は、`@PreAuthorize` と `@NoRoleRequired` の両方で宣言したメソッドを見つけると失敗する。
+- ArchUnit の規則は、宣言の有無と形だけを確かめ、判断が正しいかは確かめない。見える範囲の絞り忘れと、役割の判断の誤り（管理者だけに許す操作に `@NoRoleRequired` を付けたなど）は、[認可の表のテスト](authorization-matrix-test.md)が止める。
 
-Listener とバッチから呼ぶメソッドに `@PreAuthorize` を付けていないかと、`@NoRoleRequired` の `reason` が正しいかは、検査がなく、レビューで見る。
+Listener とバッチから呼ぶメソッドに `@PreAuthorize` を付けていないかと、`@NoRoleRequired` に渡した `Basis` が正しいか（`TENANT_SCOPED` のメソッドが本当にテナントで絞るかなど）は、検査がなく、レビューで見る。
 
 ## Presentation
 
