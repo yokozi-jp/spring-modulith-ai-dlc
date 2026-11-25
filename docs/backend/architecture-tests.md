@@ -346,7 +346,7 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
 `TableWriterArchTest`は、業務テーブルのINSERTとUPDATEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 集約ルートは、`domain.model`にあり、`shared.concurrency`の`Versioned`を実装する型とする。
 
-- `tableWritesGoThroughTableWriter`：`TableWriter`と、その子の行の書き込み（`ChildWriter`）、`Idempotency-Key`の行の書き込み（`IdempotencyKeyWriter`）の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
+- `tableWritesGoThroughTableWriter`：`TableWriter`と、その子の行の書き込み（`ChildWriter`）、`Idempotency-Key`の行の書き込み（`IdempotencyKeyWriter`）、古い出版を`FAILED`に戻す更新（`StalePublications`）の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
   呼び出し先の型が、挙げた型に代入できるかで判定する。
   - `DSLContext`、`DSL`、`WithStep`の`insertInto`、`insertQuery`、`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
   - `DSLContext`の`batchInsert`、`executeInsert`、`loadInto`、`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
@@ -362,7 +362,8 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
 
   `Insert`、`Update`、`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
-  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`ChildWriter`、`IdempotencyKeyWriter`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
+  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`ChildWriter`、`IdempotencyKeyWriter`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`、落ちたまま残った出版を`FAILED`に戻す`shared.eventresubmission`の`StalePublications`の完全修飾型名だけである。
+  `StalePublications`は業務テーブルに触れず、Spring Modulithの`modulith.event_publication`を1文のUPDATEで更新する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
   `ModuleRoleTransactionManager`は業務テーブルに触れず、ロールとテナントを設定する`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/persistence/`）を更新する。

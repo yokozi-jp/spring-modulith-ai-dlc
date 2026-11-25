@@ -38,7 +38,6 @@ import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.PropertyResolver;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.type.AnnotatedTypeMetadata;
-import org.springframework.modulith.events.core.Staleness;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -258,22 +257,6 @@ class EventPublicationResubmissionConfig {
      */
     /* package */ Duration lockAtLeastFor() {
       return interval.dividedBy(2);
-    }
-
-    /**
-     * 古い出版を FAILED に戻す閾値。{@code PUBLISHED} は {@code wait-age}、{@code PROCESSING} と {@code
-     * RESUBMITTED} は {@code in-flight-staleness} にする（ADR-079）。
-     *
-     * <p>Spring Modulith は古くなりうる 3 つの状態だけを問い合わせる（{@link Staleness#isMonitored}）。
-     */
-    /* package */ Staleness staleness() {
-      return status ->
-          switch (status) {
-            case PUBLISHED -> waitAge;
-            case PROCESSING, RESUBMITTED -> inFlightStaleness;
-            case COMPLETED, FAILED, ABANDONED ->
-                throw new IllegalArgumentException("status cannot become stale: " + status);
-          };
     }
 
     /** {@code default} の方針があるか。 */

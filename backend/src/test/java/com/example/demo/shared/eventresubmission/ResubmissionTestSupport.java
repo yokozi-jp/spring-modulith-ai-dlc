@@ -38,7 +38,6 @@ import org.mockito.Mockito;
 import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
-import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.test.context.TestPropertySource;
 
@@ -83,17 +82,17 @@ final class ResubmissionTestSupport {
   }
 
   /**
-   * 古い出版を FAILED に戻す処理を何もしないモックにする。{@code clock} と Spring Modulith の時計が別でも、行の状態を変えないためである。
+   * 古い出版を FAILED に戻す処理を何もしないモックにする。時計を進めたテストが、行の状態を変えないためである。
    *
-   * <p>本物の処理を試すテストは、{@code resubmitter} に本物の {@link EventPublicationRegistry} を渡す。
+   * <p>本物の処理を試すテストは、{@code resubmitter} に本物の {@link StalePublications} を渡す。
    */
-  /* package */ static EventPublicationRegistry noStaleCheck() {
-    return Mockito.mock(EventPublicationRegistry.class);
+  /* package */ static StalePublications noStaleCheck() {
+    return Mockito.mock(StalePublications.class);
   }
 
   /**
-   * 同じ {@code dsl}、{@code clock}、{@code properties} から、古い出版を FAILED に戻す処理を {@code registry}
-   * にして、Sweep と定期のジョブを組み立てる。
+   * 同じ {@code dsl}、{@code clock}、{@code properties} から、古い出版を FAILED に戻す処理を {@code
+   * stalePublications} にして、Sweep と定期のジョブを組み立てる。
    */
   /* package */ static EventPublicationResubmitter resubmitter(
       final DSLContext dsl,
@@ -103,10 +102,11 @@ final class ResubmissionTestSupport {
       final EventPublicationResubmissionConfig.Properties properties,
       final ResubmissionPolicies policies,
       final MeterRegistry meterRegistry,
-      final EventPublicationRegistry registry) {
+      final StalePublications stalePublications) {
     return new EventPublicationResubmitter(
         dsl,
-        new FailedPublicationSweep(dsl, failed, lockingTaskExecutor, clock, properties, registry),
+        new FailedPublicationSweep(
+            dsl, failed, lockingTaskExecutor, clock, properties, stalePublications),
         policies,
         clock,
         meterRegistry,

@@ -1,6 +1,5 @@
 package com.example.demo.shared.eventresubmission;
 
-import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.shared.eventresubmission.ResubmissionProbes.PROBE_POLICY;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -8,8 +7,6 @@ import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Ta
 import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
 import com.example.demo.shared.eventresubmission.ResubmissionProbes.ProbeListener;
 import com.example.demo.shared.eventresubmission.ResubmissionProbes.ResubmissionProbe;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -20,7 +17,6 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
-import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
 import net.javacrumbs.shedlock.core.LockProvider;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
@@ -28,14 +24,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.AdditionalAnswers;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.modulith.events.EventPublication.Status;
-import org.springframework.modulith.events.FailedEventPublications;
-import org.springframework.modulith.events.core.DefaultEventPublicationRegistry;
-import org.springframework.modulith.events.core.EventPublicationRepository;
-import org.springframework.modulith.events.core.TargetEventPublication;
 import org.springframework.modulith.test.EnableScenarios;
 import org.springframework.modulith.test.Scenario;
 
@@ -47,8 +37,6 @@ import org.springframework.modulith.test.Scenario;
  * の時刻で決まり、固定の時計では進まないため、ジョブを呼ぶ前に期限を過去にする（{@link #runJob()}）。 Spring の文脈は {@link
  * EventPublicationResubmitterTest} と同じ設定で共有する。
  */
-// ロックの有無、手での 1 回の再投入、もう 1 つのインスタンスで確かめ、その組み立てと行の準備と読み出しを持つため、型とメソッドの数が多い。
-@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 @ResubmissionTestSupport.SharedContext
 @EnableScenarios
 class EventPublicationResubmitterStalenessTest {
@@ -71,10 +59,7 @@ class EventPublicationResubmitterStalenessTest {
   /** 定期のジョブと同じロックを取る、手での 1 回の再投入。 */
   @Autowired private EventPublicationResubmitOnce resubmitOnce;
 
-  /** リスナーの方針。 */
-  @Autowired private ResubmissionPolicies policies;
-
-  /** 差し替えられる時計。Spring Modulith のレジストリもこの時計で古さを測る。 */
+  /** 差し替えられる時計。古い出版を FAILED に戻す処理もこの時計で古さを測る。 */
   @Autowired private MutableClock clock;
 
   /** 失敗の回数を決められ、門で止められるテストのリスナー。 */
@@ -85,18 +70,6 @@ class EventPublicationResubmitterStalenessTest {
 
   /** ロックを別に持つ。 */
   @Autowired private LockProvider lockProvider;
-
-  /** 定期のジョブのメトリクス。 */
-  @Autowired private MeterRegistry meterRegistry;
-
-  /** もう 1 つのインスタンスが使う、Spring Modulith の失敗した出版の再投入。 */
-  @Autowired private FailedEventPublications failedEventPublications;
-
-  /** もう 1 つのインスタンスが使う、Spring Modulith が出版を読み書きする Repository。 */
-  @Autowired private EventPublicationRepository repository;
-
-  /** 再投入の設定値。 */
-  @Autowired private EventPublicationResubmissionConfig.Properties properties;
 
   @BeforeEach
   void reset() {
@@ -167,29 +140,6 @@ class EventPublicationResubmitterStalenessTest {
         .containsExactly(Status.FAILED, Status.FAILED);
   }
 
-  @Test
-  @DisplayName("2 つのインスタンスでも、片方が古い出版を読んでから FAILED に戻すまでの間、もう片方はロックを取れず、出版は 1 回だけ再投入される")
-  void otherInstanceCannotInterleaveWithStaleCheck(final Scenario scenario) {
-    // 最初の配信を executor に積んだまま落ち、PUBLISHED に残った出版にする。
-    final UUID publication = ResubmissionTestSupport.failedProbe(scenario, listener, dsl);
-    dsl.update(EVENT_PUBLICATION)
-        .set(EVENT_PUBLICATION.STATUS, Status.PUBLISHED.name())
-        .where(EVENT_PUBLICATION.ID.eq(publication))
-        .execute();
-    clock.set(T0.plus(WAIT_AGE).plusSeconds(1));
-    final double skippedBefore = skippedRuns();
-
-    otherInstanceRunningThisJobAfterStaleRead().resubmitOnce();
-
-    assertThat(skippedRuns() - skippedBefore)
-        .as("もう片方が古い出版を読んだ後、FAILED に戻す前のこのインスタンスの回")
-        .isEqualTo(1.0);
-    // 再投入の印は回の中で付くため、リスナーが終わって archive へ移っていても回数は読める。
-    assertThat(state(publication).completionAttempts())
-        .as("publication=%s の再投入の後の attempts", publication)
-        .isEqualTo(2);
-  }
-
   private void runJob() {
     ResubmissionTestSupport.runJob(dsl, resubmitter);
   }
@@ -221,46 +171,5 @@ class EventPublicationResubmitterStalenessTest {
 
   private List<@Nullable Status> statuses(final UUID... publications) {
     return Arrays.stream(publications).map(id -> state(id).status()).toList();
-  }
-
-  private double skippedRuns() {
-    return ResubmissionTestSupport.skippedRuns(meterRegistry);
-  }
-
-  /**
-   * 同じ DB とロックを使う、もう 1 つのインスタンスの定期のジョブ。
-   *
-   * <p>古い {@code PUBLISHED} の出版を読んだ後、FAILED に戻す前に、このインスタンスの定期のジョブを別のスレッドで 1 回動かす。 この差し込みは、{@code
-   * markStalePublicationsFailed} が最初に {@code findByStatus(PUBLISHED)} で読み、読んだ出版に {@code markFailed}
-   * を呼ぶことに頼る。 この読み方は {@code ResubmissionOptionsLearningTest} の {@code
-   * stalenessMarksPublicationResubmittedAfterRead} が固定する。 同じスレッドで呼ぶと、ShedLock
-   * は持っているロックを取り直さずに中身を動かすため、別のスレッドにする。
-   */
-  private EventPublicationResubmitter otherInstanceRunningThisJobAfterStaleRead() {
-    final EventPublicationRepository interleaved =
-        Mockito.mock(EventPublicationRepository.class, AdditionalAnswers.delegatesTo(repository));
-    Mockito.doAnswer(
-            call -> {
-              final List<TargetEventPublication> read =
-                  repository.findByStatus(call.getArgument(0));
-              ResubmissionTestSupport.onVirtualThread(
-                      () -> {
-                        resubmitter.resubmitOnce();
-                        return Boolean.TRUE;
-                      })
-                  .get(JOIN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
-              return read;
-            })
-        .when(interleaved)
-        .findByStatus(Status.PUBLISHED);
-    return ResubmissionTestSupport.resubmitter(
-        dsl,
-        failedEventPublications,
-        new DefaultLockingTaskExecutor(lockProvider),
-        clock,
-        properties,
-        policies,
-        new SimpleMeterRegistry(),
-        new DefaultEventPublicationRegistry(interleaved, clock));
   }
 }
