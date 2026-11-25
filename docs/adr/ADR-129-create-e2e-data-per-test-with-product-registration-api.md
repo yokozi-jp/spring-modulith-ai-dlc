@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-129: E2E のデータを各テストが作り、商品は本番の商品を登録する API で作る'
-description: E2E が開発用のシーダーの代表データを読むのをやめ、各テストが自分専用のデータを作る決定。商品は、本番に足す商品を登録する API（POST /api/products）で作り、E2E のためだけの入口を作らない。登録の権限はテナントを選んだ利用者なら誰でもとし、制限は別の Issue に分ける。ADR-073 を置き換える。
+description: E2E が開発用のシーダーの代表データを読むのをやめ、各テストが自分専用のデータを作る決定。商品は、本番に足す商品を登録する API（POST /api/products）で作り、E2E のためだけの入口を作らない。登録の権限はテナントを選んだ利用者なら誰でもとし、制限は #758 に分ける。ADR-073 を置き換える。
 tags: [adr, e2e, testing, seed, product, web-api]
 ---
 
@@ -31,21 +31,9 @@ xUnit Test Patterns の分類では、用途の違う者が共有する General 
 ADR-073 が代表の注文で確かめていた決済済み、拒否、再投入待ちの詳細は、既存の「作成して確定」「拒否」「5xx」と「タイムアウト」のテストが同じ表示を確かめている。
 公開 API で作れない状態は商品だけだった。
 
-この ADR の最初の版は、商品を別プロセスの fixture サーバーで作る決定だった。
-backend のテストのソースに置く `E2eFixtureServer` を Playwright の `webServer` で起動し、`POST /products` で商品の行を直接入れる。
-試作は動き、`fullyParallel` の `task e2e` が全件通るところまで確かめたが、重さに対して得るものが小さいと判断して取り下げた。
-
-- **変更の量**：fixture サーバーとその周りは 12 の commit で約 1,200 行を足し、うちコードと設定が約 1,000 行だった。
-- **別プロセス**：Playwright が起動して止めるプロセスと、slot ごとの port（`E2E_FIXTURE_PORT`）と、HTTP の契約（`POST /products`、`GET /health`）が増えた。
-- **Java 25 の要件**：fixture サーバーはテストと同じ toolchain の java で起動する必要があり、Gradle の `writeE2eFixtureArgs` で java のパスと引数ファイルを書いて渡した。
-- **境界の検査**：ブラウザの別のサイトからの要求を通さないよう、`Host` の検査、`Content-Type` と本文の大きさの上限、想定外の失敗の 500 を作り、`E2eFixtureServerTest` で確かめる必要があった。
-- **本番の経路の迂回**：商品の行は `TestProducts.insert` が直接入れるので、入力の検証、`TableWriter`、`*_pgm_cd` の束縛を通らない。
-
-最初の版は、商品の管理 API を本番に足す案を、業務の要件に無い API と認可の判断が増え、本番のコードに E2E のための入口が残るとして採らなかった。
-所有者は、この判断を次のとおり改めた。
 商品の登録は商品のマスタを持つ業務の操作であり、E2E のためだけの入口ではない。
 作成だけに絞れば、足すコードは既存の書き込みの経路（`TableWriter`、モジュールのロール、RLS、共通カラム）に乗る。
-認可は、業務の API を役割で分ける仕組みがバックエンドにまだ無い（業務の API は、テナントを選んだかどうかだけを見る）ため、この ADR では決めずに別の Issue に分ける。
+認可は、業務の API を役割で分ける仕組みがバックエンドにまだ無い（業務の API は、テナントを選んだかどうかだけを見る）ため、この ADR では決めずに [#758](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/758) に分ける。
 
 ADR-073 の後に入った [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) は Proposed で、契約だけが先に入っている。
 `OpenApiConfig` の customizer が、GET と HEAD 以外の業務の operation に必須の `Idempotency-Key` を付けるが、サーバーはまだキーを検査せず、受ける側のコードも無い。
@@ -63,7 +51,7 @@ E2E は開発用のシーダーを使わない。
   商品コードの重複は、注文の作成の客先注文番号と同じく、`/problems/unique-violation` の 409 で返す。
   書き込みは `TableWriter` を通し、`product` のロール、テナントの RLS、共通カラムを既存の書き込みと同じ仕組みで通す。
 - 商品を登録できるのは、テナントを選んだ認証済みの利用者なら誰でもとする（注文の作成と同じ扱い）。
-  ADMIN だけに制限する仕組みはこの ADR で作らず、業務の API の認可と合わせて別の Issue で決める。
+  ADMIN だけに制限する仕組みはこの ADR で作らず、業務の API の認可と合わせて [#758](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/758) で決める。
 - この API は `Idempotency-Key` を検査しない。
   契約は ADR-126 の customizer が付けるとおり必須にし、Playwright の補助は契約に従ってキーを送る。
   サーバーの検査は ADR-126 の実装に任せる。
@@ -105,9 +93,11 @@ E2E は開発用のシーダーを使わない。
 
 ### 選択肢1: 別プロセスの fixture サーバーで商品を作る
 
-- **Description**：この ADR の最初の版の決定。backend のテストのソースに置く fixture サーバーを Playwright の `webServer` で起動し、`POST /products` で商品の行を直接入れる。
+- **Description**：backend のテストのソースに置く fixture サーバーを Playwright の `webServer` で起動し、HTTP で商品の行を直接入れる。
 - **Pros**：本番のコードに書き込みの API を足さない。
-- **Cons**：Context に書いたとおり、約 1,000 行のコードと設定、別プロセス、Java 25 の起動の手順、境界の検査を持ち、商品の行は本番の検証と書き込みの経路を通らない。重さに対して得るものが小さいため採らない。
+- **Cons**：E2E のたびに別の JVM のプロセスを起動し、ホストにテストと同じ toolchain の Java が要る。
+  fixture サーバーは自分の HTTP の契約と、ブラウザの別のサイトからの要求を通さない境界の検査を持ち、それをテストで確かめ続ける。
+  本番の商品を登録する API で同じ商品を作れるため採らない。
 
 ### 選択肢2: Playwright の fixture から Node で DB に直接入れる
 
