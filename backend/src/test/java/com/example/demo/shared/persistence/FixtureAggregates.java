@@ -24,6 +24,16 @@ final class FixtureAggregates {
   /* package */ static final AggregateTable<Record, Long, Item> ITEM_ONLY =
       AggregateTable.of(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID);
 
+  /** 子を持ち、item_code の重複を許す集約。item_id の重複は許さない。 */
+  /* package */ static final AggregateTable<Record, Long, Item> ITEM_IDEMPOTENT_ON_CODE =
+      AggregateTable.ofIdempotentOn(
+          FIXTURE_ITEM,
+          FIXTURE_ITEM.ITEM_ID,
+          Item::id,
+          FIXTURE_ITEM.ITEM_ID,
+          List.of(FIXTURE_ITEM.ITEM_CODE),
+          DETAILS);
+
   private FixtureAggregates() {}
 
   /** テスト用の集約ルート。ルートの一意の列は {@code id}、読み込んだ版は {@code lockNo} である。 */

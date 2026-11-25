@@ -44,10 +44,12 @@ DBの行ロックは、在庫の引き当てのように性能が重要になる
 Repositoryでの書き方は[jOOQのRepository](../backend/class-roles/jooq-repository.md)に従う。
 
 Repositoryは集約の形を、クラスの定数として一度だけ宣言する。
-`AggregateTable`はルートのテーブル、ルートを一つに決める一意の列、内部の主キー、子を持ち、`ChildTable`は子のテーブル、親の外部キーの列、親の中で行を同定する自然キーを持つ。
+`AggregateTable`はルートのテーブル、ルートを一つに決める一意の列、内部の主キー、子、重複を許す一意索引の列（`ofIdempotentOn`で宣言したときだけ）を持ち、`ChildTable`は子のテーブル、親の外部キーの列、親の中で行を同定する自然キーを持つ。
 保存のたびに、ルートの列の値と、保存後にあるべき子の全行（`ChildTable.rows`が作る`ChildRows`）を渡す。`Condition`は渡さない。
 
-- **`insert`**：ルートを`INSERT ... RETURNING 内部の主キー`で書き、続けて子を複数行のINSERTで書く。`lock_no = 1`にする。
+- **`insert`**：ルートを`INSERT ... RETURNING 内部の主キー`で書き、続けて子を複数行のINSERTで書く。`lock_no = 1`にし、`true`を返す。
+  `ofIdempotentOn`で重複を許す列を宣言した集約は、`INSERT ... ON CONFLICT (その列) DO NOTHING`で書き、その列の衝突を例外にせず、何も書かずに`false`を返す。入れなかったときは子を書かない。
+  同じ値の行を書いて未コミットのトランザクションがあれば、その終わりまで待つ。同じイベントの2回目を処理済みとして正常に終える集約に宣言する（[ADR-129](../adr/ADR-129-check-all-listeners-for-idempotency-without-a-uniform-processed-message-table.md)）。
 - **`update`**：以前に読んだ集約ルート（`Versioned`）を受け取り、その`lockNo()`を期待する版にする。
   更新件数が1件なら成功する。
   0件なら一意の列で行の有無を確かめ、行がなければ`shared.failure`の`NotFoundException`を、行があれば「他の人が更新した」として`shared.concurrency`の`ConflictException`（種類は`version`）を投げる。
@@ -77,7 +79,7 @@ RETURNING order_id;
 | Listenerやバッチからの集約の更新（画面の版を持たない）                                      | 比べる（読んだ版と行の版）                     | Repositoryの`update`の`TableWriter.update`                                                                          | H3                                                                                                    |
 | 集約の子の行の更新                                                                          | 比べない（ルートの行ロックと版で守る）         | `update`が差分で書く（子の`lock_no`を1進める）                                                                      | 親の外部キーは`TableWriter`が付ける                                                                   |
 | 集約の子の行の削除、追加                                                                    | 比べない / 該当なし（追加は`lock_no = 1`）     | `update`が差分で書く。`insert`が複数行のINSERTで書く                                                                | 同上                                                                                                  |
-| 集約ルートのINSERT                                                                          | 該当なし（`lock_no = 1`）                      | `TableWriter.insert`                                                                                                | H1（`insertInto`を`TableWriter`の外で呼べない）                                                       |
+| 集約ルートのINSERT                                                                          | 該当なし（`lock_no = 1`）                      | `TableWriter.insert`（重複を許すなら`AggregateTable.ofIdempotentOn`で宣言する）                                     | H1（`insertInto`を`TableWriter`の外で呼べない）                                                       |
 | 集約ルートの物理削除、DBの行ロック（在庫の引き当て）、一括更新、ワークテーブルの後始末      | 今は入口がない                                 | 必要になったとき、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)を更新して入口を足す | H1                                                                                                    |
 | Javaの外の書き込み（psqlのデータパッチ、Liquibaseのデータ変更、スキーマ変更に伴う値の設定） | 比べない                                       | [共通カラム](postgresql-common-columns.md)（データパッチでは`lock_no`を進めない）                                   | 検出しない（[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)のNegative） |
 | フレームワークのテーブル（`modulith`と`liquibase`のスキーマ）                               | 対象外                                         | 対象外                                                                                                              | 対象外                                                                                                |
@@ -94,6 +96,7 @@ RETURNING order_id;
 
 - 子を書く`ChildWriter`は`TableWriter`だけが呼ぶため、親の更新を通さずに子だけを書く入口がない。
 - 子のテーブルを親の子として宣言し忘れる誤りと、`parentKey`の列の誤りは、`AggregateDeclarationInspectionTest`が集約の宣言をDBの外部キーと突き合わせて止める。
+  重複を許す列の組が一意索引とずれる誤りも、同じテストが一意索引と突き合わせて止める。
 
 子の集合が増減する集約は、全置換ではなく差分で保存する。
 全置換では、子の`created_*`が保存のたびに変わる。

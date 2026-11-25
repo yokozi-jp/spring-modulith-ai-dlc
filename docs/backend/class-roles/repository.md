@@ -44,6 +44,8 @@ Presentation は Repository を使わない。
   実装は `infrastructure.persistence` の `Jooq<Aggregate>Repository` に置き、DB の DEFAULT では採番しない（[PostgreSQLの主キー](../../database/postgresql-primary-keys.md#uuidの採番)）。
 - 1件の取り出しは `Optional<集約ルート>` を、複数の取り出しは `List<集約ルート>` を返す。
 - 新しい集約の保存は `void add(集約ルート)` に、既存の集約の保存は `void update(集約ルート)` にする。
+  同じ集約の 2 回目の保存を例外にせず処理済みとして終える集約（同じイベントの 2 回目の配信で保存する決済記録など）は、`add` が保存したかを `boolean` で返してよい（`PaymentRepository.add`）。
+  その `add` は、保存しなかった場合を `@return` に書く。名前は `add` のまま変えない。`TableWriterArchTest` が `add` の名前で書き込みの入口を見分けるためである。
   新規と更新を一つの `save` にしない。
 - `update` は、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロックで保存する。
   集約の行がなければ `shared.failure` の `NotFoundException` を、更新の時点の行の `lock_no` が集約の `lockNo()` と違うか `lock_timeout` までに行のロックを取れなければ `shared.concurrency` の `ConflictException` を投げる。

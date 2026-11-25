@@ -233,7 +233,11 @@ final class SchemaCatalog {
                                WHERE x.conindid = i.indexrelid AND x.contype = 'x') AS backs_exclusion,
                        i.indisunique AS is_unique,
                        (SELECT a.attname FROM pg_attribute a
-                        WHERE a.attrelid = i.indrelid AND a.attnum = i.indkey[0]) AS first_column
+                        WHERE a.attrelid = i.indrelid AND a.attnum = i.indkey[0]) AS first_column,
+                       ARRAY(SELECT a.attname::text FROM unnest(i.indkey::int2[]) WITH ORDINALITY k(attnum, ord)
+                             JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+                             WHERE k.ord <= i.indnkeyatts
+                             ORDER BY k.ord) AS key_column_names
                 FROM pg_index i
                 JOIN pg_class ic ON ic.oid = i.indexrelid
                 JOIN pg_class t ON t.oid = i.indrelid
@@ -254,7 +258,8 @@ final class SchemaCatalog {
                 r.get("has_predicate", Boolean.class),
                 r.get("backs_exclusion", Boolean.class),
                 r.get("is_unique", Boolean.class),
-                r.get("first_column", String.class)));
+                r.get("first_column", String.class),
+                texts(r, "key_column_names")));
   }
 
   private static List<ViewDependencyRow> viewDependencies(final DSLContext dsl) {

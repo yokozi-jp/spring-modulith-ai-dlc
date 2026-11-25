@@ -128,3 +128,4 @@
 - [ADR-126: GET と HEAD 以外のすべての業務の API に Idempotency-Key を必須にし、モジュールごとの表に Result を保存する](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)（Proposed, 2026-11-24）
 - [ADR-127: 失敗の理由の enum から problem type と title のキーを作る](ADR-127-derive-problem-types-from-failure-reasons.md)（Proposed, 2026-11-24）
 - [ADR-128: バックエンドの全体のテストを pre-push で流さず、CI に任せる](ADR-128-run-backend-tests-in-ci-not-in-pre-push.md)（Proposed, 2026-11-25）
+- [ADR-129: 処理済みのメッセージの表を一律に置かず、すべてのリスナーの冪等性を全件の結合テストで確かめる](ADR-129-check-all-listeners-for-idempotency-without-a-uniform-processed-message-table.md)（Proposed, 2026-11-25）

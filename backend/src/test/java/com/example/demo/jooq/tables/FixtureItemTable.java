@@ -26,6 +26,10 @@ public final class FixtureItemTable extends FixtureBusinessTable {
           "",
           new NullToEmptyStringConverter());
 
+  /** 主キーのほかに一意制約を持つ列。NULL を許すため、この列を書かない行どうしは衝突しない。 */
+  public final TableField<Record, String> ITEM_CODE =
+      nullable("item_code", SQLDataType.VARCHAR(20));
+
   private FixtureItemTable() {
     super("t_fixture_item");
   }
