@@ -473,18 +473,21 @@ SpringとDBを起動し、MockMvcで実際のSecurity filter chainを通す。
 
 - **操作**：`AuthorizationOperation`の定数。commitした`openapi/openapi.yaml`のoperationと一致することを、`ApiContractCoverageTest`と同じくswagger-coreでspecを読んで確かめる。
 - **操作する人**：`AuthorizationActor`の定数。持ち主、同じテナントの別のmember、同じテナントのadminで持ち主でない人、別のテナントのmemberの4つである。
-- **期待の表**：`AuthorizationOperation`の`switch`式で書き、`default`を書かない。定数を足すと、期待を足すまでコンパイルが失敗する。期待は本番の方針から作らない。
+- **期待の表**：`AuthorizationExpectations`に、`AuthorizationOperation`の`switch`式で書き、`default`を書かない。定数を足すと、期待を足すまでコンパイルが失敗する。期待は本番の方針から作らない。
+- **期待の結果**：`AuthorizationOutcome`の`ALLOWED`（成功）、`HIDDEN`（存在しないときと同じ応答）、`FORBIDDEN`（403）、`UNPROCESSABLE`（422）である。一覧は見えない注文でも200で空を返すので、404ではなく`HIDDEN`で表す。
 
 拒否を期待する組では、次を確かめる。
 
-- パスにidを持つ操作と、名前が`id`か`Id`で終わるqueryの引数を持つ操作では、応答が存在しないidで叩いたときと同じstatusと本文になる。idの選び方は、Spectralの`public-id-uuid`と同じである。
+- `HIDDEN`を期待する組では、応答が存在しないときと同じstatusと本文になる（`traceId`は除く）。パスにidを持つ操作と、名前が`id`か`Id`で終わるqueryの引数を持つ操作は、ランダムなidで同じ要求を送った応答と比べる。idの選び方は、Spectralの`public-id-uuid`と同じである。idを持たない一覧は、対象を作る前の応答と比べる。
 - 書き込みの操作では、業務のスキーマの行の中身が変わらない。
 
 期待と違ってよい組は、理由とIssueの番号を付けて例外の一覧に書く。
 理由が空の例外と、specにない操作の例外があると、テストが失敗する。
+期待どおりに戻った組が例外に残っているときも失敗する。
 理由のIssueで直したら、その組を例外の一覧から消す。
 
-判定の部分は、テストの側のfixtureのController（持ち主で絞らないGETと、404を返すが他人の行を書き換えるPUT）でも動かし、違反を検出することを確かめる。
+判定は`AuthorizationJudgment`が持つ。
+`AuthorizationJudgmentTest`が、テストの側のfixtureのController（持ち主で絞らないGETと、404を返すが他人の行を書き換えるPUT）でも動かし、違反を検出することを確かめる。
 
 ## テストコード
 
