@@ -27,10 +27,8 @@ import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import net.datafaker.Faker;
 import org.jooq.DSLContext;
-import org.jooq.SQLDialect;
 import org.jooq.Schema;
 import org.jooq.Table;
-import org.jooq.conf.Settings;
 import org.jooq.impl.DSL;
 
 /**
@@ -80,12 +78,6 @@ public final class LocalDataSeeder {
   /** 日時の基準。実行日によらず同じ値にする。 */
   private static final Clock SEED_CLOCK =
       Clock.fixed(Instant.parse("2026-10-01T00:00:00Z"), ZoneOffset.UTC);
-
-  /** 実行の SQL をログに出さない jOOQ の設定。 */
-  private static final Settings SETTINGS = new Settings().withExecuteLogging(false);
-
-  /** IdP の発行者の URL の変数名。 */
-  private static final String OIDC_ISSUER_URI = "OIDC_ISSUER_URI";
 
   /** 日時の基準を取る時計。 */
   private final Clock clock;
@@ -174,16 +166,12 @@ public final class LocalDataSeeder {
     }
     final Mode mode = Mode.valueOf(args[0].toUpperCase(Locale.ROOT));
     if (mode == Mode.AUTO && !LocalDatabase.isLocalEnvironment(env)) {
-      final String environment = env.get("OTEL_DEPLOYMENT_ENVIRONMENT_NAME");
-      final String host = env.get("DB_HOST");
-      log.warn(
-          "ローカルかテストの環境でないため、代表データを入れません: OTEL_DEPLOYMENT_ENVIRONMENT_NAME={}, DB_HOST={}",
-          environment,
-          host);
+      final String environment = LocalDatabase.describe(env);
+      log.warn("ローカルかテストの環境でないため、代表データを入れません: {}", environment);
       return;
     }
     LocalDatabase.requireLocalEnvironment(env);
-    final String issuer = LocalDatabase.required(env, OIDC_ISSUER_URI);
+    final String issuer = LocalDatabase.required(env, LocalDatabase.OIDC_ISSUER_URI);
     final Connection connection;
     try {
       connection = LocalDatabase.connect(env);
@@ -199,7 +187,7 @@ public final class LocalDataSeeder {
     }
     try (connection) {
       final Outcome outcome =
-          DSL.using(connection, SQLDialect.POSTGRES, SETTINGS)
+          LocalDatabase.dsl(connection)
               .transactionResult(
                   cfg -> new LocalDataSeeder(SEED_CLOCK, issuer).seed(cfg.dsl(), mode));
       log.info("代表データの投入の結果: {}", outcome);
