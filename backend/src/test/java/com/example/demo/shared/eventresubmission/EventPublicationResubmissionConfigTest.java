@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
 import com.example.demo.shared.events.ResubmissionPolicy;
+import com.example.demo.testkit.ScheduledTasks.AnotherScheduledJob;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Clock;
@@ -37,7 +38,6 @@ import org.springframework.boot.context.properties.bind.validation.BindValidatio
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.support.SpringFactoriesLoader;
@@ -49,7 +49,6 @@ import org.springframework.modulith.events.config.EventPublicationAutoConfigurat
 import org.springframework.modulith.events.core.EventPublicationRepository;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.config.FixedDelayTask;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -586,11 +585,6 @@ class EventPublicationResubmissionConfigTest {
                 .as("%s の起動の失敗", property)
                 .hasRootCauseInstanceOf(BindValidationException.class));
   }
-
-  /** 期限を過ぎた冪等性キーの掃除のように、定期のタスクを持たずに @EnableScheduling だけを付ける別の定期のジョブ。 */
-  @Configuration(proxyBeanMethods = false)
-  @EnableScheduling
-  /* package */ static class AnotherScheduledJob {}
 
   /** 設定にない方針の名前を指定したリスナー。 */
   // 受信メソッドは on と命名する規約のため。

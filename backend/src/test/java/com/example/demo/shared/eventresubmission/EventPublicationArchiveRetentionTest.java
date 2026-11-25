@@ -24,12 +24,6 @@ class EventPublicationArchiveRetentionTest {
   /** 削除を動かす時刻。マイクロ秒の精度にする。 */
   private static final Instant NOW = Instant.parse("2026-10-17T01:02:03.123456Z");
 
-  /** application.yaml の保持期限。 */
-  private static final Duration RETENTION = Duration.ofDays(7);
-
-  /** 削除の時刻から保持期限ちょうど前の時刻。 */
-  private static final Instant EXPIRY = NOW.minus(RETENTION);
-
   /** 出版の行を作り、残った行を読む。 */
   @Autowired private DSLContext dsl;
 
@@ -42,28 +36,30 @@ class EventPublicationArchiveRetentionTest {
   /** 読み戻す期間を決める再投入の設定値。 */
   @Autowired private EventPublicationResubmissionConfig.Properties resubmission;
 
+  /** application.yaml の保持期限の設定値。削除を無効にしたテストの環境でも登録される。 */
+  @Autowired private EventPublicationArchiveRetentionConfig.Properties properties;
+
   @Test
   @DisplayName("完了の時刻から 7 日を 1 マイクロ秒過ぎた COMPLETED の行だけを消し、7 日ちょうどの行、ABANDONED の行、未完了の行を残す")
   void deletesOnlyCompletedRowsOlderThanRetention() {
+    assertThat(properties.retention()).as("application.yaml の保持期限").isEqualTo(Duration.ofDays(7));
+    final Instant expiry = NOW.minus(properties.retention());
     final UUID expired =
-        ResubmissionTestSupport.insertArchived(dsl, EXPIRY.minusNanos(1_000), "COMPLETED");
-    final UUID boundary = ResubmissionTestSupport.insertArchived(dsl, EXPIRY, "COMPLETED");
+        ResubmissionTestSupport.insertArchived(dsl, expiry.minusNanos(1_000), "COMPLETED");
+    final UUID boundary = ResubmissionTestSupport.insertArchived(dsl, expiry, "COMPLETED");
     final UUID abandoned =
-        ResubmissionTestSupport.insertArchived(dsl, EXPIRY.minus(Duration.ofDays(30)), "ABANDONED");
+        ResubmissionTestSupport.insertArchived(dsl, expiry.minus(Duration.ofDays(30)), "ABANDONED");
     final UUID live =
         ResubmissionTestSupport.insertPublication(
             dsl,
             UUID.randomUUID(),
             "archive-retention-test",
-            EXPIRY.minus(Duration.ofDays(30)),
+            expiry.minus(Duration.ofDays(30)),
             "FAILED",
             1);
     clock.set(NOW);
 
-    new EventPublicationArchiveRetentionConfig.Scheduling(
-            completed,
-            new EventPublicationArchiveRetentionConfig.Properties(RETENTION, Duration.ofDays(1)),
-            resubmission)
+    new EventPublicationArchiveRetentionConfig.Scheduling(completed, properties, resubmission)
         .deleteExpired();
 
     assertThat(

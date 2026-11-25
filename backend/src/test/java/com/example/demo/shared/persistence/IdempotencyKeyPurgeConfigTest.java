@@ -1,20 +1,17 @@
 package com.example.demo.shared.persistence;
 
 import static com.example.demo.testkit.ScheduledTasks.fixedDelayTasks;
+import static com.example.demo.testkit.ScheduledTasks.schedulingRunner;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.testkit.ScheduledTasks.AnotherScheduledJob;
 import java.time.Duration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
-import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.config.FixedDelayTask;
 
 /** 期限を過ぎた冪等性キーの掃除が、有効なときだけ {@code interval} の固定の遅延のタスクになり、設定の誤りで起動に失敗することを確かめる（ADR-126）。 */
@@ -23,10 +20,7 @@ class IdempotencyKeyPurgeConfigTest {
 
   /** 検証対象の設定と、初回の遅延の間は動かないジョブの mock だけを与える runner。 */
   private final ApplicationContextRunner runner =
-      new ApplicationContextRunner()
-          .withConfiguration(
-              AutoConfigurations.of(
-                  ValidationAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
+      schedulingRunner()
           .withUserConfiguration(IdempotencyKeyPurgeConfig.class)
           .withBean(IdempotencyKeyPurge.class, () -> Mockito.mock(IdempotencyKeyPurge.class))
           .withPropertyValues(
@@ -78,9 +72,4 @@ class IdempotencyKeyPurgeConfigTest {
         .run(context ->
             assertThat(context).getFailure().hasRootCauseInstanceOf(BindValidationException.class));
   }
-
-  /** 掃除のように、定期のタスクを持たずに {@code @EnableScheduling} だけを付ける別の定期のジョブ。 */
-  @Configuration(proxyBeanMethods = false)
-  @EnableScheduling
-  /* package */ static class AnotherScheduledJob {}
 }

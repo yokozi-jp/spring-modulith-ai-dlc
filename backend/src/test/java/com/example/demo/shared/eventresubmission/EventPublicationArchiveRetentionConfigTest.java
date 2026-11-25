@@ -1,59 +1,48 @@
 package com.example.demo.shared.eventresubmission;
 
 import static com.example.demo.testkit.ScheduledTasks.fixedDelayTasks;
+import static com.example.demo.testkit.ScheduledTasks.schedulingRunner;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
+import com.example.demo.testkit.ScheduledTasks.AnotherScheduledJob;
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
-import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Answers;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
-import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
-import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
-import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
+import org.springframework.dao.QueryTimeoutException;
 import org.springframework.modulith.events.CompletedEventPublications;
-import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.config.FixedDelayTask;
-import org.springframework.transaction.PlatformTransactionManager;
 
 /**
  * archive の行の保持期限の削除が、有効なときだけ {@code interval} の固定の遅延のタスクになり、保持期限が定期の再投入の archive
- * を読み戻す期間（ADR-079）以下なら起動に失敗することを確かめる（ADR-120）。
+ * を読み戻す期間（ADR-079）以下なら起動に失敗し、削除の失敗を投げずに記録することを確かめる（ADR-120）。
  */
 // ApplicationContextRunner の run に渡す callback の中で assert するため、PMD はテストメソッドの assert を検出できない。
 @SuppressWarnings("PMD.UnitTestShouldIncludeAssert")
+@ExtendWith(OutputCaptureExtension.class)
 class EventPublicationArchiveRetentionConfigTest {
 
   /** 有効と無効のキー。 */
   private static final String ENABLED = "event-publication.archive-retention.enabled";
 
-  /** 再投入の設定から決まる、archive を読み戻す期間。{@code max(3 × 10 分, 25 分 + 10 分 + 2 × 1 分)} の 37 分である。 */
+  /** 再投入の設定値から決まる、archive を読み戻す期間。 */
   private static final Duration READ_BACK = Duration.ofMinutes(37);
 
   /** 再投入の設定値。読み戻す期間を {@link #READ_BACK} にする。 */
   private static final EventPublicationResubmissionConfig.Properties RESUBMISSION =
-      new EventPublicationResubmissionConfig.Properties(
-          Duration.ofMinutes(5),
-          Duration.ofMinutes(25),
-          Duration.ofMinutes(1),
-          100,
-          Duration.ofMinutes(10),
+      ResubmissionTestSupport.properties(
           Map.of(
               EventPublicationResubmissionConfig.DEFAULT_POLICY,
               new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1), null)));
 
   /** 検証対象の設定と、再投入の設定値と、初回の遅延の間は動かない Spring Modulith の API の mock だけを与える runner。 */
   private final ApplicationContextRunner runner =
-      new ApplicationContextRunner()
-          .withConfiguration(
-              AutoConfigurations.of(
-                  ValidationAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
+      schedulingRunner()
           .withUserConfiguration(EventPublicationArchiveRetentionConfig.class)
           .withBean(EventPublicationResubmissionConfig.Properties.class, () -> RESUBMISSION)
           .withBean(
@@ -62,18 +51,21 @@ class EventPublicationArchiveRetentionConfigTest {
           .withPropertyValues("event-publication.archive-retention.interval=PT1H");
 
   @Test
-  @DisplayName("有効で保持期限が読み戻す期間より 1 マイクロ秒長ければ、削除を interval の固定の遅延のタスクとして 1 つ登録する")
+  @DisplayName("有効で保持期限が読み戻す期間より 1 マイクロ秒長ければ、削除を起動の 5 分後から interval の固定の遅延のタスクとして 1 つ登録する")
   void enabledRegistersDeletionAsFixedDelayTask() {
     final Duration retention = READ_BACK.plusNanos(1_000);
     runner
         .withPropertyValues(
             ENABLED + "=true", "event-publication.archive-retention.retention=" + retention)
         .run(context -> {
-          final List<FixedDelayTask> tasks = fixedDelayTasks(context);
-          assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
-          assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofHours(1));
-          assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofHours(1));
-          tasks.getFirst().getRunnable().run();
+          assertThat(fixedDelayTasks(context))
+              .as("固定の遅延のタスク")
+              .singleElement()
+              .satisfies(task -> {
+                assertThat(task.getInitialDelayDuration()).isEqualTo(Duration.ofMinutes(5));
+                assertThat(task.getIntervalDuration()).isEqualTo(Duration.ofHours(1));
+                task.getRunnable().run();
+              });
           Mockito.verify(context.getBean(CompletedEventPublications.class))
               .deletePublicationsOlderThan(retention);
         });
@@ -110,32 +102,25 @@ class EventPublicationArchiveRetentionConfigTest {
   }
 
   @Test
-  @DisplayName("application.yaml の保持期限と間隔で有効にすると、テストの環境の再投入の設定で起動し、1 日ごとのタスクを登録する")
-  void applicationYamlStartsWhenEnabled() {
-    new ApplicationContextRunner()
-        .withInitializer(new ConfigDataApplicationContextInitializer())
-        .withConfiguration(
-            AutoConfigurations.of(
-                ValidationAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
-        .withUserConfiguration(
-            EventPublicationResubmissionConfig.class, EventPublicationArchiveRetentionConfig.class)
-        // ロックの provider は作るだけで DB に触れないため、依存は mock で足りる。
-        .withBean(
-            DSLContext.class, () -> Mockito.mock(DSLContext.class, Answers.RETURNS_DEEP_STUBS))
-        .withBean(
-            PlatformTransactionManager.class, () -> Mockito.mock(PlatformTransactionManager.class))
-        .withBean(
-            CompletedEventPublications.class, () -> Mockito.mock(CompletedEventPublications.class))
-        .withPropertyValues(ENABLED + "=true", "event-publication.resubmission.enabled=false")
-        .run(context ->
-            assertThat(fixedDelayTasks(context))
-                .singleElement()
-                .satisfies(
-                    task -> assertThat(task.getIntervalDuration()).isEqualTo(Duration.ofDays(1))));
-  }
+  @DisplayName("削除が DB の失敗と予期しない例外を別のイベントで記録し、どちらも投げずに戻る")
+  void deleteExpiredLogsFailuresWithoutThrowing(final CapturedOutput output) {
+    final CompletedEventPublications completed = Mockito.mock(CompletedEventPublications.class);
+    Mockito.doThrow(new QueryTimeoutException("lock timeout"))
+        .doThrow(new IllegalStateException("unexpected"))
+        .when(completed)
+        .deletePublicationsOlderThan(Mockito.any(Duration.class));
+    final EventPublicationArchiveRetentionConfig.Scheduling scheduling =
+        new EventPublicationArchiveRetentionConfig.Scheduling(
+            completed,
+            new EventPublicationArchiveRetentionConfig.Properties(
+                Duration.ofDays(7), Duration.ofDays(1)),
+            RESUBMISSION);
 
-  /** 期限を過ぎた冪等性キーの掃除のように、定期のタスクを持たずに {@code @EnableScheduling} だけを付ける別の定期のジョブ。 */
-  @Configuration(proxyBeanMethods = false)
-  @EnableScheduling
-  /* package */ static class AnotherScheduledJob {}
+    assertThatCode(scheduling::deleteExpired).as("DB の失敗").doesNotThrowAnyException();
+    assertThatCode(scheduling::deleteExpired).as("予期しない例外").doesNotThrowAnyException();
+
+    assertThat(output.getOut())
+        .contains("Event publication archive retention failed")
+        .contains("Event publication archive retention crashed");
+  }
 }

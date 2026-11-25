@@ -27,8 +27,7 @@ class EventPublicationArchiveRetentionConfig {
   /**
    * 有効なときだけ、archive の行を定期に消す。
    *
-   * <p>{@code @EnableScheduling} はアプリのすべての {@code @Scheduled} を動かすため、{@code @Scheduled}
-   * はこの条件付きの構成に置く。有効かどうかを決めるのはこの条件だけで、{@code true}（大文字小文字を問わない）だけを真とする。
+   * <p>{@code @Scheduled} を条件付きの構成に置く理由は {@code IdempotencyKeyPurgeConfig.Scheduling} と同じである。
    *
    * <p>同じ条件の DELETE は何度流しても結果が変わらないため、ロックを取らずに各インスタンスで流す。archive
    * の表はモジュールに属さないため、モジュールのロールに切り替えず、{@code app_user} のまま 1 文で消す（#307）。
@@ -72,15 +71,15 @@ class EventPublicationArchiveRetentionConfig {
     }
 
     /**
-     * 前の回の終わりから {@code interval} を空けて、保持期限を過ぎた行を消す。投げずに戻る。
+     * 起動の 5 分後と、前の回の終わりから {@code interval} を空けて、保持期限を過ぎた行を消す。投げずに戻る。
      *
      * <p>DB の失敗は WARN で、予期しない実行時の例外は ERROR で記録する。どちらも次の回に同じ行を消し直す。
      */
-    // スケジューラの既定のエラーハンドラは DB の一時的な失敗も ERROR で記録するため、例外を受けてこのジョブのログで WARN と ERROR に分ける。
     @SuppressWarnings("PMD.AvoidCatchingGenericException")
+    // 初回を interval（1 日）にすると、1 日に 1 回より多く再起動するインスタンスでは一度も動かない。DELETE は冪等なので起動ごとに流してよい。
     @Scheduled(
         fixedDelayString = "${event-publication.archive-retention.interval}",
-        initialDelayString = "${event-publication.archive-retention.interval}")
+        initialDelayString = "PT5M")
     /* package */ void deleteExpired() {
       try {
         completed.deletePublicationsOlderThan(retention);
