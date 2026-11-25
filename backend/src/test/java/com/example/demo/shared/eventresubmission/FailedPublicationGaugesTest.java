@@ -20,15 +20,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.NullSource;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * {@link FailedPublicationGauges} が、本物の DB の行から {@code state} ごとの件数と最古の経過秒数を出し、上限を超えた {@code
  * FAILED} の出版の ERROR を件数が 0 から増えた回だけ出すことを検証する。
  *
- * <p>テストの回数の上限（{@code abandon-after-attempts}）は 2 である。
+ * <p>テストの回数の上限（{@code abandon-after-attempts}）は 2 で、{@code probe-once} の方針のリスナーだけ 1（自動で再投入しない）である。
  */
 @ResubmissionTestSupport.SharedContext
 class FailedPublicationGaugesTest {
@@ -61,8 +60,8 @@ class FailedPublicationGaugesTest {
   /** 出版の行を読み書きする。 */
   @Autowired private DSLContext dsl;
 
-  /** 再投入の回数の上限。 */
-  @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
+  /** リスナーごとの再投入の回数の上限。 */
+  @Autowired private ResubmissionPolicies policies;
 
   /** OTLP へ送る LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
@@ -81,7 +80,7 @@ class FailedPublicationGaugesTest {
     // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
     OpenTelemetryAppender.install(openTelemetry);
     meterRegistry = new SimpleMeterRegistry();
-    gauges = new FailedPublicationGauges(dsl, meterRegistry, abandon);
+    gauges = new FailedPublicationGauges(dsl, meterRegistry, policies);
   }
 
   @Test
@@ -127,18 +126,37 @@ class FailedPublicationGaugesTest {
     }
   }
 
-  @ParameterizedTest(name = "completion_attempts={0}")
-  @NullSource
-  @ValueSource(ints = {0, 1, 2, 3, 4})
-  @DisplayName("FAILED の行を over-limit に数えるかは、定期の再投入の回数の規則（AbandonProperties.exceeded）と一致する")
-  void overLimitPredicateAgreesWithJavaRule(final @Nullable Integer attempts) {
-    final UUID id = insertFailed(0, T0);
+  @ParameterizedTest(name = "listener={0}, completion_attempts={1}")
+  @CsvSource({
+    "gauge-test,",
+    "gauge-test,0",
+    "gauge-test,1",
+    "gauge-test,2",
+    "gauge-test,3",
+    "gauge-test,4",
+    "once,0",
+    "once,1",
+    "once,2"
+  })
+  @DisplayName("FAILED の行を over-limit に数えるかは、行のリスナーの、定期の再投入の回数の上限（ResubmissionPolicies）と一致する")
+  void overLimitPredicateAgreesWithJavaRule(final String listener, final @Nullable Integer attempts)
+      throws NoSuchMethodException {
+    final String listenerId =
+        "once".equals(listener)
+            ? ResubmissionPolicies.listenerId(
+                ResubmissionProbes.OnceProbeListener.class.getDeclaredMethod(
+                    "on", ResubmissionProbes.OnceProbe.class))
+            : listener;
+    final UUID id =
+        ResubmissionTestSupport.insertPublication(
+            dsl, UUID.randomUUID(), listenerId, T0, "FAILED", 0);
     dsl.update(EVENT_PUBLICATION)
         .set(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, attempts)
         .where(EVENT_PUBLICATION.ID.eq(id))
         .execute();
     // Spring Modulith と EventPublicationStates は、空の completion_attempts を 0 と読む。
-    final boolean exceeded = abandon.exceeded(attempts == null ? 0 : attempts);
+    final boolean exceeded =
+        (attempts == null ? 0 : attempts) > policies.limitOf(listenerId).maxResubmissions();
 
     gauges.refresh(T0);
 

@@ -18,7 +18,7 @@ Proposed
 ## Context
 
 エージェントは git worktree ごとに作業し、複数の worktree で同時に Task を実行する。
-`docker/compose-test.yml`（compose-test）を使う Task は、`task test`（pre-push）、`task e2e`、`task e2e-up`（`/verify-demo`）、`task scan-dast` である。
+`docker/compose-test.yml`（compose-test）を使う Task は、`task test`、`task e2e`、`task e2e-up`（`/verify-demo`）、`task scan-dast` である。
 この ADR の前は、これらの Task が compose-test の同じホストのポート（PostgreSQL 5433、Redis 6380、Keycloak 8081、決済代行の WireMock 8082）のうち必要なものを使い、`task e2e` はさらに Vite preview の 5173 と backend の 8080 を使っていた。
 `task test` と `task e2e` は同じ Compose project（`spring-modulith-test`）を使い、`task test` は開始時と終了時にこの project を `down --volumes` で消していた。
 そのため、ある worktree で push すると、別の worktree の E2E や `/verify-demo` の stack が消えた。

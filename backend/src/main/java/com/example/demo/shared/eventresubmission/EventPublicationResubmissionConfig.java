@@ -325,9 +325,13 @@ class EventPublicationResubmissionConfig {
    *
    * @param multiplier 再投入のたびに待ち時間に掛ける倍率。1 なら待ち時間を延ばさない
    * @param maxWait 待ち時間の上限
+   * @param abandonAfterAttempts このリスナーの出版を諦める回数。全体の {@code abandon-after-attempts} と同じ数え方で、1
+   *     は最初の配信の失敗で諦める（自動で再投入しない）。全体の値より小さくする。{@code null} なら全体の値に従う
    */
   /* package */ record Policy(
-      @DecimalMin("1.0") double multiplier, @NotNull @DurationMin(seconds = 1) Duration maxWait) {
+      @DecimalMin("1.0") double multiplier,
+      @NotNull @DurationMin(seconds = 1) Duration maxWait,
+      @Nullable @Min(1) Integer abandonAfterAttempts) {
 
     /**
      * 次の再投入の前の待ち時間。
@@ -352,7 +356,7 @@ class EventPublicationResubmissionConfig {
    * にする。 最初の配信と 1 回目の再投入の失敗はどちらも 1 と比べる（ResubmissionOptionsLearningTest）ため、2 以上なら
    * この値の回数目の再投入の失敗で諦め、1 なら最初の配信の失敗で諦める。 1 と未設定（Spring Modulith は諦めない）は起動に失敗させる。
    *
-   * @param abandonAfterAttempts 自動で再投入する回数の上限
+   * @param abandonAfterAttempts 自動で再投入する回数の上限。方針の {@code abandon-after-attempts} がなければ、全リスナーの既定になる
    */
   /* package */ @ConfigurationProperties("spring.modulith.events.resubmission")
   @Validated
@@ -362,13 +366,7 @@ class EventPublicationResubmissionConfig {
               message =
                   "spring.modulith.events.resubmission.abandon-after-attempts must be at least 2:"
                       + " 1 abandons the first delivery")
-          int abandonAfterAttempts) {
-
-    /** 行の {@code completion_attempts}（再投入した回数 + 1）が、もう再投入しない回数か。 */
-    /* package */ boolean exceeded(final int completionAttempts) {
-      return completionAttempts > abandonAfterAttempts;
-    }
-  }
+          int abandonAfterAttempts) {}
 
   /**
    * Spring Modulith の {@code spring.modulith.events.staleness} のうち、組み込みの Staleness Monitor の閾値。

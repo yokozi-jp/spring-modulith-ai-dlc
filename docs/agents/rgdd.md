@@ -77,7 +77,7 @@ pstack のプレイブックには、このリポジトリの規約と食い違�
 ワークスペースのファイルを編集せず、ワークスペースで gradle を実行しない（実行が要るなら /tmp に写す）。
 ```
 
-サブエージェントがワークスペースで `./gradlew` を動かすと、同じ DB のコンテナを使う `task be-test` や pre-push の `be-test` と重なり、`PaymentGatewayClientIntegrationTest` が負荷で落ちる。
+サブエージェントがワークスペースで `./gradlew` を動かすと、同じ DB のコンテナを使う `task be-test` と重なり、`PaymentGatewayClientIntegrationTest` が負荷で落ちる。
 `/thermos` を実行するエージェントは、差分とブランチの状態を読むだけにさせ、テストの実行は自分で、レビューの前に済ませておく。
 
 Kiro Web では `invoke_sub_agent` が無く `/thermos` を実行できない。

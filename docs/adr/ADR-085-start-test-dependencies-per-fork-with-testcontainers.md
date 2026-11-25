@@ -74,7 +74,7 @@ Pull Request のレビューで Decision を書き直した。
 
 - fork ごとに 3 つのコンテナを起動し、changeset を適用するため、fork を増やすほど起動の時間とメモリが増える。
 - GitHub Actions の 4 vCPU の runner では 2 つの fork になり、速くならなかった。`:test` は約 103 秒から約 114 秒、テストのジョブ全体は 3 分 53 秒から 4 分 52 秒になった。コンテナの起動とイメージの取得が、並列の分を打ち消している。
-- テストの実行に Docker が必須になる。`docker` が無い環境で pre-push の `be-test` を飛ばす扱いは、これまでと変わらない。
+- テストの実行に Docker が必須になる。`docker` が無い環境で `task test` を飛ばす扱いは、これまでと変わらない（pre-push では流さない。ADR-128）。
 - `task be-test-dev`（`task test-dev`）は、作りかけの changeset で動かすため、カバレッジを検証しない。
 
 ### Neutral

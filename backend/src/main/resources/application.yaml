@@ -209,7 +209,9 @@ event-publication:
     lock-at-most-for: PT10M
     # リスナーの再投入の方針。リスナーの on に @ResubmissionPolicy("<名前>") を付けて選び、付けなければ default にする。
     # n 回目の再投入の前に、最後の試行から min(wait-age × multiplier^(n-1), max-wait) だけ待つ。
-    # 回数の上限は spring.modulith.events.resubmission.abandon-after-attempts で全リスナーに共通である。
+    # 回数の上限の既定は spring.modulith.events.resubmission.abandon-after-attempts で、全リスナーに共通である。
+    # 方針に abandon-after-attempts（1 以上、全体の値より小さい）を書くと、その方針のリスナーだけその回数で諦める。
+    # 1 は最初の配信の失敗で ABANDONED にし、自動では再投入しない（冪等キーのない外部システムを呼ぶリスナー向け）。
     policies:
       default:
         multiplier: 2
