@@ -8,7 +8,9 @@ import com.example.demo.ordering.application.ConfirmOrderCommandHandler;
 import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.ordering.application.DraftOrderResult;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -24,12 +26,19 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-/** 注文の HTTP API。 */
+/**
+ * 注文の HTTP API。
+ *
+ * <p>更新の操作は {@code Idempotency-Key} を本文より先に読み、ないか形式が誤っていれば処理の前に 400 にする（ADR-126）。契約のヘッダーは {@code
+ * OpenApiConfig} が共通の components から付けるので、引数は契約に出さない。同じキーの再送には CommandHandler が保存した Result を返すので、応答は
+ * 1 回目と同じ形で作る。
+ */
 // 起きる応答（404、409、422）をハンドラごとに @ApiResponse で書くため、同じ文字列を繰り返す。
 @SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @RestController
@@ -71,6 +80,7 @@ class OrderController {
    *
    * <p>作成した注文の URI を Location に入れて返す。客先注文番号が既にあれば 409、存在しないか販売終了の商品を指定すると 422 を返す。
    *
+   * @param idempotencyKey 作成の操作ごとにクライアントが採番したキー
    * @param request 作る注文の内容
    * @return 本文のない 201 の応答
    */
@@ -85,8 +95,11 @@ class OrderController {
   @ApiResponse(responseCode = "409", ref = "#/components/responses/ConflictProblem")
   @ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
   @PostMapping
-  /* package */ ResponseEntity<Void> draft(@Valid @RequestBody final DraftOrderRequest request) {
-    final DraftOrderResult result = draftOrder.handle(request.toCommand());
+  /* package */ ResponseEntity<Void> draft(
+      @Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER)
+          final IdempotencyKey idempotencyKey,
+      @Valid @RequestBody final DraftOrderRequest request) {
+    final DraftOrderResult result = draftOrder.handle(request.toCommand(idempotencyKey));
     final URI location =
         ServletUriComponentsBuilder.fromCurrentRequest()
             .path("/{orderId}")
@@ -139,6 +152,7 @@ class OrderController {
    * <p>注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでないか、存在しないか販売終了の商品を指定すると 422 を返す。
    *
    * @param orderId 明細を置き換える注文の ID
+   * @param idempotencyKey 明細の変更の操作ごとにクライアントが採番したキー
    * @param request 置き換えた後の明細と、画面が読んだ注文のロック番号
    * @return 本文のない 204 の応答
    */
@@ -149,8 +163,11 @@ class OrderController {
   @ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
   @PutMapping("/{orderId}/lines")
   /* package */ ResponseEntity<Void> changeLines(
-      @PathVariable final UUID orderId, @Valid @RequestBody final ChangeOrderLinesRequest request) {
-    changeOrderLines.handle(request.toCommand(orderId));
+      @PathVariable final UUID orderId,
+      @Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER)
+          final IdempotencyKey idempotencyKey,
+      @Valid @RequestBody final ChangeOrderLinesRequest request) {
+    changeOrderLines.handle(request.toCommand(orderId, idempotencyKey));
     return ResponseEntity.noContent().build();
   }
 
@@ -160,6 +177,7 @@ class OrderController {
    * <p>注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでなければ 422 を返す。
    *
    * @param orderId 確定する注文の ID
+   * @param idempotencyKey 確定の操作ごとにクライアントが採番したキー
    * @param request 画面が読んだ注文のロック番号
    * @return 本文のない 204 の応答
    */
@@ -170,8 +188,11 @@ class OrderController {
   @ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
   @PostMapping("/{orderId}/confirm")
   /* package */ ResponseEntity<Void> confirm(
-      @PathVariable final UUID orderId, @Valid @RequestBody final ConfirmOrderRequest request) {
-    confirmOrder.handle(request.toCommand(orderId));
+      @PathVariable final UUID orderId,
+      @Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER)
+          final IdempotencyKey idempotencyKey,
+      @Valid @RequestBody final ConfirmOrderRequest request) {
+    confirmOrder.handle(request.toCommand(orderId, idempotencyKey));
     return ResponseEntity.noContent().build();
   }
 
@@ -181,6 +202,7 @@ class OrderController {
    * <p>注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでなければ 422 を返す。
    *
    * @param orderId 取り消す注文の ID
+   * @param idempotencyKey 取消の操作ごとにクライアントが採番したキー
    * @param request 画面が読んだ注文のロック番号
    * @return 本文のない 204 の応答
    */
@@ -191,8 +213,11 @@ class OrderController {
   @ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
   @PostMapping("/{orderId}/cancel")
   /* package */ ResponseEntity<Void> cancel(
-      @PathVariable final UUID orderId, @Valid @RequestBody final CancelOrderRequest request) {
-    cancelOrder.handle(request.toCommand(orderId));
+      @PathVariable final UUID orderId,
+      @Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER)
+          final IdempotencyKey idempotencyKey,
+      @Valid @RequestBody final CancelOrderRequest request) {
+    cancelOrder.handle(request.toCommand(orderId, idempotencyKey));
     return ResponseEntity.noContent().build();
   }
 }

@@ -9,8 +9,10 @@ import com.example.demo.ordering.OrderSearchCriteria;
 import com.example.demo.ordering.OrderSummary;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.IdempotencyKeys;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
 import io.micrometer.observation.Observation;
@@ -87,9 +89,13 @@ class OrderQueryServiceTest {
     final String confirmedOrderId = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
     final String cancelledOrderId = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
     observed(() ->
-        confirmOrder.handle(new ConfirmOrderCommand(confirmedOrderId, new ExpectedLockNo(1))));
-    observed(
-        () -> cancelOrder.handle(new CancelOrderCommand(cancelledOrderId, new ExpectedLockNo(1))));
+        confirmOrder.handle(
+            new ConfirmOrderCommand(
+                confirmedOrderId, new ExpectedLockNo(1), IdempotencyKeys.next())));
+    observed(() ->
+        cancelOrder.handle(
+            new CancelOrderCommand(
+                cancelledOrderId, new ExpectedLockNo(1), IdempotencyKeys.next())));
 
     assertThat(orderQueries.findDetails(confirmedOrderId))
         .as("orderId=%s の確定", confirmedOrderId)
@@ -113,7 +119,9 @@ class OrderQueryServiceTest {
     final UUID pen = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
     final String first = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
     final String second = draft(UniqueCodes.next("C"), pen, 1, pen, 1);
-    observed(() -> cancelOrder.handle(new CancelOrderCommand(first, new ExpectedLockNo(1))));
+    observed(() ->
+        cancelOrder.handle(
+            new CancelOrderCommand(first, new ExpectedLockNo(1), IdempotencyKeys.next())));
 
     assertThat(orderQueries.search(new OrderSearchCriteria(null)))
         .extracting(OrderSummary::orderId)
@@ -142,12 +150,14 @@ class OrderQueryServiceTest {
                     customerOrderCode,
                     List.of(
                         new DraftOrderCommand.Line(firstProduct.toString(), firstQuantity),
-                        new DraftOrderCommand.Line(secondProduct.toString(), secondQuantity))))
+                        new DraftOrderCommand.Line(secondProduct.toString(), secondQuantity)),
+                    IdempotencyKeys.next()))
             .orderId());
   }
 
-  /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */
+  /** 共通カラムの trace ID を取れるよう、observation の中で、テストの利用者で認証して処理を呼ぶ。 */
   private <T> T observed(final Supplier<T> action) {
-    return Observation.createNotStarted("order-test", observationRegistry).observe(action);
+    return Observation.createNotStarted("order-test", observationRegistry)
+        .observe(() -> AppUsers.signedIn(action));
   }
 }

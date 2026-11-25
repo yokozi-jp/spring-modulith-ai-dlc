@@ -97,7 +97,8 @@ class PackageByFeatureOnionArchitectureTest {
 
   /** どの層からも使ってよい shared のパッケージの一覧。層の除外と shared の利用の規則は、ここから組み立てる。 */
   private static final List<String> ANY_LAYER_SHARED_PACKAGES =
-      List.of("concurrency", "failure", "events", "security", "tenancy", "validation");
+      List.of(
+          "concurrency", "failure", "events", "idempotency", "security", "tenancy", "validation");
 
   /**
    * Domain が使ってよい標準型のパッケージ。{@code java..} 全体は許さず、{@code java.net.http}、{@code java.io}、{@code

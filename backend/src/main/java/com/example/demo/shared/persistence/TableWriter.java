@@ -3,13 +3,16 @@ package com.example.demo.shared.persistence;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.concurrency.Versioned;
 import com.example.demo.shared.failure.NotFoundException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.JSONB;
 import org.jooq.Record;
 import org.jooq.Record1;
 import org.jooq.Result;
@@ -31,9 +34,13 @@ import org.springframework.stereotype.Component;
  * ConflictException} への変換は、すべてここで行う。変換は例外の型ではなく SQLSTATE で決める。どの入口も、読み取り専用ではない、開いているトランザクションの中で呼ぶ。
  *
  * <p>例外のメッセージには、テーブル名、ルートの一意の列の値、期待する版を入れ、SQL は入れない（docs/observability/conventions.md）。
+ *
+ * <p>モジュールのスキーマの {@code Idempotency-Key} の表も、共通カラムと SQLSTATE の変換を揃えるため、ここで書く（{@link
+ * #claimIdempotencyKey}、{@link #saveIdempotentResult}、ADR-126）。
  */
 // jOOQ の型を使って集約のルートの文を組み立てるため、結合するクラスの数の上限を外す。
-@SuppressWarnings("PMD.CouplingBetweenObjects")
+// 書き込みの入口を 1 つのクラスに集める規則（ADR-054）に、キーの表の書き込みも入れるため、メソッドの数の上限を外す。
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 @Component
 public class TableWriter {
 
@@ -140,6 +147,78 @@ public class TableWriter {
     }
   }
 
+  /**
+   * {@code Idempotency-Key} の行を入れる。期限切れの行があれば、新しいキーとして取り直す（ADR-126）。
+   *
+   * <p>{@code INSERT ... ON CONFLICT (テナント, 利用者, キー) DO UPDATE ... WHERE expires_at <= now}
+   * である。有効な行があれば何も書かずにその行をロックし、{@code false} を返す。同じキーの行を別のトランザクションが入れていれば、その終わりを待つ。
+   *
+   * @return 行を入れたか、期限切れの行を取り直したら {@code true}
+   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
+   * @throws ConflictException 別のトランザクションの終わりを {@code lock_timeout} までに待てなかった場合（種類は {@code
+   *     LOCK}）。原因は持たない
+   */
+  /* package */ boolean claimIdempotencyKey(
+      final IdempotencyKeyTable keys,
+      final UUID user,
+      final UUID key,
+      final byte[] payloadHash,
+      final Instant now,
+      final Instant expiresAt) {
+    requireTransaction();
+    final Table<?> table = keys.table();
+    final Field<Long> lockNo =
+        CommonColumns.requiredField(table, CommonColumns.LOCK_NO, Long.class);
+    final int rows =
+        ConflictTranslator.executeOrConflict(
+            () ->
+                dsl.insertInto(table)
+                    .set(keys.user(), user)
+                    .set(keys.key(), key)
+                    .set(keys.payloadHash(), payloadHash)
+                    .set(keys.expiresAt(), expiresAt)
+                    .set(commonColumns.forInsert(table))
+                    .onConflict(keys.tenant(), keys.user(), keys.key())
+                    .doUpdate()
+                    .set(keys.payloadHash(), payloadHash)
+                    .setNull(keys.result())
+                    .set(keys.expiresAt(), expiresAt)
+                    .set(commonColumns.forUpdate(table))
+                    .set(lockNo, lockNo.plus(1L))
+                    .where(keys.expiresAt().le(now))
+                    .execute(),
+            () -> keyTarget(table, key));
+    return rows == ONE_ROW;
+  }
+
+  /**
+   * {@link #claimIdempotencyKey} で取ったキーの行に、業務の処理の Result を保存する（ADR-126）。
+   *
+   * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合、更新件数が 1 でない場合
+   */
+  /* package */ void saveIdempotentResult(
+      final IdempotencyKeyTable keys, final UUID user, final UUID key, final JSONB result) {
+    requireTransaction();
+    final Table<?> table = keys.table();
+    final Field<Long> lockNo =
+        CommonColumns.requiredField(table, CommonColumns.LOCK_NO, Long.class);
+    final Supplier<String> target = () -> keyTarget(table, key);
+    final int rows =
+        ConflictTranslator.executeOrConflict(
+            () ->
+                dsl.update(table)
+                    .set(keys.result(), result)
+                    .set(commonColumns.forUpdate(table))
+                    .set(lockNo, lockNo.plus(1L))
+                    .where(keys.user().eq(user).and(keys.key().eq(key)))
+                    .execute(),
+            target);
+    if (rows != ONE_ROW) {
+      throw new IllegalStateException(
+          "claimed idempotency key matched " + rows + " rows: " + target.get());
+    }
+  }
+
   /** 更新したルートがちょうど 1 行であることを確かめ、そうでなければ NotFound か Conflict にする。 */
   private <R extends Record, K> void requireOneRow(
       final Result<Record1<Long>> updated,
@@ -225,6 +304,11 @@ public class TableWriter {
     if (!writable) {
       throw new IllegalStateException("a read-write transaction is required to write");
     }
+  }
+
+  /** 例外のメッセージに入れる、キーの表の名前とキー。 */
+  private static String keyTarget(final Table<?> table, final UUID key) {
+    return "table=" + table.getName() + ", key=" + key;
   }
 
   /** 例外のメッセージに入れる、テーブル名、ルートの一意の列の値、期待する版。 */

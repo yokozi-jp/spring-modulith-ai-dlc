@@ -5,6 +5,7 @@ package com.example.demo.jooq.ordering;
 
 
 import com.example.demo.jooq.DefaultCatalog;
+import com.example.demo.jooq.ordering.tables.TIdempotencyKey;
 import com.example.demo.jooq.ordering.tables.TOrder;
 import com.example.demo.jooq.ordering.tables.TOrderLine;
 
@@ -41,6 +42,11 @@ public class Ordering extends SchemaImpl {
     public static final Ordering ORDERING = new Ordering();
 
     /**
+     * 冪等性キー
+     */
+    public final TIdempotencyKey T_IDEMPOTENCY_KEY = TIdempotencyKey.T_IDEMPOTENCY_KEY;
+
+    /**
      * 注文
      */
     public final TOrder T_ORDER = TOrder.T_ORDER;
@@ -68,6 +74,7 @@ public class Ordering extends SchemaImpl {
     @NonNull
     public final List<Table<?>> getTables() {
         return Arrays.asList(
+            TIdempotencyKey.T_IDEMPOTENCY_KEY,
             TOrder.T_ORDER,
             TOrderLine.T_ORDER_LINE
         );

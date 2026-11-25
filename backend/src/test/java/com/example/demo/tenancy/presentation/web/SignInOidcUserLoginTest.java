@@ -11,6 +11,7 @@ import com.example.demo.product.TestProducts;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.BindTestTenantExtension;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
+import com.example.demo.testkit.IdempotencyKeys;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
 import java.time.Instant;
@@ -130,7 +131,9 @@ class SignInOidcUserLoginTest {
 
     draftOrder.handle(
         new DraftOrderCommand(
-            customerOrderCode, List.of(new DraftOrderCommand.Line(product.toString(), 1))));
+            customerOrderCode,
+            List.of(new DraftOrderCommand.Line(product.toString(), 1)),
+            IdempotencyKeys.next()));
 
     final List<String> operators =
         AsModule.call(

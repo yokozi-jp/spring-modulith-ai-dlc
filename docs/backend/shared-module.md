@@ -34,12 +34,15 @@ tags: [architecture, backend, spring-modulith, shared-module]
   `JobPeriodRule` 以外のクラスは package-private にする。
   Runner と Aspect の振る舞いは [バッチ](../batch/index.md) に従う。
 - メールアドレスの形式の制約 `MailAddress` を `shared.validation` に置き、このパッケージも `@NamedInterface("validation")` で公開する（[メールアドレスの扱い](../mail/email-address.md#形式の検査)）。
+- `Idempotency-Key` の値 `IdempotencyKey`、それを持つ Command の印 `IdempotentCommand`、CommandHandler が呼ぶ入口 `Idempotency`、ペイロードの不一致と処理中の例外を `shared.idempotency` に置き、このパッケージも `@NamedInterface("idempotency")` で公開する（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+  `Idempotency` の実装 `JooqIdempotency` は、キーの表を jOOQ で読むため `shared.persistence` に置き、キーの行の書き込みは `TableWriter` が行う。
+  キーの表は、呼び出し中の CommandHandler の `*_pgm_cd` のモジュールのスキーマの `t_idempotency_key` から引く。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
 - `shared.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
   `shared.eventresubmission` は `shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
   `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
-  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenancy`、`shared.validation` は、どの層からも使える。
+  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.idempotency`、`shared.security`、`shared.tenancy`、`shared.validation` は、どの層からも使える。
   ただし `domain.model` と `domain.service` が使える `shared` の型は許可リストに限る（[ArchUnit の規則](architecture-tests.md)）。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。

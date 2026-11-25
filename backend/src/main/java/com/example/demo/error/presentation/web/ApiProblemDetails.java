@@ -117,6 +117,20 @@ final class ApiProblemDetails {
   }
 
   /**
+   * {@code Idempotency-Key} の誤りの 400 と、同じキーの処理中の 409 を作る（ADR-126）。
+   *
+   * <p>type は {@code /problems/idempotency-key-<reason>}、title は {@code
+   * problem.title.idempotency-key-<reason>} を解決し、detail は付けない。
+   *
+   * @param reason {@code missing}、{@code invalid}、{@code payload-mismatch}、{@code in-progress} のどれか
+   */
+  /* package */ ProblemDetail idempotencyKeyProblem(
+      final HttpStatus status, final String reason, final Locale locale) {
+    return businessProblem(
+        status, "idempotency-key-" + reason, "Idempotency-Key " + reason, locale);
+  }
+
+  /**
    * 業務固有の problem type の Problem Details を作る。
    *
    * <p>type は {@code /problems/<kebab-case>}、title は {@code problem.title.<kebab-case>} を解決する。

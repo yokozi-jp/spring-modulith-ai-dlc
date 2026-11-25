@@ -15,6 +15,7 @@ import com.example.demo.product.TestProducts;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.ContractCase;
+import com.example.demo.testkit.IdempotencyKeys;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
 import java.util.Locale;
@@ -155,6 +156,7 @@ class OrderApiTest {
             post("/api/orders")
                 .with(oidcLogin())
                 .with(csrf())
+                .with(IdempotencyKeys.fresh())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     String.format(
@@ -204,6 +206,7 @@ class OrderApiTest {
             put("/api/orders/" + orderId + "/lines")
                 .with(oidcLogin())
                 .with(csrf())
+                .with(IdempotencyKeys.fresh())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     String.format(
@@ -263,6 +266,7 @@ class OrderApiTest {
                     HttpMethod.valueOf(method), "/api/orders/" + orderId + suffix)
                 .with(oidcLogin())
                 .with(csrf())
+                .with(IdempotencyKeys.fresh())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(body))
         .andExpect(status().isBadRequest())
@@ -393,6 +397,7 @@ class OrderApiTest {
         post("/api/orders")
             .with(oidcLogin())
             .with(csrf())
+            .with(IdempotencyKeys.fresh())
             .contentType(MediaType.APPLICATION_JSON)
             .content(
                 String.format(
@@ -436,6 +441,7 @@ class OrderApiTest {
                 HttpMethod.valueOf(method), "/api/orders/" + orderId + suffix)
             .with(oidcLogin())
             .with(csrf())
+            .with(IdempotencyKeys.fresh())
             .contentType(MediaType.APPLICATION_JSON)
             .content(String.format(Locale.ROOT, "{\"lockNo\":%d}", lockNo));
     return "/lines".equals(suffix)
@@ -450,6 +456,7 @@ class OrderApiTest {
         put("/api/orders/" + orderId + "/lines")
             .with(oidcLogin())
             .with(csrf())
+            .with(IdempotencyKeys.fresh())
             .contentType(MediaType.APPLICATION_JSON)
             .content(
                 String.format(

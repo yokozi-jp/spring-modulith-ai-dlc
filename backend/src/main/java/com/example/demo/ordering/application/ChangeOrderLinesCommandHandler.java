@@ -6,6 +6,7 @@ import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.ordering.domain.model.OrderedItem;
 import com.example.demo.product.ProductQueries;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.idempotency.Idempotency;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -21,28 +22,39 @@ public class ChangeOrderLinesCommandHandler {
   /** 明細の商品の単価と販売の状態を読む。 */
   private final ProductQueries productQueries;
 
+  /** 同じ冪等性キーの再送に、保存した Result を返す。 */
+  private final Idempotency idempotency;
+
   /** 依存を受け取る。 */
   public ChangeOrderLinesCommandHandler(
-      final OrderRepository orderRepository, final ProductQueries productQueries) {
+      final OrderRepository orderRepository,
+      final ProductQueries productQueries,
+      final Idempotency idempotency) {
     this.orderRepository = orderRepository;
     this.productQueries = productQueries;
+    this.idempotency = idempotency;
   }
 
-  /** ロック番号を確かめ、明細の商品を読み直して明細を置き換え、保存する。 */
+  /** ロック番号を確かめ、明細の商品を読み直して明細を置き換え、保存する。同じ冪等性キーの再送には、保存した Result を返す。 */
   @Transactional
   public ChangeOrderLinesResult handle(final ChangeOrderLinesCommand command) {
-    final Order order =
-        orderRepository
-            .findById(new OrderId(UUID.fromString(command.orderId())))
-            .orElseThrow(
-                () -> new NotFoundException("order not found: orderId=" + command.orderId()));
-    order.ensureLockNo(command.expectedLockNo());
-    final List<OrderedItem> items =
-        command.lines().stream()
-            .map(line -> OrderedItems.item(line.productId(), line.quantity()))
-            .toList();
-    order.changeLines(items, OrderedItems.offers(productQueries, items));
-    orderRepository.update(order);
-    return new ChangeOrderLinesResult(order.id().value().toString());
+    return idempotency.execute(
+        command,
+        ChangeOrderLinesResult.class,
+        () -> {
+          final Order order =
+              orderRepository
+                  .findById(new OrderId(UUID.fromString(command.orderId())))
+                  .orElseThrow(
+                      () -> new NotFoundException("order not found: orderId=" + command.orderId()));
+          order.ensureLockNo(command.expectedLockNo());
+          final List<OrderedItem> items =
+              command.lines().stream()
+                  .map(line -> OrderedItems.item(line.productId(), line.quantity()))
+                  .toList();
+          order.changeLines(items, OrderedItems.offers(productQueries, items));
+          orderRepository.update(order);
+          return new ChangeOrderLinesResult(order.id().value().toString());
+        });
   }
 }

@@ -56,6 +56,10 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 - ハンドラメソッドは、マッピングのアノテーションの次の行に `/* package */` を書いた package-private のメソッドにする。
 - 状態を変える操作は `@Valid @RequestBody` で Request を受け、`request.toCommand(...)` で Command にする。
   パス変数の値は `toCommand` の引数で渡す（`request.toCommand(orderId)`）。
+  `Idempotency-Key` を求める操作は、`@Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER) final IdempotencyKey idempotencyKey` で受け、`toCommand` の引数で渡す（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+  ヘッダーがないか、引用符で囲んだ UUID でなければ、`ApiExceptionHandler` が処理の前に専用の type の 400 にする。
+  契約のヘッダーは `OpenApiConfig` が共通の components から付けるので、`hidden` で引数を契約に出さない。
+  再送には CommandHandler が保存した Result を返すので、Controller は 1 回目と同じ方法で応答（201 と `Location`、204）を作る。
   DELETE は本文を持たないため、`@RequestParam @Min(1) long lockNo` で受けた値を Request に渡す（[Request](request.md#delete-の入力)）。
 - 作成は `ServletUriComponentsBuilder.fromCurrentRequest()` で `Location` の URI を作り、`ResponseEntity.created(location).build()` を返す。
 - 本文のない更新は `ResponseEntity.noContent().build()` を返す。

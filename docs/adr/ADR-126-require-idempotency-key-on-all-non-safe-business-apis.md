@@ -36,6 +36,7 @@ Proposed
 
 Proposed の間に Decision を書き直した。
 契約を #540 で実装したとき、除外を `operationId` の一覧から operation の印に変え、キーを `apiFetch` で付けない理由を足したためである。
+サーバーを実装したとき、キーの組を主キーからユニークインデックスに変えた。
 
 ## Decision
 
@@ -47,7 +48,7 @@ Proposed の間に Decision を書き直した。
 
 - Spring Security のログインとログアウトなど、OpenAPI の契約の外にある経路。
 - テナントを選ぶ前の操作（テナントの選択）。
-  キーの主キーが `tenant_public_id` から始まり、テナントが決まる前は表に書けないためである。
+  キーの組が `tenant_public_id` から始まり、テナントが決まる前は表に書けないためである。
   テナントの選択は、成功して応答を失うと、再送が 422（選択済み）か、セッション ID が変わった後の 401 になる。
   この問題は残り、Negative に書く。
   招待の受け入れは、API が存在しないので、ここでは決めない。
@@ -68,13 +69,14 @@ Proposed の間に Decision を書き直した。
 
 - 書き込みの API を持つモジュールのスキーマに、キーの表を 1 つずつ置く。
   共有のスキーマに置くと、すべてのモジュールのロールに別のスキーマの権限を与えることになるためである。
-- 主キーは `(tenant_public_id, 利用者の ID, キー)` にする。
+- `(tenant_public_id, 利用者の ID, キー)` の組にユニークインデックスを張る。
+  主キーは、複合主キーを使わない規約（[ADR-112](ADR-112-forbid-composite-primary-keys.md)）に従い、サロゲートキーにする。
   利用者の ID は、[ADR-096](ADR-096-require-app-user-principal-for-audit-columns.md) の `AppUserPrincipal` の値を使う。
 - 列は、ペイロードのハッシュ、保存した Result、期限を持つ。
 - RLS（`ENABLE` と `FORCE`）で別のテナントの行を隠し、自分のモジュールのロールだけに権限を与える。
-  別の利用者の行は、主キーで分ける。
+  別の利用者の行は、このユニークインデックスで分ける。
   `tenancy` のスキーマは [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md) が RLS の外に置き、テナントなしでトランザクションを始められる。
-  `tenancy` のキーの表は RLS を付けず、主キーの `tenant_public_id` を、検索の条件に必ず入れて分ける。
+  `tenancy` のキーの表は RLS を付けず、ユニークインデックスの `tenant_public_id` を、検索の条件に必ず入れて分ける。
 - 業務の更新と同じトランザクションに書くので、業務の結果とキーの記録は、一緒に commit されるか一緒に rollback される。
   Servlet の Filter や `HandlerInterceptor` など、トランザクションの外の層には置かない。
 
@@ -82,7 +84,7 @@ Proposed の間に Decision を書き直した。
 
 `shared` の共通の処理を、CommandHandler のトランザクションの中で呼ぶ。
 
-1. キーを `INSERT ... ON CONFLICT (主キー) DO UPDATE ... WHERE 期限 <= 現在` する。
+1. キーを `INSERT ... ON CONFLICT (キーの組) DO UPDATE ... WHERE 期限 <= 現在` する。
    期限切れで、まだ消えていない行は、この `UPDATE` で新しいキーとして取り直す。
    現在は `Clock` の `Instant` を渡す。
 2. 行が入ったか更新されたときだけ業務を実行し、Result を保存する。
@@ -215,5 +217,6 @@ Proposed の間に Decision を書き直した。
 - [ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md)
 - [ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)
 - [ADR-096](ADR-096-require-app-user-principal-for-audit-columns.md)
+- [ADR-112](ADR-112-forbid-composite-primary-keys.md)
 - [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)
 - [#310](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/310)、[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)

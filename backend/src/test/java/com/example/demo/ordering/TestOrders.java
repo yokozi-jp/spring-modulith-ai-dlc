@@ -4,7 +4,9 @@ import com.example.demo.ordering.application.DraftOrderCommand;
 import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.tenancy.TenantId;
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.IdempotencyKeys;
 import com.example.demo.testkit.UniqueCodes;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
@@ -22,7 +24,7 @@ public final class TestOrders {
   /**
    * 単価 120 円の販売中の商品を 2 個注文する下書きを作り、注文 ID を返す。
    *
-   * <p>共通カラムの trace ID を取れるよう、observation の中で作る。
+   * <p>共通カラムの trace ID を取れるよう、observation の中で、テストの利用者で認証して作る。
    */
   public static String drafted(
       final DSLContext dsl,
@@ -44,11 +46,13 @@ public final class TestOrders {
     final UUID productId = TestProducts.onSale(dsl, tenant, UniqueCodes.next("P"), "120.00");
     return Observation.createNotStarted("order-test", observationRegistry)
         .observe(() ->
-            draftOrder
-                .handle(
-                    new DraftOrderCommand(
-                        UniqueCodes.next("C"),
-                        List.of(new DraftOrderCommand.Line(productId.toString(), 2))))
-                .orderId());
+            AppUsers.signedIn(() ->
+                draftOrder
+                    .handle(
+                        new DraftOrderCommand(
+                            UniqueCodes.next("C"),
+                            List.of(new DraftOrderCommand.Line(productId.toString(), 2)),
+                            IdempotencyKeys.next()))
+                    .orderId()));
   }
 }

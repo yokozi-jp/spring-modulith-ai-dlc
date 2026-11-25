@@ -4,6 +4,9 @@ import com.example.demo.LocaleSupport;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.idempotency.IdempotencyKey;
+import com.example.demo.shared.idempotency.IdempotencyKeyInProgressException;
+import com.example.demo.shared.idempotency.IdempotencyKeyPayloadMismatchException;
 import com.example.demo.shared.security.TenantNotSelectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -11,6 +14,7 @@ import jakarta.validation.ConstraintViolationException;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -20,6 +24,8 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -29,11 +35,12 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 import org.springframework.web.util.DisconnectedClientHelper;
 
 /**
- * Spring MVC と Spring Security の例外と、業務上の失敗（shared.failure と shared.concurrency）を RFC 9457 Problem
- * Details へ変換する。
+ * Spring MVC と Spring Security の例外と、業務上の失敗（shared.failure と shared.concurrency）と、Idempotency-Key
+ * の誤り（shared.idempotency）を RFC 9457 Problem Details へ変換する。
  */
 // 基底クラスの override と例外ごとの @ExceptionHandler は、1 つの advice に置く必要がある。
-@SuppressWarnings("PMD.TooManyMethods")
+// 対応づける例外の型ごとに結合が増えるため、メソッドの数と結合の数の上限を外す。
+@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
 @Slf4j
 @RestControllerAdvice
 public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
@@ -43,6 +50,9 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
   /** 409 の種類のログの属性名（version、lock、unique）。 */
   private static final String CONFLICT_KIND = "conflict.kind";
+
+  /** 同じ Idempotency-Key の処理中の 409 に付ける、再試行までの秒数。ADR-055 の lock_timeout の待ちと同じ桁にする。 */
+  private static final String IN_PROGRESS_RETRY_AFTER_SECONDS = "1";
 
   /** Problem Details の共通フィールドを生成する。 */
   private final ApiProblemDetails problemDetails;
@@ -99,6 +109,23 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return problem(exception, HttpStatus.CONFLICT, request);
   }
 
+  /** 有効な Idempotency-Key を内容の違う要求に使った 400 を、専用の type にする（ADR-126）。 */
+  @ExceptionHandler(IdempotencyKeyPayloadMismatchException.class)
+  /* package */ @Nullable ResponseEntity<Object> handleIdempotencyKeyPayloadMismatchException(
+      final IdempotencyKeyPayloadMismatchException exception, final WebRequest request) {
+    return idempotencyKeyProblem(
+        exception, HttpStatus.BAD_REQUEST, "payload-mismatch", new HttpHeaders(), request);
+  }
+
+  /** 同じ Idempotency-Key の処理中を、lock_no の競合と別の type の 409 にし、Retry-After を付ける（ADR-126）。 */
+  @ExceptionHandler(IdempotencyKeyInProgressException.class)
+  /* package */ @Nullable ResponseEntity<Object> handleIdempotencyKeyInProgressException(
+      final IdempotencyKeyInProgressException exception, final WebRequest request) {
+    final HttpHeaders headers = new HttpHeaders();
+    headers.set(HttpHeaders.RETRY_AFTER, IN_PROGRESS_RETRY_AFTER_SECONDS);
+    return idempotencyKeyProblem(exception, HttpStatus.CONFLICT, "in-progress", headers, request);
+  }
+
   /** 見つからない集約や行を 404 Problem Details へ変換する。例外の内容は応答に入れない。 */
   @ExceptionHandler(NotFoundException.class)
   /* package */ @Nullable ResponseEntity<Object> handleNotFoundException(
@@ -152,6 +179,33 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return handleExceptionInternal(ex, body, headers, status, request);
   }
 
+  /** Idempotency-Key のヘッダーがない要求を、専用の type の 400 にする。ほかの欠けた値は基底クラスどおりにする（ADR-126）。 */
+  @Override
+  protected @Nullable ResponseEntity<Object> handleServletRequestBindingException(
+      final ServletRequestBindingException ex,
+      final HttpHeaders headers,
+      final HttpStatusCode status,
+      final WebRequest request) {
+    if (ex instanceof MissingRequestHeaderException missing
+        && missing.getParameter().getParameterType() == IdempotencyKey.class) {
+      return idempotencyKeyProblem(ex, HttpStatus.BAD_REQUEST, "missing", headers, request);
+    }
+    return super.handleServletRequestBindingException(ex, headers, status, request);
+  }
+
+  /** Idempotency-Key のヘッダーが引用符で囲んだ UUID でない要求を、専用の type の 400 にする（ADR-126）。 */
+  @Override
+  protected @Nullable ResponseEntity<Object> handleTypeMismatch(
+      final TypeMismatchException ex,
+      final HttpHeaders headers,
+      final HttpStatusCode status,
+      final WebRequest request) {
+    if (ex.getRequiredType() == IdempotencyKey.class) {
+      return idempotencyKeyProblem(ex, HttpStatus.BAD_REQUEST, "invalid", headers, request);
+    }
+    return super.handleTypeMismatch(ex, headers, status, request);
+  }
+
   /** 全ての例外が通る。ログを 1 か所で出し、コミット済みの応答では本文を書かない。 */
   @Override
   protected @Nullable ResponseEntity<Object> handleExceptionInternal(
@@ -190,6 +244,20 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     }
     return super.createResponseEntity(
         body, ApiProblemDetails.responseHeaders(headers, status, locale), status, request);
+  }
+
+  private @Nullable ResponseEntity<Object> idempotencyKeyProblem(
+      final Exception exception,
+      final HttpStatus status,
+      final String reason,
+      final HttpHeaders headers,
+      final WebRequest request) {
+    return handleExceptionInternal(
+        exception,
+        problemDetails.idempotencyKeyProblem(status, reason, resolveLocale(request)),
+        headers,
+        status,
+        request);
   }
 
   private @Nullable ResponseEntity<Object> problem(

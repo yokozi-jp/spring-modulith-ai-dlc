@@ -5,6 +5,7 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderId;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.idempotency.Idempotency;
 import com.example.demo.shared.tenancy.TenantContext;
 import java.time.Clock;
 import java.time.Instant;
@@ -26,30 +27,40 @@ public class ConfirmOrderCommandHandler {
   /** 確定した時刻を取る時計。 */
   private final Clock clock;
 
+  /** 同じ冪等性キーの再送に、保存した Result を返す。 */
+  private final Idempotency idempotency;
+
   /** 依存を受け取る。 */
   public ConfirmOrderCommandHandler(
       final OrderRepository orderRepository,
       final ApplicationEventPublisher events,
-      final Clock clock) {
+      final Clock clock,
+      final Idempotency idempotency) {
     this.orderRepository = orderRepository;
     this.events = events;
     this.clock = clock;
+    this.idempotency = idempotency;
   }
 
-  /** ロック番号を確かめて注文を確定して保存し、確定のイベントを発行する。 */
+  /** ロック番号を確かめて注文を確定して保存し、確定のイベントを発行する。同じ冪等性キーの再送には、保存した Result を返す。 */
   @Transactional
   public ConfirmOrderResult handle(final ConfirmOrderCommand command) {
-    final Order order =
-        orderRepository
-            .findById(new OrderId(UUID.fromString(command.orderId())))
-            .orElseThrow(
-                () -> new NotFoundException("order not found: orderId=" + command.orderId()));
-    order.ensureLockNo(command.expectedLockNo());
-    order.confirm();
-    orderRepository.update(order);
-    events.publishEvent(
-        new OrderConfirmed(
-            order.id().value().toString(), Instant.now(clock), TenantContext.current()));
-    return new ConfirmOrderResult(order.id().value().toString());
+    return idempotency.execute(
+        command,
+        ConfirmOrderResult.class,
+        () -> {
+          final Order order =
+              orderRepository
+                  .findById(new OrderId(UUID.fromString(command.orderId())))
+                  .orElseThrow(
+                      () -> new NotFoundException("order not found: orderId=" + command.orderId()));
+          order.ensureLockNo(command.expectedLockNo());
+          order.confirm();
+          orderRepository.update(order);
+          events.publishEvent(
+              new OrderConfirmed(
+                  order.id().value().toString(), Instant.now(clock), TenantContext.current()));
+          return new ConfirmOrderResult(order.id().value().toString());
+        });
   }
 }
