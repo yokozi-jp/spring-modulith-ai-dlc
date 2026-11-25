@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.11.0
+  version: 0.12.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -458,6 +458,41 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerErrorProblem"
       summary: 商品の一覧を返す。
+      tags:
+      - product
+    post:
+      description: 登録した商品の URI を Location に入れて返す。商品コードが既にあれば 409 を返す。
+      operationId: registerProduct
+      parameters:
+      - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterProductRequest"
+        description: 登録する商品の内容
+        required: true
+      responses:
+        "201":
+          description: 本文のない 201 の応答
+          headers:
+            Location:
+              description: 登録した商品の URI
+              schema:
+                type: string
+                format: uri
+              style: simple
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "409":
+          $ref: "#/components/responses/ConflictProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 商品を登録する。
       tags:
       - product
 components:
@@ -923,6 +958,37 @@ components:
       required:
       - productCode
       - productId
+      - productName
+      - salesStatus
+      - unitPrice
+    RegisterProductRequest:
+      type: object
+      description: 商品を登録する API の本文。
+      properties:
+        productCode:
+          type: string
+          description: 商品コード。テナントの中で一意にする
+          example: P-0001
+          maxLength: 20
+          minLength: 1
+        productName:
+          type: string
+          description: 商品名
+          example: ボールペン
+          maxLength: 100
+          minLength: 1
+        salesStatus:
+          type: string
+          description: 販売の状態のコード値（ON_SALE か DISCONTINUED）
+          example: ON_SALE
+          pattern: ^(ON_SALE|DISCONTINUED)$
+        unitPrice:
+          type: number
+          description: 単価（円）。0 以上で、小数は 2 桁まで
+          example: 120.0
+          minimum: 0.00
+      required:
+      - productCode
       - productName
       - salesStatus
       - unitPrice

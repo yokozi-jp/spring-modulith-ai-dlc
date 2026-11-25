@@ -1,11 +1,22 @@
 package com.example.demo.product.presentation.web;
 
 import com.example.demo.product.ProductQueries;
+import com.example.demo.product.application.RegisterProductCommandHandler;
+import com.example.demo.product.application.RegisterProductResult;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.headers.Header;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import java.net.URI;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** 商品の HTTP API。 */
 @RestController
@@ -13,12 +24,46 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "product", description = "商品の API")
 class ProductController {
 
+  /** 商品を登録する CommandHandler。 */
+  private final RegisterProductCommandHandler registerProduct;
+
   /** 商品の参照。 */
   private final ProductQueries productQueries;
 
   /** 依存を受け取る。 */
-  /* package */ ProductController(final ProductQueries productQueries) {
+  /* package */ ProductController(
+      final RegisterProductCommandHandler registerProduct, final ProductQueries productQueries) {
+    this.registerProduct = registerProduct;
     this.productQueries = productQueries;
+  }
+
+  /**
+   * 商品を登録する。
+   *
+   * <p>登録した商品の URI を Location に入れて返す。商品コードが既にあれば 409 を返す。
+   *
+   * @param request 登録する商品の内容
+   * @return 本文のない 201 の応答
+   */
+  @Operation(operationId = "registerProduct")
+  @ApiResponse(
+      responseCode = "201",
+      headers =
+          @Header(
+              name = "Location",
+              description = "登録した商品の URI",
+              schema = @Schema(type = "string", format = "uri")))
+  @ApiResponse(responseCode = "409", ref = "#/components/responses/ConflictProblem")
+  @PostMapping
+  /* package */ ResponseEntity<Void> register(
+      @Valid @RequestBody final RegisterProductRequest request) {
+    final RegisterProductResult result = registerProduct.handle(request.toCommand());
+    final URI location =
+        ServletUriComponentsBuilder.fromCurrentRequest()
+            .path("/{productId}")
+            .buildAndExpand(result.productId())
+            .toUri();
+    return ResponseEntity.created(location).build();
   }
 
   /**

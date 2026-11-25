@@ -33,6 +33,17 @@ export const getListProductsMockHandler = (overrideResponse?: ProductSummaryList
       })
   }, options)
 }
+
+export const getRegisterProductMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
+  return http.post('*/api/products', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+  if (typeof overrideResponse === 'function') {await overrideResponse(info); }
+
+    return new HttpResponse(null,
+      { status: 201
+      })
+  }, options)
+}
 export const getProductMock = () => [
-  getListProductsMockHandler()
+  getListProductsMockHandler(),
+  getRegisterProductMockHandler()
 ]

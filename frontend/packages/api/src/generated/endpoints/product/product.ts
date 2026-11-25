@@ -4,6 +4,7 @@
  */
 import {
   queryOptions as queryOptionsBuilder,
+  useMutation,
   useQuery,
   useSuspenseQuery
 } from '@tanstack/react-query';
@@ -11,10 +12,13 @@ import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
   UseSuspenseQueryOptions,
@@ -22,9 +26,13 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  BadRequestProblemResponse,
+  ConflictProblemResponse,
   ForbiddenProblemResponse,
   InternalServerErrorProblemResponse,
   ProductSummaryListResponse,
+  RegisterProductHeaders,
+  RegisterProductRequest,
   UnauthorizedProblemResponse
 } from '../../models';
 
@@ -234,3 +242,129 @@ export function useListProductsSuspense<TData = Awaited<ReturnType<typeof listPr
 
 
 
+export type registerProductResponse201 = {
+  data: void
+  status: 201
+}
+
+export type registerProductResponse400 = {
+  data: BadRequestProblemResponse
+  status: 400
+}
+
+export type registerProductResponse401 = {
+  data: UnauthorizedProblemResponse
+  status: 401
+}
+
+export type registerProductResponse403 = {
+  data: ForbiddenProblemResponse
+  status: 403
+}
+
+export type registerProductResponse409 = {
+  data: ConflictProblemResponse
+  status: 409
+}
+
+export type registerProductResponse500 = {
+  data: InternalServerErrorProblemResponse
+  status: 500
+}
+
+export type registerProductResponseSuccess = (registerProductResponse201) & {
+  headers: Headers;
+};
+export type registerProductResponseError = (registerProductResponse400 | registerProductResponse401 | registerProductResponse403 | registerProductResponse409 | registerProductResponse500) & {
+  headers: Headers;
+};
+
+export const getRegisterProductUrl = () => {
+
+
+
+
+  return `/api/products`
+}
+
+/**
+ * 登録した商品の URI を Location に入れて返す。商品コードが既にあれば 409 を返す。
+ * @summary 商品を登録する。
+ */
+export const registerProduct = async (registerProductRequest: RegisterProductRequest,
+    headers: RegisterProductHeaders, options?: Parameters<typeof apiFetch>[1]): Promise<registerProductResponseSuccess> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<registerProductResponseSuccess>(getRegisterProductUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json',...headers, ...getHeaders(options?.headers) },
+    body: JSON.stringify(registerProductRequest)
+  }
+);}
+
+
+
+
+
+export const getRegisterProductMutationKey = () => ['registerProduct'] as const;
+
+export const getRegisterProductMutationOptions = <TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | ConflictProblemResponse | InternalServerErrorProblemResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerProduct>>, TError,RegisterProductMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerProduct>>, TError,RegisterProductMutationVariables, TContext> => {
+
+const mutationKey = getRegisterProductMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerProduct>>, RegisterProductMutationVariables> = (props) => {
+          const {data,headers} = props ?? {};
+
+          return  registerProduct(data,headers,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterProductMutationResult = NonNullable<Awaited<ReturnType<typeof registerProduct>>>
+    export type RegisterProductMutationBody = RegisterProductRequest
+    export type RegisterProductMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | ConflictProblemResponse | InternalServerErrorProblemResponse>
+    export type RegisterProductMutationVariables = {data: RegisterProductRequest;headers: RegisterProductHeaders}
+
+    /**
+ * @summary 商品を登録する。
+ */
+export const useRegisterProduct = <TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | ConflictProblemResponse | InternalServerErrorProblemResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerProduct>>, TError,RegisterProductMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof registerProduct>>,
+        TError,
+        RegisterProductMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRegisterProductMutationOptions(options), queryClient);
+    }

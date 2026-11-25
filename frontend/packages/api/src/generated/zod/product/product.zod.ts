@@ -19,3 +19,32 @@ export const ListProductsResponse = zod.object({
 }).describe('商品の一覧の1行を返す API の本文。')).describe('商品の一覧の行')
 }).describe('商品の一覧を items で包んで返す API の本文。')
 
+/**
+ * 登録した商品の URI を Location に入れて返す。商品コードが既にあれば 409 を返す。
+ * @summary 商品を登録する。
+ */
+export const registerProductHeaderIdempotencyKeyRegExp = new RegExp('^"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"$');
+
+
+export const RegisterProductHeader = zod.object({
+  "Idempotency-Key": zod.string().regex(registerProductHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）')
+})
+
+export const registerProductBodyProductCodeMax = 20;
+
+export const registerProductBodyProductNameMax = 100;
+
+export const registerProductBodySalesStatusRegExp = new RegExp('^(ON_SALE|DISCONTINUED)$');
+export const registerProductBodyUnitPriceMin = 0;
+
+
+
+export const RegisterProductBody = zod.object({
+  "productCode": zod.string().min(1).max(registerProductBodyProductCodeMax).describe('商品コード。テナントの中で一意にする'),
+  "productName": zod.string().min(1).max(registerProductBodyProductNameMax).describe('商品名'),
+  "salesStatus": zod.string().regex(registerProductBodySalesStatusRegExp).describe('販売の状態のコード値（ON_SALE か DISCONTINUED）'),
+  "unitPrice": zod.number().min(registerProductBodyUnitPriceMin).describe('単価（円）。0 以上で、小数は 2 桁まで')
+}).describe('商品を登録する API の本文。')
+
+export const RegisterProductResponse = zod.void()
+
