@@ -1,5 +1,6 @@
 package com.example.demo.shared.eventresubmission;
 
+import static com.example.demo.testkit.ScheduledTasks.fixedDelayTasks;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
@@ -36,7 +37,6 @@ import org.springframework.boot.context.properties.bind.validation.BindValidatio
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
@@ -51,8 +51,6 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.config.FixedDelayTask;
-import org.springframework.scheduling.config.ScheduledTask;
-import org.springframework.scheduling.config.ScheduledTaskHolder;
 import org.springframework.transaction.PlatformTransactionManager;
 
 /**
@@ -244,14 +242,6 @@ class EventPublicationResubmissionConfigTest {
     } catch (ClassNotFoundException e) {
       throw new IllegalStateException("掃除の構成が見つからない", e);
     }
-  }
-
-  private static List<FixedDelayTask> fixedDelayTasks(final ApplicationContext context) {
-    return context.getBean(ScheduledTaskHolder.class).getScheduledTasks().stream()
-        .map(ScheduledTask::getTask)
-        .filter(FixedDelayTask.class::isInstance)
-        .map(FixedDelayTask.class::cast)
-        .toList();
   }
 
   @Test
