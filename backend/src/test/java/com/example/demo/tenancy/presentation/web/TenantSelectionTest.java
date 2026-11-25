@@ -40,6 +40,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -500,13 +501,17 @@ class TenantSelectionTest {
    * IdP のトークンの endpoint と ID トークンの検証の代わり。
    *
    * <p>認可コードを ID トークンの {@code sub} にし、ID トークンの値に {@code sub} と nonce のハッシュを入れる。共有構成の登録は userinfo の
-   * URL を持たないので、{@code OidcUserService} は IdP を呼ばない。
+   * URL を持つが、{@code SignInOidcUserService} は UserInfo を読まないので、IdP を呼ばない。
+   *
+   * <p>{@code oauth2Login} は、この型の bean が 1 つのときだけそれを使う。本番の {@code OidcTokenClientConfig} の bean
+   * と並ぶため、{@code @Primary} にする。
    */
   @TestConfiguration(proxyBeanMethods = false)
   /* package */ static class FakeIdp {
 
     /** 認可コードの代わりに受け取った {@code sub} の、ID トークンとアクセストークンを返す。 */
     @Bean
+    @Primary
     /* package */ OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>
         fakeTokenEndpoint() {
       return grant -> {

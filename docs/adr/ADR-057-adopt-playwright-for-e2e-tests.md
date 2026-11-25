@@ -48,7 +48,7 @@ backend は PostgreSQL、Keycloak へ service 名で接続し、compose が公�
 ブラウザは公開用の `127.0.0.1:8081`、backend は `keycloak:8080` で Keycloak へ到達するため、issuer を次のようにそろえる。
 
 - Keycloak は hostname v2 の `KC_HOSTNAME=http://127.0.0.1:8081` で、issuer とブラウザ向けの endpoint を公開用の URL に固定する。
-  `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true` で、backend が直接呼ぶ token、jwks、userinfo の endpoint だけを要求の Host から決める。
+  `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true` で、backend が直接呼ぶ token、jwks の endpoint だけを要求の Host から決める。
 - backend は `OIDC_DISCOVERY_URI` を設定したときだけ、discovery を `keycloak:8080` から読む `OidcDiscoveryLocationConfig` を有効にする。
   discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動を止め、`ClientRegistrations.fromOidcConfiguration` で issuer と discovery の全体を registration に残す。
   これにより、ID トークンの `iss` の検査と、`end_session_endpoint` を使う OIDC のログアウトが、discovery を issuer から読む場合と同じに動く。

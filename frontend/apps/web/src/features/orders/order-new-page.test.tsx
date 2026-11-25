@@ -6,6 +6,7 @@ import {
 } from "@frontend/api/mocks/ordering/ordering.msw";
 import { getListPaymentsMockHandler } from "@frontend/api/mocks/payment/payment.msw";
 import { getListProductsMockHandler } from "@frontend/api/mocks/product/product.msw";
+import { draftOrderHeaderIdempotencyKeyRegExp } from "@frontend/api/zod/ordering/ordering.zod";
 import { screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
@@ -28,6 +29,7 @@ import { renderRoute } from "@/testing/render-route";
 
 interface SentRequest {
   csrf: string | null;
+  idempotencyKey: string | null;
   body: unknown;
 }
 
@@ -44,7 +46,11 @@ function serveDraftOrder(respond: () => Response) {
   const sent: SentRequest[] = [];
   server.use(
     http.post("*/api/orders", async ({ request }) => {
-      sent.push({ csrf: request.headers.get("X-XSRF-TOKEN"), body: await request.json() });
+      sent.push({
+        csrf: request.headers.get("X-XSRF-TOKEN"),
+        idempotencyKey: request.headers.get("Idempotency-Key"),
+        body: await request.json(),
+      });
       return respond();
     }),
   );
@@ -70,6 +76,7 @@ function notice() {
   return screen.getByRole("status");
 }
 
+// oxlint-disable-next-line max-statements -- 注文の作成の画面のテストを 1 つの describe に置き、準備を共有する。
 describe("注文の作成の画面", () => {
   beforeEach(() => {
     stubCsrfCookie();
@@ -100,9 +107,26 @@ describe("注文の作成の画面", () => {
     expect(sent).toStrictEqual([
       {
         csrf: csrfCookieValue,
+        idempotencyKey: expect.stringMatching(draftOrderHeaderIdempotencyKeyRegExp) as unknown,
         body: { customerOrderCode: "C-001", lines: [{ productId: penId, quantity: 2 }] },
       },
     ]);
+  });
+
+  it("押すたびに、引用符で囲んだ UUID の新しい Idempotency-Key を送る", async () => {
+    const sent = serveDraftOrder(() => problemResponse(409, "競合が発生しました"));
+    const user = await submitFilledForm();
+    await expect(within(notice()).findByText("競合が発生しました")).resolves.toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "作成する" }));
+
+    await waitFor(() => {
+      expect(sent).toHaveLength(2);
+    });
+    const [first, second] = sent.map((request) => request.idempotencyKey);
+    expect(first).toMatch(draftOrderHeaderIdempotencyKeyRegExp);
+    expect(second).toMatch(draftOrderHeaderIdempotencyKeyRegExp);
+    expect(second).not.toBe(first);
   });
 
   it.each([

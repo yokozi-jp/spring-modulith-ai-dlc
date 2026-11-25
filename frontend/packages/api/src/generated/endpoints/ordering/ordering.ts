@@ -27,10 +27,14 @@ import type {
 
 import type {
   BadRequestProblemResponse,
+  CancelOrderHeaders,
   CancelOrderRequest,
+  ChangeOrderLinesHeaders,
   ChangeOrderLinesRequest,
+  ConfirmOrderHeaders,
   ConfirmOrderRequest,
   ConflictProblemResponse,
+  DraftOrderHeaders,
   DraftOrderRequest,
   ForbiddenProblemResponse,
   InternalServerErrorProblemResponse,
@@ -314,7 +318,8 @@ export const getDraftOrderUrl = () => {
  * 作成した注文の URI を Location に入れて返す。客先注文番号が既にあれば 409、存在しないか販売終了の商品を指定すると 422 を返す。
  * @summary 下書きの注文を作る。
  */
-export const draftOrder = async (draftOrderRequest: DraftOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<draftOrderResponseSuccess> => {
+export const draftOrder = async (draftOrderRequest: DraftOrderRequest,
+    headers: DraftOrderHeaders, options?: Parameters<typeof apiFetch>[1]): Promise<draftOrderResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -334,7 +339,7 @@ return apiFetch<draftOrderResponseSuccess>(getDraftOrderUrl(),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { 'Content-Type': 'application/json',...headers, ...getHeaders(options?.headers) },
     body: JSON.stringify(draftOrderRequest)
   }
 );}
@@ -360,9 +365,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof draftOrder>>, DraftOrderMutationVariables> = (props) => {
-          const {data} = props ?? {};
+          const {data,headers} = props ?? {};
 
-          return  draftOrder(data,requestOptions)
+          return  draftOrder(data,headers,requestOptions)
         }
 
 
@@ -375,7 +380,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DraftOrderMutationResult = NonNullable<Awaited<ReturnType<typeof draftOrder>>>
     export type DraftOrderMutationBody = DraftOrderRequest
     export type DraftOrderMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>
-    export type DraftOrderMutationVariables = {data: DraftOrderRequest}
+    export type DraftOrderMutationVariables = {data: DraftOrderRequest;headers: DraftOrderHeaders}
 
     /**
  * @summary 下書きの注文を作る。
@@ -643,7 +648,8 @@ export const getCancelOrderUrl = (orderId: string,) => {
  * @summary 下書きの注文を取り消す。
  */
 export const cancelOrder = async (orderId: string,
-    cancelOrderRequest: CancelOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<cancelOrderResponseSuccess> => {
+    cancelOrderRequest: CancelOrderRequest,
+    headers: CancelOrderHeaders, options?: Parameters<typeof apiFetch>[1]): Promise<cancelOrderResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -663,7 +669,7 @@ return apiFetch<cancelOrderResponseSuccess>(getCancelOrderUrl(orderId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { 'Content-Type': 'application/json',...headers, ...getHeaders(options?.headers) },
     body: JSON.stringify(cancelOrderRequest)
   }
 );}
@@ -689,9 +695,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof cancelOrder>>, CancelOrderMutationVariables> = (props) => {
-          const {orderId,data} = props ?? {};
+          const {orderId,data,headers} = props ?? {};
 
-          return  cancelOrder(orderId,data,requestOptions)
+          return  cancelOrder(orderId,data,headers,requestOptions)
         }
 
 
@@ -704,7 +710,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CancelOrderMutationResult = NonNullable<Awaited<ReturnType<typeof cancelOrder>>>
     export type CancelOrderMutationBody = CancelOrderRequest
     export type CancelOrderMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>
-    export type CancelOrderMutationVariables = {orderId: string;data: CancelOrderRequest}
+    export type CancelOrderMutationVariables = {orderId: string;data: CancelOrderRequest;headers: CancelOrderHeaders}
 
     /**
  * @summary 下書きの注文を取り消す。
@@ -779,7 +785,8 @@ export const getConfirmOrderUrl = (orderId: string,) => {
  * @summary 下書きの注文を確定する。
  */
 export const confirmOrder = async (orderId: string,
-    confirmOrderRequest: ConfirmOrderRequest, options?: Parameters<typeof apiFetch>[1]): Promise<confirmOrderResponseSuccess> => {
+    confirmOrderRequest: ConfirmOrderRequest,
+    headers: ConfirmOrderHeaders, options?: Parameters<typeof apiFetch>[1]): Promise<confirmOrderResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -799,7 +806,7 @@ return apiFetch<confirmOrderResponseSuccess>(getConfirmOrderUrl(orderId),
   {
     ...options,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { 'Content-Type': 'application/json',...headers, ...getHeaders(options?.headers) },
     body: JSON.stringify(confirmOrderRequest)
   }
 );}
@@ -825,9 +832,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof confirmOrder>>, ConfirmOrderMutationVariables> = (props) => {
-          const {orderId,data} = props ?? {};
+          const {orderId,data,headers} = props ?? {};
 
-          return  confirmOrder(orderId,data,requestOptions)
+          return  confirmOrder(orderId,data,headers,requestOptions)
         }
 
 
@@ -840,7 +847,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ConfirmOrderMutationResult = NonNullable<Awaited<ReturnType<typeof confirmOrder>>>
     export type ConfirmOrderMutationBody = ConfirmOrderRequest
     export type ConfirmOrderMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>
-    export type ConfirmOrderMutationVariables = {orderId: string;data: ConfirmOrderRequest}
+    export type ConfirmOrderMutationVariables = {orderId: string;data: ConfirmOrderRequest;headers: ConfirmOrderHeaders}
 
     /**
  * @summary 下書きの注文を確定する。
@@ -915,7 +922,8 @@ export const getChangeOrderLinesUrl = (orderId: string,) => {
  * @summary 下書きの注文の明細を置き換える。
  */
 export const changeOrderLines = async (orderId: string,
-    changeOrderLinesRequest: ChangeOrderLinesRequest, options?: Parameters<typeof apiFetch>[1]): Promise<changeOrderLinesResponseSuccess> => {
+    changeOrderLinesRequest: ChangeOrderLinesRequest,
+    headers: ChangeOrderLinesHeaders, options?: Parameters<typeof apiFetch>[1]): Promise<changeOrderLinesResponseSuccess> => {
 
     const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
@@ -935,7 +943,7 @@ return apiFetch<changeOrderLinesResponseSuccess>(getChangeOrderLinesUrl(orderId)
   {
     ...options,
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    headers: { 'Content-Type': 'application/json',...headers, ...getHeaders(options?.headers) },
     body: JSON.stringify(changeOrderLinesRequest)
   }
 );}
@@ -961,9 +969,9 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
       const mutationFn: MutationFunction<Awaited<ReturnType<typeof changeOrderLines>>, ChangeOrderLinesMutationVariables> = (props) => {
-          const {orderId,data} = props ?? {};
+          const {orderId,data,headers} = props ?? {};
 
-          return  changeOrderLines(orderId,data,requestOptions)
+          return  changeOrderLines(orderId,data,headers,requestOptions)
         }
 
 
@@ -976,7 +984,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ChangeOrderLinesMutationResult = NonNullable<Awaited<ReturnType<typeof changeOrderLines>>>
     export type ChangeOrderLinesMutationBody = ChangeOrderLinesRequest
     export type ChangeOrderLinesMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | ConflictProblemResponse | UnprocessableContentProblemResponse | InternalServerErrorProblemResponse>
-    export type ChangeOrderLinesMutationVariables = {orderId: string;data: ChangeOrderLinesRequest}
+    export type ChangeOrderLinesMutationVariables = {orderId: string;data: ChangeOrderLinesRequest;headers: ChangeOrderLinesHeaders}
 
     /**
  * @summary 下書きの注文の明細を置き換える。

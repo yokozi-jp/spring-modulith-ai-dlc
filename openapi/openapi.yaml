@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.10.0
+  version: 0.11.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -65,6 +65,7 @@ paths:
       summary: 所属するテナントを選び、そのテナントで業務の API を使えるようにする。
       tags:
       - tenancy
+      x-idempotency-key: none
   /api/current-tenant/members:
     get:
       description: 一覧は所属した順に items で包んで返す。lockNo は変更の操作で送り返す。管理者以外には 403 を返す。
@@ -105,6 +106,7 @@ paths:
           type: integer
           format: int64
           minimum: 1
+      - $ref: "#/components/parameters/IdempotencyKey"
       responses:
         "204":
           description: 本文のない 204 の応答
@@ -136,6 +138,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -219,6 +222,8 @@ paths:
       description: 作成した注文の URI を Location に入れて返す。客先注文番号が既にあれば 409、存在しないか販売終了の商品を指定すると
         422 を返す。
       operationId: draftOrder
+      parameters:
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -295,6 +300,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -334,6 +340,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -374,6 +381,7 @@ paths:
         schema:
           type: string
           format: uuid
+      - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -453,20 +461,43 @@ paths:
       tags:
       - product
 components:
+  parameters:
+    IdempotencyKey:
+      description: 利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は
+        UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema:
+        type: string
+        example: '"8e03978e-40d5-43e8-bc93-6894a57f9324"'
+        pattern: "^\"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\"\
+          $"
   responses:
     BadRequestProblem:
       content:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ValidationProblem"
-      description: 要求の形式または入力値が正しくない
+      description: 要求の形式または入力値が正しくない。Idempotency-Key がないときの type は /problems/idempotency-key-missing、形式が正しくないときは
+        /problems/idempotency-key-invalid、同じキーで内容の違う要求を送ったときは /problems/idempotency-key-payload-mismatch
     ConflictProblem:
       content:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
       description: ほかの要求と競合した。type は競合の種類ごとに異なり、ProblemDetail.type の x-extensible-enum
-        に載る
+        に載る。同じ Idempotency-Key の要求を処理しているときの type は /problems/idempotency-key-in-progress
+        で、Retry-After を付ける
+      headers:
+        Retry-After:
+          description: 同じキーで再試行するまで待つ秒数。type が /problems/idempotency-key-in-progress
+            のときだけ付く
+          schema:
+            type: integer
+            format: int32
+            example: 1
+            minimum: 0
     ForbiddenProblem:
       content:
         application/problem+json:
@@ -967,7 +998,8 @@ components:
           type:
             type: string
             format: uri-reference
-            description: 入力検証エラーなら /problems/validation-error。それ以外の 400 は about:blank
+            description: 入力検証エラーなら /problems/validation-error。Idempotency-Key の誤りなら
+              /problems/idempotency-key- で始まる type。それ以外の 400 は about:blank
             example: /problems/validation-error
       description: 400 の Problem Details。type が /problems/validation-error なら入力検証エラーで、errors
         に誤りのある入力の位置と説明を持つ

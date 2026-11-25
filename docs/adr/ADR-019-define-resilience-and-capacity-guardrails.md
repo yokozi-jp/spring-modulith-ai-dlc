@@ -19,7 +19,8 @@ Proposed
 
 バックエンドは Resilience4j と仮想スレッドを導入済みだが、外部連携に適用する timeout、retry、circuit breaker の共通値を定めていない。
 
-現時点ではアプリケーションが所有する外部 HTTP クライアントがなく、PostgreSQL、OIDC の通信は各 Spring starter が管理している。
+アプリケーションが所有する外部 HTTP クライアントは決済代行とメール送信で、PostgreSQL、OIDC の通信は各 Spring starter が管理している。
+OIDC の呼び出しのうち、トークンの取得と UserInfo は既定でタイムアウトを持たない。
 Resilience4j の設定を追加しても、これらの通信には自動適用されない。
 
 retry をすべての呼び出しへ一律に適用すると、非冪等な更新や認証処理を重複実行する可能性がある。
@@ -51,6 +52,17 @@ JDK 25 では JEP 491 により、通常の `synchronized` メソッドとブロ
 - retry は client adapter の一層だけで行い、HTTP client や呼び出し元の retry と重ねない。
 
 circuit breaker の既定値を、count based window 20 回、評価開始 10 回、failure rate 50 パーセント、open 30 秒、half-open 5 回とする。
+
+starter が管理する通信のタイムアウトは、呼び出しごとに次の値と置き場所で持つ。
+
+- 認可コードをトークンに替える（ログインのコールバック）：接続 1 秒、応答 5 秒。`spring.http.clients.*` に置き、`OidcTokenClientConfig` が Boot の `RestClient.Builder` から作った `RestClient` を `RestClientAuthorizationCodeTokenResponseClient` に渡す。
+- UserInfo：呼び出さない。`SignInOidcUserService` が使うのは ID トークンの `iss` と `sub` だけなので、`OidcUserService.setRetrieveUserInfo` で止める。UserInfo の HTTP クライアントは `new RestTemplate()` で、タイムアウトを足すには request factory を持つ `RestTemplate` が別に要る。
+- ID トークンの JWK Set：接続 30 秒、応答 30 秒。Spring Security の `NimbusJwtDecoder` の既定を残す。上限があり、署名の鍵は読んだ後に cache される。変えるには `JwtDecoderFactory` の差し替えが要り、得るものより手間が大きい。
+- 起動のときの discovery：接続 30 秒、応答 30 秒。Spring Security の `ClientRegistrations` の既定を残す。起動だけで、利用者を待たせない。`oidc.discovery-uri` を渡す E2E の `OidcDiscoveryLocationConfig` は `spring.http.clients.*`（1 秒、5 秒）に従う。
+- PostgreSQL：接続は `DB_POOL_CONNECTION_TIMEOUT_MS`、応答は `DB_STATEMENT_TIMEOUT_MS`。HikariCP と `application.yaml` のセッションの `SET` に置く。セッションの読み書きも同じ。
+
+トークンの取得の応答を、外部 HTTP client の開始値の 2 秒より長い 5 秒にする。ログインは利用者が画面で待つが、トランザクションの外にあり、IdP の一時的な遅延でログインを落とさないよう余裕を持たせる。
+`spring.http.clients.*` は自分の値を持たない Boot の `RestClient` の既定なので、新しい client を足すときは自分の値で上書きする。決済代行は `payment-gateway.*` で上書きする。メールは AWS SDK の HTTP クライアントで、`spring.http.clients.*` を使わず `mail-sender.*` を使う。
 
 外部連携を追加するときは、依存先の SLO と上位処理の時間予算から値を見直し、名前付き instance の設定と境界テストを同じ変更に含める。
 既定値をそのまま採用した場合も、その根拠を client adapter の文書へ残す。
@@ -91,7 +103,7 @@ maximum-pool-size × 最大アプリケーションタスク数
 
 ### Neutral
 
-- 現在の PostgreSQL、OIDC 通信は Resilience4j の対象にせず、各 starter の timeout と再接続設定を使う。
+- 現在の PostgreSQL、OIDC 通信は Resilience4j の対象にせず、Decision の呼び出しごとのタイムアウトを使う。
 - bulkhead と rate limiter は依存先の同時実行上限が判明した時点で、名前付き instance へ追加する。
 - JFR の pinning 検証は常時有効化せず、負荷スモークと障害調査で実行する。
 

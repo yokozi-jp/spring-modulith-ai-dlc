@@ -1,4 +1,5 @@
 import { useDraftOrder } from "@frontend/api/endpoints/ordering/ordering";
+import { idempotencyKeyHeaders } from "@frontend/api/idempotency-key";
 import { useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -43,7 +44,7 @@ export function useDraftOrderForm() {
       }
       setNotice(undefined);
       mutation.mutate(
-        { data: schema.parse(value) },
+        { data: schema.parse(value), headers: idempotencyKeyHeaders() },
         {
           onSuccess: (response) => {
             const orderId = createdOrderId(response.headers.get("Location"));
