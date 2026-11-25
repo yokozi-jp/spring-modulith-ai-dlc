@@ -2,12 +2,10 @@ package com.example.demo.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.DemoApplication;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.domain.JavaMethod;
 import com.tngtech.archunit.core.domain.JavaParameter;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -16,6 +14,7 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import com.tngtech.archunit.lang.conditions.ArchConditions;
 import io.swagger.v3.oas.annotations.Operation;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -34,9 +33,8 @@ import org.springframework.web.bind.annotation.PutMapping;
  * <p>規則は {@code xxxRule(basePackage)} のファクトリで組み立て、{@link ArchitectureRuleFixtureTest}
  * がフィクスチャのパッケージで同じ規則を再利用する。
  */
-// JavaClasses は ArchUnit の import 結果を表す公開 API 型であり、インタフェースへ置き換えられない。
-// ArchUnit の JUnit 5 エンジンが @ArchTest のフィールドとメソッドを読むため、ユーティリティクラスにしない。
-@SuppressWarnings({"PMD.LooseCoupling", "PMD.TestClassWithoutTestCases", "PMD.UseUtilityClass"})
+// ArchUnit の JUnit 5 エンジンが @ArchTest のフィールドを読むため、規則ファクトリだけを持つクラスでもユーティリティクラスにしない。
+@SuppressWarnings({"PMD.TestClassWithoutTestCases", "PMD.UseUtilityClass"})
 @AnalyzeClasses(packagesOf = DemoApplication.class, importOptions = ProductionCodeOnly.class)
 class IdempotencyArchTest {
 
@@ -84,16 +82,23 @@ class IdempotencyArchTest {
   /* package */ static final ArchRule idempotentCommandHandlersExecuteThroughIdempotency =
       idempotentCommandHandlersExecuteThroughIdempotencyRule(BASE_PACKAGE);
 
-  /** 一時的に除く操作が、まだキーを受け取っていないことを確かめる。受け取ったら一覧から消させる。 */
+  /** 一時的に除く操作は、まだキーを受け取っていない。受け取ったら一覧から消させる。 */
   @ArchTest
-  /* package */ static void temporaryExclusionsStillLackTheKey(final JavaClasses classes) {
-    final ArchRule withoutExclusions = unsafeHandlersTakeIdempotencyKeyRule(BASE_PACKAGE, Set.of());
-    for (final String operation : NOT_YET_IDEMPOTENT) {
-      assertThatThrownBy(() -> withoutExclusions.check(classes))
-          .as("%s はキーを受け取ったので、NOT_YET_IDEMPOTENT から消す", operation)
-          .hasMessageContaining(BASE_PACKAGE + "." + operation + "(");
-    }
-  }
+  /* package */ static final ArchRule temporaryExclusionsStillLackTheKey =
+      methods()
+          .that(
+              DescribedPredicate.describe(
+                  "NOT_YET_IDEMPOTENT に挙げた操作",
+                  method -> NOT_YET_IDEMPOTENT.contains(operationName(BASE_PACKAGE, method))))
+          .should(
+              ArchConditions.not(
+                  takeIdempotencyKeyAfterPathVariables(
+                      BASE_PACKAGE + ".shared.idempotency.IdempotencyKey")))
+          .because(
+              "キーを受け取った操作を一覧に残すと、後で外したキーを unsafeHandlersTakeIdempotencyKey が見落とすため。"
+                  + "直し方：キーを受け取った操作を IdempotencyArchTest の NOT_YET_IDEMPOTENT から消す。"
+                  + "規約："
+                  + DOCS);
 
   /**
    * キーを受け取る Controller の規則を組み立てる。
@@ -115,10 +120,7 @@ class IdempotencyArchTest {
                 method ->
                     UNSAFE_MAPPINGS.stream().anyMatch(method::isAnnotatedWith)
                         && !marksNoKey(method)
-                        && !notYetIdempotent.contains(
-                            method.getOwner().getName().substring(basePackage.length() + 1)
-                                + "."
-                                + method.getName())))
+                        && !notYetIdempotent.contains(operationName(basePackage, method))))
         .should(takeIdempotencyKeyAfterPathVariables(idempotencyKey))
         .allowEmptyShould(true)
         .because(
@@ -146,6 +148,11 @@ class IdempotencyArchTest {
                 + " にし、本体を private メソッドに置く。"
                 + "規約："
                 + DOCS);
+  }
+
+  /** 基底パッケージより下の {@code <クラス>.<メソッド>} を返す。 */
+  private static String operationName(final String basePackage, final JavaMethod method) {
+    return method.getOwner().getName().substring(basePackage.length() + 1) + "." + method.getName();
   }
 
   /** {@code @Operation} の拡張に {@code x-idempotency-key: none} があるかを返す。 */
