@@ -1,0 +1,25 @@
+{
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "url": "/v2/email/outbound-emails",
+    "headers": {
+      "Content-Type": { "contains": "application/json" }
+    },
+    "bodyPatterns": [
+      { "matchesJsonPath": "$.FromEmailAddress" },
+      { "matchesJsonPath": "$.Destination.ToAddresses[0]" },
+      { "matchesJsonPath": "$.Content.Simple.Subject.Data" },
+      { "matchesJsonPath": "$.Content.Simple.Body.Text.Data" },
+      { "matchesJsonPath": "$.ConfigurationSetName" }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "headers": { "Content-Type": "application/json" },
+    "jsonBody": {
+      "MessageId": "{{randomValue type='UUID'}}"
+    },
+    "transformers": ["response-template"]
+  }
+}

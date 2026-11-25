@@ -66,8 +66,8 @@ services:
     restart: unless-stopped
 
   wiremock:
-    # ローカル専用の決済代行の偽物。docker/wiremock/mappings の請求の成功のスタブを返す。
-    # 失敗は管理 API（/__admin/mappings）で実行中に足す。本番は実際の決済代行の URL を注入する。
+    # ローカル専用の決済代行と SES v2 の API の偽物。docker/wiremock/mappings の成功のスタブを返す。
+    # 失敗は管理 API（/__admin/mappings）で実行中に足す。本番は実際の決済代行の URL を注入し、SES の接続先を書かない。
     image: wiremock/wiremock:3.13.2@sha256:0d4ecb3e4dc8213fd7a4d37d6a78f6e6b553a6d2e15bd51b0999781282ac61b3
     # JDK の HttpClient が平文の HTTP/2 へ upgrade すると、本文付きの POST が切れるため、平文の HTTP/2 を止める。
     command: ["--disable-banner", "--disable-http2-plain"]
@@ -174,6 +174,16 @@ services:
       SPRINGDOC_ENABLED: ${SPRINGDOC_ENABLED:?SPRINGDOC_ENABLED is required}
       # 決済代行はローカルの WireMock を Compose の service 名で呼ぶ。
       PAYMENT_GATEWAY_BASE_URL: http://wiremock:8080
+      MAIL_SENDER_FROM_ADDRESS: ${MAIL_SENDER_FROM_ADDRESS:?MAIL_SENDER_FROM_ADDRESS is required}
+      MAIL_SENDER_FROM_NAME: ${MAIL_SENDER_FROM_NAME:?MAIL_SENDER_FROM_NAME is required}
+      MAIL_SENDER_CONFIGURATION_SET: ${MAIL_SENDER_CONFIGURATION_SET:?MAIL_SENDER_CONFIGURATION_SET is required}
+      MAIL_SENDER_ALLOWED_RECIPIENTS: ${MAIL_SENDER_ALLOWED_RECIPIENTS:?MAIL_SENDER_ALLOWED_RECIPIENTS is required}
+      # メールは SES v2 の API の接続先を同じ WireMock に向ける（ADR-125）。
+      # アクセスキーはダミーの値で、接続先を書き忘れても本物の SES はこの署名を断る。
+      AWS_ENDPOINT_URL_SESV2: http://wiremock:8080
+      AWS_REGION: ap-northeast-1
+      AWS_ACCESS_KEY_ID: local-dummy-access-key
+      AWS_SECRET_ACCESS_KEY: local-dummy-secret-key
       EVENT_PUBLICATION_RESUBMISSION_ENABLED: ${EVENT_PUBLICATION_RESUBMISSION_ENABLED:?EVENT_PUBLICATION_RESUBMISSION_ENABLED is required}
       EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE: ${EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE:?EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE is required}
       EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS: ${EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS:?EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS is required}

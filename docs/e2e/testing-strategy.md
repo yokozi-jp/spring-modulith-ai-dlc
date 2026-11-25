@@ -80,6 +80,13 @@ backend を再起動せず、シナリオの途中で注文ごとに応答を切
 - 全体に効く失敗のスタブを足さない。
   並列のテストと他の注文まで失敗させる。
 
+## 送ったメールを読む
+
+backend が送ったメールは、compose-test の WireMock（`.env.test` の `PAYMENT_GATEWAY_BASE_URL`。決済代行と同じ WireMock を指す）の要求の記録から読む（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
+メールを読む spec はまだない。
+
+- 管理 API の `POST /__admin/requests/find` に、`/v2/email/outbound-emails` のパスと、`$.Destination.ToAddresses[0]` で絞った一意の宛先を送ると、`requests[].body` に SDK が送った JSON の文字列が返る。
+
 ## 認証
 
 setup project は、`storageState` を持たない browser context で `/oauth2/authorization/web` を開き、Keycloak の画面で `test-user` としてログインする。
@@ -130,13 +137,13 @@ compose が公開する port は、すべて `127.0.0.1` に限る。
 slot の割り当て、slot 1 から 3 の port、空きがないときの待ちは、[compose-test の slot](../tooling/test-slots.md) にある。
 slot 0 の port は次のとおりである。
 
-| port | 用途                                                   |
-| ---- | ------------------------------------------------------ |
-| 5173 | Vite preview（Keycloak の redirect URI と同じ origin） |
-| 8080 | backend                                                |
-| 5433 | PostgreSQL                                             |
-| 8081 | Keycloak                                               |
-| 8082 | 決済代行の WireMock（Playwright が管理 API を呼ぶ）    |
+| port | 用途                                                       |
+| ---- | ---------------------------------------------------------- |
+| 5173 | Vite preview（Keycloak の redirect URI と同じ origin）     |
+| 8080 | backend                                                    |
+| 5433 | PostgreSQL                                                 |
+| 8081 | Keycloak                                                   |
+| 8082 | 決済代行と SES の WireMock（Playwright が管理 API を呼ぶ） |
 
 - slot 0 の 5173 と 8080 は、開発用の Vite と Keycloak と同じ port である。
   slot を取るときに、port が `127.0.0.1` で応答する slot は飛ばす。

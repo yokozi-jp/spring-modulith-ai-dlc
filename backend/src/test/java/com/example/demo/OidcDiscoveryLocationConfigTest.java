@@ -1,14 +1,10 @@
 package com.example.demo;
 
+import static com.example.demo.testkit.LoopbackHttpServer.reply;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+import com.example.demo.testkit.LoopbackHttpServer;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -34,7 +30,7 @@ class OidcDiscoveryLocationConfigTest {
   private static final String DISCOVERY_PATH = "/discovery";
 
   /** discovery を返すローカルの HTTP スタブ。 */
-  private static HttpServer server;
+  private static LoopbackHttpServer server;
 
   /** スタブの base URL。 */
   private static String baseUrl;
@@ -62,28 +58,27 @@ class OidcDiscoveryLocationConfigTest {
 
   @BeforeAll
   static void startServer() throws IOException {
-    server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-    baseUrl = "http://127.0.0.1:" + server.getAddress().getPort();
+    server = LoopbackHttpServer.start();
+    baseUrl = server.url();
     // 内部の URL の discovery。issuer は公開用の URL を返す（Keycloak の hostname v2 と同じ）。
-    server.createContext(DISCOVERY_PATH, exchange -> respond(exchange, discovery(PUBLIC_ISSUER)));
+    server.handle(DISCOVERY_PATH, exchange -> reply(exchange, 200, discovery(PUBLIC_ISSUER)));
     // issuer がスタブ自身の URL である discovery。Boot の自動構成が issuer-uri から読む。
-    server.createContext(
+    server.handle(
         "/realms/demo/.well-known/openid-configuration",
-        exchange -> respond(exchange, discovery(baseUrl + "/realms/demo")));
+        exchange -> reply(exchange, 200, discovery(baseUrl + "/realms/demo")));
     // discovery の URL への 302。辿ると discovery が読めてしまう。
-    server.createContext(
+    server.handle(
         "/redirect",
         exchange -> {
           exchange.getResponseHeaders().add("Location", baseUrl + DISCOVERY_PATH);
           exchange.sendResponseHeaders(302, -1);
           exchange.close();
         });
-    server.start();
   }
 
   @AfterAll
   static void stopServer() {
-    server.stop(0);
+    server.stop();
   }
 
   @Test
@@ -182,14 +177,5 @@ class OidcDiscoveryLocationConfigTest {
     }
     """
         .replace("ISSUER", issuer);
-  }
-
-  private static void respond(final HttpExchange exchange, final String body) throws IOException {
-    final byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-    exchange.getResponseHeaders().add("Content-Type", "application/json");
-    exchange.sendResponseHeaders(200, bytes.length);
-    try (OutputStream out = exchange.getResponseBody()) {
-      out.write(bytes);
-    }
   }
 }

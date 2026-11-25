@@ -236,6 +236,19 @@ payment-gateway:
   connect-timeout: 1s
   read-timeout: 2s
 
+# メールの送信（ADR-125）。From のアドレスと表示名、SES の設定セット、送ってよい宛先に既定値を置かず、未設定なら起動に失敗する。
+# リージョン（AWS_REGION）と、ローカルとテストの接続先と資格情報（AWS_ENDPOINT_URL_SESV2 など）は SesV2ClientConfig が読む。
+mail-sender:
+  from-address: ${MAIL_SENDER_FROM_ADDRESS}
+  # UTF-8 で 45 バイト以下にする。RFC 2047 の 1 つの encoded-word に収めるためである。
+  from-name: ${MAIL_SENDER_FROM_NAME}
+  configuration-set: ${MAIL_SENDER_CONFIGURATION_SET}
+  # 送ってよい宛先。カンマ区切りで、* は全許可、@example.com はドメイン、user@example.com はアドレス。本番は * にする。
+  allowed-recipients: ${MAIL_SENDER_ALLOWED_RECIPIENTS}
+  # ADR-019 の開始値。read-timeout は応答の読み取りと、SDK の呼び出し全体（apiCallTimeout）の両方の上限にする。
+  connect-timeout: 1s
+  read-timeout: 2s
+
 # 外部 client は依存先ごとに名前付き instance を定義し、client adapter の境界で適用する。
 # 現在の PostgreSQL、OIDC 通信へは自動適用されない。
 resilience4j:
@@ -254,6 +267,10 @@ resilience4j:
         # 429 以外の 4xx は資格情報か契約の不備で、決済代行の不調ではないので失敗として数えない（ADR-072）。
         # 429 は一時障害なので数える。ignore-exceptions に HttpClientErrorException を書くと 429 まで無視するため、述語にする。
         ignore-exception-predicate: com.example.demo.payment.infrastructure.client.IgnoredClientErrorPredicate
+      mail-sender:
+        base-config: default
+        # スロットリング以外の 4xx は SES の不調ではないので失敗として数えない（docs/mail/sending.md の「結果と失敗の扱い」）。
+        ignore-exception-predicate: com.example.demo.mail.infrastructure.client.IgnoredSesClientErrorPredicate
   retry:
     configs:
       # 非冪等処理を重複実行しないよう、明示しない retry は無効にする。
@@ -275,6 +292,9 @@ resilience4j:
     instances:
       # 冪等キーを渡すが、CommandHandler のトランザクションの中で呼ぶため default（試行 1 回）を継承する。
       payment-gateway:
+        base-config: default
+      # SES の SendEmail には冪等キーがないため、default（試行 1 回）を継承する。SDK の再試行も止める（ADR-125）。
+      mail-sender:
         base-config: default
   timelimiter:
     configs:

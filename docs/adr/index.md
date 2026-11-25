@@ -124,4 +124,5 @@
 - [ADR-122: Spring Modulith 2.2.0 を Spring Boot 4.1.2 のまま入れてから、Spring Boot 4.2.0 と Spring Cloud 2026.0.0 へ別の変更で上げる](ADR-122-raise-spring-boot-4-2-after-spring-modulith-2-2.md)（Proposed, 2026-11-24）
 - [ADR-123: メールアドレスの形式の検査で、サーバーの式をクライアントの Zod の式に揃える](ADR-123-align-server-email-validation-with-zod.md)（Proposed, 2026-11-24）
 - [ADR-124: mise の版の更新だけを Renovate に任せ、Dependabot と併存させる](ADR-124-update-mise-pinned-versions-with-renovate.md)（Proposed, 2026-11-24）
+- [ADR-125: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける](ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)（Proposed, 2026-11-24）
 - [ADR-126: GET と HEAD 以外のすべての業務の API に Idempotency-Key を必須にし、モジュールごとの表に Result を保存する](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)（Proposed, 2026-11-24）
