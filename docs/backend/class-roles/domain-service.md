@@ -82,6 +82,7 @@ public class DiscountPolicy {
 ```
 
 典型的な例は、Repository で数えて規則を確かめる `OrderLimitPolicy` である。
+違反の理由は、この例の `domain.model` の enum `OrderFailure` の定数 `UNSHIPPED_LIMIT_REACHED` で渡す（[業務上の失敗の例外](business-exception.md#422-の理由の-enum)）。
 
 ```java
 package com.example.demo.ordering.domain.service;
@@ -105,6 +106,7 @@ public class OrderLimitPolicy {
   public void ensureCanPlace(final CustomerId customerId) {
     if (orderRepository.countUnshippedByCustomer(customerId) >= MAX_UNSHIPPED_ORDERS) {
       throw new BusinessRuleViolationException(
+          OrderFailure.UNSHIPPED_LIMIT_REACHED,
           "unshipped order limit reached: customerId=" + customerId.value());
     }
   }

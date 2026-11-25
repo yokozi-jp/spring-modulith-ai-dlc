@@ -116,7 +116,7 @@ public final class OrderLine {
 // com.example.demo.ordering.domain.model.Order（抜粋）
 /** 受付の注文の明細の数量を変える。 */
 public void changeLineQuantity(final int lineNumber, final Quantity quantity) {
-  ensureStatus(OrderStatus.PLACED);
+  ensureStatus(OrderStatus.PLACED, OrderFailure.NOT_PLACED);
   lines.stream()
       .filter(line -> line.lineNumber() == lineNumber)
       .findFirst()

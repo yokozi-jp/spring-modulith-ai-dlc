@@ -55,13 +55,17 @@ describe("テナントを選ぶ画面", () => {
   it("選べなかったときは、backend の title を出して画面に残る", async () => {
     server.use(
       getListMembershipsMockHandler({ items: [tradingTenant] }),
-      http.put("*/api/current-tenant", () => problemResponse(422, "処理できない内容です")),
+      http.put("*/api/current-tenant", () =>
+        problemResponse(422, "テナントに所属していません", {
+          type: "/problems/tenancy/not-tenant-member",
+        }),
+      ),
     );
     const { router, user } = await renderRoute("/tenants");
 
     await user.click(await screen.findByRole("button", { name: "サンプル商事" }));
 
-    await expect(screen.findByText("処理できない内容です")).resolves.toBeTruthy();
+    await expect(screen.findByText("テナントに所属していません")).resolves.toBeTruthy();
     expect(router.state.location.pathname).toBe("/tenants");
   });
 

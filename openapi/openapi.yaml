@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.10.0
+  version: 0.11.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -486,7 +486,8 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
-      description: リソースの現在の状態と競合する。同じ Idempotency-Key の要求を処理しているときの type は /problems/idempotency-key-in-progress
+      description: ほかの要求と競合した。type は競合の種類ごとに異なり、ProblemDetail.type の x-extensible-enum
+        に載る。同じ Idempotency-Key の要求を処理しているときの type は /problems/idempotency-key-in-progress
         で、Retry-After を付ける
       headers:
         Retry-After:
@@ -534,7 +535,8 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
-      description: 業務規則に反するため処理できない
+      description: 業務規則に反するため処理できない。type は理由ごとに異なり、ProblemDetail.type の x-extensible-enum
+        に載る
   schemas:
     CancelOrderRequest:
       type: object
@@ -860,8 +862,24 @@ components:
         type:
           type: string
           format: uri-reference
-          description: Problem type の識別 URI。about:blank かパスを全部書いた相対 URI
+          description: Problem type の識別 URI。about:blank かパスを全部書いた相対 URI。x-extensible-enum
+            に今の値を載せる。値は増えることがある
           example: about:blank
+          x-extensible-enum:
+          - about:blank
+          - /problems/validation-error
+          - /problems/csrf-token-invalid
+          - /problems/tenant-not-selected
+          - /problems/version-conflict
+          - /problems/lock-timeout
+          - /problems/unique-violation
+          - /problems/ordering/no-lines
+          - /problems/ordering/not-draft
+          - /problems/ordering/product-discontinued
+          - /problems/ordering/product-not-found
+          - /problems/tenancy/last-admin
+          - /problems/tenancy/not-tenant-member
+          - /problems/tenancy/tenant-already-selected
       required:
       - status
       - title

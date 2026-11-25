@@ -5,6 +5,6 @@
 import type { ProblemDetail } from './problemDetail.ts';
 
 /**
- * 業務規則に反するため処理できない
+ * 業務規則に反するため処理できない。type は理由ごとに異なり、ProblemDetail.type の x-extensible-enum に載る
  */
 export type UnprocessableContentProblemResponse = ProblemDetail;

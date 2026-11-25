@@ -27,7 +27,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -59,6 +58,12 @@ import org.springframework.web.bind.annotation.RequestMethod;
 @Import(SharedTestConfiguration.class)
 @ExtendWith(CleanGeneratedTablesExtension.class)
 class OrderApiTest {
+
+  /** status 以上の意味がない problem type。 */
+  private static final String ABOUT_BLANK = "about:blank";
+
+  /** 下書きでない注文の操作の problem type。 */
+  private static final String NOT_DRAFT = "/problems/ordering/not-draft";
 
   /** 作成した注文の Location の形。 */
   private static final String LOCATION_PATTERN =
@@ -123,7 +128,7 @@ class OrderApiTest {
     final String customerOrderCode = UniqueCodes.next("C");
     final String orderId = draftAndGetId(customerOrderCode, pen, 1);
 
-    expectProblem(draft(customerOrderCode, eraser, 1), 409);
+    expectProblem(draft(customerOrderCode, eraser, 1), 409, "/problems/unique-violation");
     details(orderId).andExpect(jsonPath("$.lines[0].productId").value(pen.toString()));
     mockMvc
         .perform(get("/api/orders").with(oidcLogin()))
@@ -134,7 +139,10 @@ class OrderApiTest {
   @DisplayName("存在しない商品で注文を作ると 422 を返し、注文を作らない")
   @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 422)
   void draftWithMissingProductReturnsUnprocessable() throws Exception {
-    expectProblem(draft(UniqueCodes.next("C"), UUID.randomUUID(), 1), 422);
+    expectProblem(
+        draft(UniqueCodes.next("C"), UUID.randomUUID(), 1),
+        422,
+        "/problems/ordering/product-not-found");
     mockMvc
         .perform(get("/api/orders").with(oidcLogin()))
         .andExpect(jsonPath("$.items.length()").value(0));
@@ -143,7 +151,10 @@ class OrderApiTest {
   @Test
   @DisplayName("販売終了の商品で注文を作ると 422 を返す")
   void draftWithDiscontinuedProductReturnsUnprocessable() throws Exception {
-    expectProblem(draft(UniqueCodes.next("C"), discontinued, 1), 422);
+    expectProblem(
+        draft(UniqueCodes.next("C"), discontinued, 1),
+        422,
+        "/problems/ordering/product-discontinued");
   }
 
   @Test
@@ -172,14 +183,14 @@ class OrderApiTest {
   @DisplayName("存在しない注文の詳細は 404 を返す")
   @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 404)
   void missingOrderDetailsReturnsNotFound() throws Exception {
-    expectProblem(details(UUID.randomUUID().toString()), 404);
+    expectProblem(details(UUID.randomUUID().toString()), 404, ABOUT_BLANK);
   }
 
   @Test
   @DisplayName("UUID でない注文 ID の詳細は about:blank の 400 を返す")
   @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 400)
   void malformedOrderIdReturnsBadRequest() throws Exception {
-    expectProblem(details("not-a-uuid"), 400);
+    expectProblem(details("not-a-uuid"), 400, ABOUT_BLANK);
   }
 
   @ParameterizedTest(name = "{0} {1}")
@@ -190,7 +201,7 @@ class OrderApiTest {
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 404)
   void operationOnMissingOrderReturnsNotFound(final String method, final String suffix)
       throws Exception {
-    expectProblem(operate(method, UUID.randomUUID().toString(), suffix, 1), 404);
+    expectProblem(operate(method, UUID.randomUUID().toString(), suffix, 1), 404, ABOUT_BLANK);
   }
 
   @Test
@@ -225,15 +236,18 @@ class OrderApiTest {
   }
 
   @ParameterizedTest(name = "商品が販売終了で存在する={0}")
-  @ValueSource(booleans = {false, true})
-  @DisplayName("明細の変更で存在しない商品か販売終了の商品を指定すると 422 を返し、注文を変えない")
+  @CsvSource({
+    "false, /problems/ordering/product-not-found",
+    "true, /problems/ordering/product-discontinued"
+  })
+  @DisplayName("明細の変更で存在しない商品か販売終了の商品を指定すると、理由の type の 422 を返し、注文を変えない")
   @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 422)
-  void changeLinesWithUnavailableProductReturnsUnprocessable(final boolean exists)
-      throws Exception {
+  void changeLinesWithUnavailableProductReturnsUnprocessable(
+      final boolean exists, final String type) throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
     final String before = detailsBody(orderId);
 
-    expectProblem(changeLines(orderId, exists ? discontinued : UUID.randomUUID(), 1), 422);
+    expectProblem(changeLines(orderId, exists ? discontinued : UUID.randomUUID(), 1), 422, type);
 
     assertThat(detailsBody(orderId)).as("orderId=%s の 422 の後の詳細", orderId).isEqualTo(before);
   }
@@ -281,7 +295,7 @@ class OrderApiTest {
     final String orderId = draftAndGetId(UniqueCodes.next("C"), pen, 1);
     final String before = detailsBody(orderId);
 
-    expectProblem(operate(method, orderId, suffix, 2), 409);
+    expectProblem(operate(method, orderId, suffix, 2), 409, "/problems/version-conflict");
 
     assertThat(detailsBody(orderId)).as("orderId=%s の 409 の後の詳細", orderId).isEqualTo(before);
   }
@@ -317,7 +331,7 @@ class OrderApiTest {
     operate("POST", orderId, "/confirm", 1).andExpect(status().isNoContent());
     final String before = detailsBody(orderId);
 
-    expectProblem(operate(method, orderId, suffix, 2), 422);
+    expectProblem(operate(method, orderId, suffix, 2), 422, NOT_DRAFT);
 
     assertThat(detailsBody(orderId)).as("orderId=%s の 422 の後の詳細", orderId).isEqualTo(before);
   }
@@ -340,7 +354,7 @@ class OrderApiTest {
     operate("POST", orderId, "/cancel", 1).andExpect(status().isNoContent());
     details(orderId).andExpect(jsonPath("$.status").value("CANCELLED"));
 
-    expectProblem(operate("POST", orderId, "/confirm", 2), 422);
+    expectProblem(operate("POST", orderId, "/confirm", 2), 422, NOT_DRAFT);
   }
 
   @Test
@@ -459,12 +473,12 @@ class OrderApiTest {
                     lockNo)));
   }
 
-  /** about:blank の Problem Details で、detail を持たないことを確かめる。 */
-  private static void expectProblem(final ResultActions actions, final int status)
-      throws Exception {
+  /** 指定した type の Problem Details で、detail を持たないことを確かめる。 */
+  private static void expectProblem(
+      final ResultActions actions, final int status, final String type) throws Exception {
     actions
         .andExpect(status().is(status))
-        .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(jsonPath("$.type").value(type))
         .andExpect(jsonPath("$.status").value(status))
         .andExpect(jsonPath("$.title").exists())
         .andExpect(jsonPath("$.detail").doesNotExist());

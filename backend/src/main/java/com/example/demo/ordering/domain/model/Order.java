@@ -174,6 +174,7 @@ public final class Order implements Versioned {
   private void ensureDraft() {
     if (status != OrderStatus.DRAFT) {
       throw new BusinessRuleViolationException(
+          OrderFailure.NOT_DRAFT,
           "order is not draft: orderId=" + id.value() + ", status=" + status);
     }
   }
@@ -186,10 +187,12 @@ public final class Order implements Versioned {
       final @Nullable ProductOffer offer = offers.get(item.productId());
       if (offer == null) {
         throw new BusinessRuleViolationException(
+            OrderFailure.PRODUCT_NOT_FOUND,
             "product not found: orderId=" + id.value() + ", productId=" + item.productId().value());
       }
       if (!offer.onSale()) {
         throw new BusinessRuleViolationException(
+            OrderFailure.PRODUCT_DISCONTINUED,
             "product is discontinued: orderId="
                 + id.value()
                 + ", productId="
@@ -204,7 +207,7 @@ public final class Order implements Versioned {
   private static List<OrderLine> requireLines(final OrderId id, final List<OrderLine> lines) {
     if (lines.isEmpty()) {
       throw new BusinessRuleViolationException(
-          "order lines must not be empty: orderId=" + id.value());
+          OrderFailure.NO_LINES, "order lines must not be empty: orderId=" + id.value());
     }
     return List.copyOf(lines);
   }

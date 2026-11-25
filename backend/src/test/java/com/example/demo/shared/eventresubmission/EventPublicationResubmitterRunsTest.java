@@ -2,6 +2,7 @@ package com.example.demo.shared.eventresubmission;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.opentelemetry.api.OpenTelemetry;
@@ -77,7 +78,7 @@ class EventPublicationResubmitterRunsTest {
   @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
 
   /** 差し替えられる時計。 */
-  @Autowired private EventPublicationResubmitterTest.MutableClock clock;
+  @Autowired private MutableClock clock;
 
   /** 集計の Gauge が読む DB。 */
   @Autowired private DSLContext dsl;
@@ -195,7 +196,8 @@ class EventPublicationResubmitterRunsTest {
             properties,
             policies,
             meterRegistry,
-            abandon);
+            abandon,
+            ResubmissionTestSupport.noStaleCheck());
     final Supplier<Double> exhaustedGauge =
         () ->
             meterRegistry.get("event.publication.failed").tag("state", "exhausted").gauge().value();
@@ -226,7 +228,8 @@ class EventPublicationResubmitterRunsTest {
         properties,
         policies,
         meterRegistry,
-        abandon);
+        abandon,
+        ResubmissionTestSupport.noStaleCheck());
   }
 
   /** ロックの実行が、決めた例外を投げるモック。 */

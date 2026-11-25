@@ -1,5 +1,6 @@
 package com.example.demo.payment.infrastructure.client;
 
+import static com.example.demo.testkit.LoopbackHttpServer.reply;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -7,14 +8,11 @@ import com.example.demo.payment.domain.model.ChargeOutcome;
 import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
-import com.sun.net.httpserver.HttpExchange;
+import com.example.demo.testkit.LoopbackHttpServer;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.UUID;
@@ -90,13 +88,13 @@ class PaymentGatewayClientTest {
           .withBean(PaymentGatewayClient.class);
 
   /** テストごとに起動する決済代行の代わりの HTTP サーバ。 */
-  private @Nullable HttpServer server;
+  private @Nullable LoopbackHttpServer server;
 
   /** 起動した HTTP サーバを止める。 */
   @AfterEach
   void stopServer() {
     if (server != null) {
-      server.stop(0);
+      server.stop();
     }
   }
 
@@ -286,31 +284,14 @@ class PaymentGatewayClientTest {
 
   /** ループバックの空いているポートで HTTP サーバを起動し、その URL を指す Client を返す。 */
   private PaymentGatewayClient start(final HttpHandler handler) throws IOException {
-    final HttpServer started =
-        HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-    started.createContext("/v1/charges", handler);
-    started.start();
+    final LoopbackHttpServer started = LoopbackHttpServer.start().handle("/v1/charges", handler);
     server = started;
     return new PaymentGatewayClient(
         RestClient.builder(),
         ClientHttpRequestFactoryBuilder.jdk(),
         HttpClientSettings.defaults().withRedirects(HttpRedirects.DONT_FOLLOW),
-        "http://"
-            + InetAddress.getLoopbackAddress().getHostAddress()
-            + ":"
-            + started.getAddress().getPort(),
+        started.url(),
         Duration.ofSeconds(1),
         Duration.ofSeconds(2));
-  }
-
-  /** JSON の本文で応答する。本文が空なら本文を送らない。 */
-  private static void reply(final HttpExchange exchange, final int status, final String body)
-      throws IOException {
-    final byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
-    exchange.getResponseHeaders().add("Content-Type", "application/json");
-    exchange.sendResponseHeaders(status, bytes.length == 0 ? -1 : bytes.length);
-    try (OutputStream out = exchange.getResponseBody()) {
-      out.write(bytes);
-    }
   }
 }

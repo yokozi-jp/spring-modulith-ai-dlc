@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -63,7 +64,7 @@ class FailedPublicationSweepTest {
     assertThat(accepted).as("上限の 2 件").containsExactly(rows.get(0), rows.get(1));
     assertThat(swept)
         .as("1 件目はモックが進めず、3 件目は上限を超えた")
-        .contains(new FailedPublicationSweep.Swept(Set.of(rows.get(1)), 1));
+        .contains(new FailedPublicationSweep.Swept(Map.of(rows.get(1), 2), 1));
   }
 
   @Test
@@ -77,7 +78,7 @@ class FailedPublicationSweepTest {
         sweep.tryOnce(publication -> publication.getIdentifier().equals(rows.get(2)));
 
     assertThat(accepted).containsExactly(rows.get(2));
-    assertThat(swept).contains(new FailedPublicationSweep.Swept(Set.of(rows.get(2)), 0));
+    assertThat(swept).contains(new FailedPublicationSweep.Swept(Map.of(rows.get(2), 2), 0));
   }
 
   /** {@code rows} を FAILED の行として {@code resubmit} に流すモックの上の sweep。 */
@@ -106,22 +107,19 @@ class FailedPublicationSweepTest {
             })
         .when(failed)
         .resubmit(Mockito.any(ResubmissionOptions.class));
-    return newSweep(
+    return new FailedPublicationSweep(
+        dsl,
         failed,
+        lockingTaskExecutor,
+        Clock.fixed(NOW, ZoneOffset.UTC),
         new EventPublicationResubmissionConfig.Properties(
             properties.waitAge(),
             properties.inFlightStaleness(),
             properties.interval(),
             maxPerRun,
             properties.lockAtMostFor(),
-            properties.policies()));
-  }
-
-  private FailedPublicationSweep newSweep(
-      final FailedEventPublications failed,
-      final EventPublicationResubmissionConfig.Properties sweepProperties) {
-    return new FailedPublicationSweep(
-        dsl, failed, lockingTaskExecutor, Clock.fixed(NOW, ZoneOffset.UTC), sweepProperties);
+            properties.policies()),
+        ResubmissionTestSupport.noStaleCheck());
   }
 
   /** completion_attempts が 1 の FAILED の行を DB に作る。 */

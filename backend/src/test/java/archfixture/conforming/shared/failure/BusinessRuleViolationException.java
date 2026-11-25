@@ -7,8 +7,13 @@ public final class BusinessRuleViolationException extends RuntimeException {
 
   @Serial private static final long serialVersionUID = 1L;
 
-  /** 例外を作る。 */
-  public BusinessRuleViolationException(final String message) {
-    super(message);
+  /**
+   * 理由の enum の定数とメッセージから例外を作る。
+   *
+   * @param <E> 理由の enum
+   */
+  public <E extends Enum<E> & FailureReason> BusinessRuleViolationException(
+      final E reason, final String message) {
+    super(reason.name() + ": " + message);
   }
 }
