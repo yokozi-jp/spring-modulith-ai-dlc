@@ -1,5 +1,6 @@
 package com.example.demo.ordering.presentation.web;
 
+import static com.example.demo.jooq.ordering.Tables.T_IDEMPOTENCY_KEY;
 import static com.example.demo.testkit.AppUsers.oidcLogin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
@@ -16,17 +17,21 @@ import com.example.demo.ordering.application.ConfirmOrderCommandHandler;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.idempotency.IdempotencyKey;
+import com.example.demo.shared.persistence.TestCommonColumns;
 import com.example.demo.shared.tenancy.TenantContext;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.IdempotencyKeys;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
-import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -35,6 +40,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -96,6 +102,12 @@ class OrderIdempotencyApiTest {
 
   /** 共通カラムの trace ID を作る observation registry。 */
   @Autowired private ObservationRegistry observationRegistry;
+
+  /** API が出したログ。 */
+  @Autowired private CapturedLogRecords capturedLogRecords;
+
+  /** 1 つ目の要求のトランザクションの、DB のバックエンドのプロセス ID。 */
+  private final AtomicInteger holderPid = new AtomicInteger();
 
   /** 同じキーの 2 つの要求を並行に送るスレッド。 */
   private final ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -220,10 +232,7 @@ class OrderIdempotencyApiTest {
     final Future<?> first = holdConfirm(orderId, key);
 
     final Future<MvcResult> second = executor.submit(() -> confirm(orderId, key).andReturn());
-    await("key=" + key.value() + " の 2 つ目の要求がキーの行のロックを待つ")
-        .atMost(WAIT)
-        .pollInterval(Duration.ofMillis(10))
-        .untilAsserted(() -> assertThat(waitingKeyInserts()).as("キーの INSERT のロック待ち").isPositive());
+    awaitSecondWaitsForFirst(key);
     release.countDown();
     first.get(WAIT.toSeconds(), TimeUnit.SECONDS);
 
@@ -231,6 +240,73 @@ class OrderIdempotencyApiTest {
         .as("key=%s の 2 つ目の要求", key.value())
         .isEqualTo(204);
     details(orderId).andExpect(jsonPath("$.lockNo").value(2));
+  }
+
+  @Test
+  @DisplayName("期限切れの行を同じキーの 2 つの要求が取り直すと、2 つ目は 1 つ目を待って同じ 204 を返し、確定は 1 回だけ動く")
+  void concurrentTakeoverOfExpiredKeyRunsOnce() throws Exception {
+    final String orderId = draftAndGetId(UniqueCodes.next("C"));
+    final IdempotencyKey key = IdempotencyKeys.next();
+    insertExpiredKey(key);
+    final Future<?> first = holdConfirm(orderId, key);
+
+    final Future<MvcResult> second = executor.submit(() -> confirm(orderId, key).andReturn());
+    awaitSecondWaitsForFirst(key);
+    release.countDown();
+    first.get(WAIT.toSeconds(), TimeUnit.SECONDS);
+
+    // 2 つ目も業務を動かしていれば、版の 1 は古いので 204 でなく 409 になる。
+    assertThat(second.get(WAIT.toSeconds(), TimeUnit.SECONDS).getResponse().getStatus())
+        .as("key=%s の 2 つ目の要求", key.value())
+        .isEqualTo(204);
+    details(orderId).andExpect(jsonPath("$.lockNo").value(2));
+  }
+
+  @Test
+  @DisplayName("確定に使ったキーで、同じ本文の取消を送ると、操作の名前が違うのでペイロードの不一致の 400 を返し、注文を変えない")
+  void sameKeyForAnotherOperationReturnsBadRequest() throws Exception {
+    final String orderId = draftAndGetId(UniqueCodes.next("C"));
+    final IdempotencyKey key = IdempotencyKeys.next();
+    confirm(orderId, key).andExpect(status().isNoContent());
+
+    // 確定と取消の Command は同じ JSON になるので、操作の名前だけがペイロードを分ける。
+    expectIdempotencyProblem(
+        mockMvc.perform(
+            write(HttpMethod.POST, "/api/orders/" + orderId + "/cancel", "{\"lockNo\":1}")
+                .with(IdempotencyKeys.header(key))),
+        400,
+        "idempotency-key-payload-mismatch");
+    details(orderId)
+        .andExpect(jsonPath("$.status").value("CONFIRMED"))
+        .andExpect(jsonPath("$.lockNo").value(2));
+  }
+
+  @Test
+  @DisplayName("ある注文の確定に使ったキーで、パスの注文 ID だけが違う確定を送ると、ペイロードの不一致の 400 を返し、その注文を確定しない")
+  void sameKeyForAnotherOrderReturnsBadRequest() throws Exception {
+    final String confirmed = draftAndGetId(UniqueCodes.next("C"));
+    final String other = draftAndGetId(UniqueCodes.next("C"));
+    final IdempotencyKey key = IdempotencyKeys.next();
+    confirm(confirmed, key).andExpect(status().isNoContent());
+
+    expectIdempotencyProblem(confirm(other, key), 400, "idempotency-key-payload-mismatch");
+    details(other).andExpect(jsonPath("$.status").value("DRAFT"));
+  }
+
+  @Test
+  @DisplayName("Idempotency-Key のヘッダーが 2 行あれば、値が同じでも形式の誤りの 400 を返し、注文を変えない")
+  void repeatedKeyHeaderReturnsBadRequest() throws Exception {
+    final String orderId = draftAndGetId(UniqueCodes.next("C"));
+    final IdempotencyKey key = IdempotencyKeys.next();
+
+    expectIdempotencyProblem(
+        mockMvc.perform(
+            write(HttpMethod.POST, "/api/orders/" + orderId + "/confirm", "{\"lockNo\":1}")
+                .with(IdempotencyKeys.header(key))
+                .with(IdempotencyKeys.header(key))),
+        400,
+        "idempotency-key-invalid");
+    details(orderId).andExpect(jsonPath("$.status").value("DRAFT"));
   }
 
   @Test
@@ -242,6 +318,13 @@ class OrderIdempotencyApiTest {
 
     expectIdempotencyProblem(confirm(orderId, key), 409, "idempotency-key-in-progress")
         .andExpect(header().string(HttpHeaders.RETRY_AFTER, "1"));
+    final LogRecordData logged = capturedLogRecords.withBody("API conflict").getLast();
+    assertThat(logged.getAttributes().get(AttributeKey.stringKey("problem.type")))
+        .as("処理中の 409 のログの problem.type")
+        .isEqualTo("/problems/idempotency-key-in-progress");
+    assertThat(logged.getAttributes().get(AttributeKey.stringKey("conflict.kind")))
+        .as("処理中の 409 のログの conflict.kind")
+        .isEqualTo("idempotency_in_progress");
     release.countDown();
     first.get(WAIT.toSeconds(), TimeUnit.SECONDS);
 
@@ -261,19 +344,21 @@ class OrderIdempotencyApiTest {
             TenantContext.call(
                 AsTenant.TENANT,
                 () ->
-                    Observation.createNotStarted("order-test", observationRegistry)
-                        .observe(() ->
+                    AppUsers.signedInAndObserved(
+                        observationRegistry,
+                        () ->
                             AsModule.call(
                                 dsl,
                                 "ordering",
-                                tx ->
-                                    AppUsers.signedIn(() -> {
-                                      confirmOrder.handle(
-                                          new ConfirmOrderCommand(
-                                              orderId, new ExpectedLockNo(1), key));
-                                      handled.countDown();
-                                      return awaitRelease();
-                                    })))));
+                                tx -> {
+                                  holderPid.set(
+                                      tx.fetchSingle("select pg_backend_pid()")
+                                          .get(0, Integer.class));
+                                  confirmOrder.handle(
+                                      new ConfirmOrderCommand(orderId, new ExpectedLockNo(1), key));
+                                  handled.countDown();
+                                  return awaitRelease();
+                                }))));
     assertThat(handled.await(WAIT.toSeconds(), TimeUnit.SECONDS))
         .as("key=%s の 1 つ目の要求の処理", key.value())
         .isTrue();
@@ -289,13 +374,37 @@ class OrderIdempotencyApiTest {
     }
   }
 
-  /** キーの表への INSERT で、ロックを待っている接続の数を返す。 */
-  private int waitingKeyInserts() {
-    return dsl.fetchSingle(
-            "select count(*)::int from pg_stat_activity"
-                + " where wait_event_type = 'Lock'"
-                + " and query like 'insert into \"ordering\".\"t_idempotency_key\"%'")
-        .get(0, Integer.class);
+  /** 2 つ目の要求が、1 つ目の要求のトランザクションの持つロックを待つまで待つ。 */
+  private void awaitSecondWaitsForFirst(final IdempotencyKey key) {
+    await("key=" + key.value() + " の 2 つ目の要求が 1 つ目の要求のロックを待つ")
+        .atMost(WAIT)
+        .pollInterval(Duration.ofMillis(10))
+        .untilAsserted(() ->
+            assertThat(
+                    dsl.fetchSingle(
+                            "select count(*)::int from pg_stat_activity"
+                                + " where wait_event_type = 'Lock' and ? = any(pg_blocking_pids(pid))",
+                            holderPid.get())
+                        .get(0, Integer.class))
+                .as("1 つ目の要求（pid=%s）のロックを待つ接続", holderPid.get())
+                .isPositive());
+  }
+
+  /** テストの利用者のテナントに、期限を過ぎたキーの行を入れる。 */
+  private void insertExpiredKey(final IdempotencyKey key) {
+    final Instant expired = Instant.parse("2026-01-01T00:00:00.000001Z");
+    AsModule.run(
+        dsl,
+        "ordering",
+        tx ->
+            TestCommonColumns.runAs(() ->
+                tx.insertInto(T_IDEMPOTENCY_KEY)
+                    .set(T_IDEMPOTENCY_KEY.USER_PUBLIC_ID, UUID.fromString(AppUsers.USER_ID))
+                    .set(T_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY, key.value())
+                    .set(T_IDEMPOTENCY_KEY.PAYLOAD_HASH, new byte[] {1})
+                    .set(T_IDEMPOTENCY_KEY.EXPIRES_AT, expired)
+                    .set(TestCommonColumns.at(expired).forInsert(T_IDEMPOTENCY_KEY))
+                    .execute()));
   }
 
   private ResultActions confirm(final String orderId, final IdempotencyKey key) throws Exception {

@@ -42,22 +42,21 @@ public class DraftOrderCommandHandler {
   /** 明細の商品を読んで下書きの注文を作り、保存する。同じ冪等性キーの再送には、保存した Result を返す。 */
   @Transactional
   public DraftOrderResult handle(final DraftOrderCommand command) {
-    return idempotency.execute(
-        command,
-        DraftOrderResult.class,
-        () -> {
-          final List<OrderedItem> items =
-              command.lines().stream()
-                  .map(line -> OrderedItems.item(line.productId(), line.quantity()))
-                  .toList();
-          final Order order =
-              Order.draft(
-                  command.customerOrderCode(),
-                  items,
-                  OrderedItems.offers(productQueries, items),
-                  Instant.now(clock));
-          orderRepository.add(order);
-          return new DraftOrderResult(order.id().value().toString());
-        });
+    return idempotency.execute(command, DraftOrderResult.class, () -> draft(command));
+  }
+
+  private DraftOrderResult draft(final DraftOrderCommand command) {
+    final List<OrderedItem> items =
+        command.lines().stream()
+            .map(line -> OrderedItems.item(line.productId(), line.quantity()))
+            .toList();
+    final Order order =
+        Order.draft(
+            command.customerOrderCode(),
+            items,
+            OrderedItems.offers(productQueries, items),
+            Instant.now(clock));
+    orderRepository.add(order);
+    return new DraftOrderResult(order.id().value().toString());
   }
 }

@@ -1,25 +1,24 @@
 package com.example.demo.shared.persistence;
 
-import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.idempotency.Idempotency;
-import com.example.demo.shared.idempotency.IdempotencyKeyInProgressException;
-import com.example.demo.shared.idempotency.IdempotencyKeyPayloadMismatchException;
+import com.example.demo.shared.idempotency.IdempotencyKeyException;
 import com.example.demo.shared.idempotency.IdempotentCommand;
-import com.example.demo.shared.security.AppUserPrincipal;
+import com.example.demo.shared.tenancy.TenantContext;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
 import org.jooq.JSONB;
 import org.jooq.Record2;
 import org.jspecify.annotations.Nullable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.json.JsonMapper;
@@ -27,9 +26,8 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * {@link Idempotency} を、呼び出し中の CommandHandler のモジュールのキーの表で実装する（ADR-126）。
  *
- * <p>操作の名前は {@code *_pgm_cd}（{@code
- * ordering.ConfirmOrder}）で、キーの表はその先頭のモジュールのスキーマから引く。ペイロードのハッシュは、操作の名前と Command の JSON の SHA-256
- * である。Result は JSON で保存する。
+ * <p>操作の名前は {@code *_pgm_cd}（{@code ordering.ConfirmOrder}）で、キーの表はそのモジュールのスキーマから引く。モジュールごとの表は起動のときに
+ * jOOQ のカタログから一度だけ引き、列を確かめる。ペイロードのハッシュは、操作の名前と Command の JSON の SHA-256 である。Result は JSON で保存する。
  *
  * <p>JSON は API の {@code spring.jackson.*} の設定から切り離した既定の形で作り、設定を変えてもハッシュと保存した形が変わらないようにする。保存した
  * Result は配備をまたいで読み直すので、今の Result の型にないプロパティは無視する。
@@ -48,71 +46,75 @@ import tools.jackson.databind.json.JsonMapper;
   private final DSLContext dsl;
 
   /** キーの行を書く。 */
-  private final TableWriter tableWriter;
+  private final IdempotencyKeyWriter writer;
+
+  /** モジュールの名前からキーの表への対応。 */
+  private final Map<String, IdempotencyKeyTable> tables;
 
   /** 期限の基準の現在時刻を取る時計。 */
   private final Clock clock;
 
-  /** 依存を受け取る。 */
+  /**
+   * jOOQ のカタログのキーの表で作る。
+   *
+   * @throws IllegalArgumentException キーの表に列がない、または型が異なる場合
+   */
+  /* package */ @Autowired
+  JooqIdempotency(final DSLContext dsl, final CommonColumns commonColumns, final Clock clock) {
+    this(dsl, commonColumns, clock, IdempotencyKeyTable.inCatalog());
+  }
+
+  /** モジュールの名前からキーの表への対応を受け取る。生成されたカタログにない表で確かめるテストが使う。 */
   /* package */ JooqIdempotency(
-      final DSLContext dsl, final TableWriter tableWriter, final Clock clock) {
+      final DSLContext dsl,
+      final CommonColumns commonColumns,
+      final Clock clock,
+      final Map<String, IdempotencyKeyTable> tables) {
     this.dsl = dsl;
-    this.tableWriter = tableWriter;
+    this.writer = new IdempotencyKeyWriter(dsl, commonColumns);
+    this.tables = Map.copyOf(tables);
     this.clock = clock;
   }
 
   @Override
   public <R> R execute(
       final IdempotentCommand command, final Class<R> resultType, final Supplier<R> operation) {
-    final String pgmCd = PgmCdAspect.current();
+    final String module = PgmCdAspect.currentModule();
     final IdempotencyKeyTable keys =
-        IdempotencyKeyTable.ofModule(pgmCd.substring(0, pgmCd.indexOf('.')));
-    final UUID user = currentUser();
-    final UUID key = command.idempotencyKey().value();
+        Optional.ofNullable(tables.get(module))
+            .orElseThrow(() ->
+                new IllegalStateException("idempotency key table is missing: module=" + module));
+    final IdempotencyKeyTable.ScopedKey scopedKey =
+        new IdempotencyKeyTable.ScopedKey(
+            TenantContext.current().value(), currentUser(), command.idempotencyKey().value());
+    final String pgmCd = PgmCdAspect.current();
     final byte[] payloadHash = payloadHash(pgmCd, command);
     final Instant now = Instant.now(clock);
-    if (claim(keys, user, key, payloadHash, now)) {
+    if (writer.claim(keys, scopedKey, payloadHash, now, now.plus(RETENTION))) {
       final R result = operation.get();
-      tableWriter.saveIdempotentResult(
-          keys, user, key, JSONB.valueOf(JSON.writeValueAsString(result)));
+      writer.saveResult(keys, scopedKey, JSONB.valueOf(JSON.writeValueAsString(result)));
       return result;
     }
     // claim が 0 行なら、commit 済みの有効な行がある。ON CONFLICT DO UPDATE がその行をロックしたので、消えない。
     final Record2<byte[], JSONB> stored =
         dsl.select(keys.payloadHash(), keys.result())
             .from(keys.table())
-            .where(keys.user().eq(user).and(keys.key().eq(key)))
+            .where(keys.identifies(scopedKey))
             .fetchSingle();
     if (!MessageDigest.isEqual(stored.value1(), payloadHash)) {
-      throw new IdempotencyKeyPayloadMismatchException(
-          "Idempotency-Key was used for a different payload: operation=" + pgmCd + ", key=" + key);
+      throw new IdempotencyKeyException(
+          IdempotencyKeyException.Reason.PAYLOAD_MISMATCH,
+          "Idempotency-Key was used for a different payload: operation="
+              + pgmCd
+              + ", key="
+              + scopedKey.key());
     }
     final @Nullable JSONB result = stored.value2();
     if (result == null) {
-      throw new IllegalStateException("committed idempotency key has no result: key=" + key);
+      throw new IllegalStateException(
+          "committed idempotency key has no result: key=" + scopedKey.key());
     }
     return JSON.readValue(result.data(), resultType);
-  }
-
-  /** キーの行を取る。同じキーの要求の終わりを待ち切れなかったら、処理中の例外にする。 */
-  // ConflictException は原因を持たず、メッセージは処理中の例外に書き直すので、捨てるスタックトレースに情報はない（ADR-062）。
-  @SuppressWarnings("PMD.PreserveStackTrace")
-  private boolean claim(
-      final IdempotencyKeyTable keys,
-      final UUID user,
-      final UUID key,
-      final byte[] payloadHash,
-      final Instant now) {
-    try {
-      return tableWriter.claimIdempotencyKey(
-          keys, user, key, payloadHash, now, now.plus(RETENTION));
-    } catch (final ConflictException e) {
-      if (e.kind() != ConflictException.Kind.LOCK) {
-        throw e;
-      }
-      throw new IdempotencyKeyInProgressException(
-          "request with the same Idempotency-Key is in progress: key=" + key);
-    }
   }
 
   /** 操作の名前と Command の JSON の SHA-256 を返す。 */
@@ -129,11 +131,9 @@ import tools.jackson.databind.json.JsonMapper;
 
   /** キーを分ける利用者の ID を返す（ADR-096）。 */
   private static UUID currentUser() {
-    final @Nullable Authentication authentication =
-        SecurityContextHolder.getContext().getAuthentication();
-    if (authentication != null && authentication.getPrincipal() instanceof AppUserPrincipal user) {
-      return UUID.fromString(user.userId());
-    }
-    throw new IllegalStateException("Idempotency-Key requires an authenticated app user");
+    return UUID.fromString(
+        CommonColumns.currentAppUserId()
+            .orElseThrow(() ->
+                new IllegalStateException("Idempotency-Key requires an authenticated app user")));
   }
 }

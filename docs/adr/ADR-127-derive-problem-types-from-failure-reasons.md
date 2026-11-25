@@ -34,7 +34,8 @@ ADR-058 の `/problems/<kebab-case>` のままでは、モジュールをまた�
 この版は、Pull Request #737 のレビューを受けて Decision を書き直した。
 前の版は、`shared` の `FailureReason` が type と `title` のキーを作り、`error` の `ApiProblemDetails` が同じ接頭辞を別に持っていた。
 モジュールによらない type の名前は、`ApiProblemDetails` の定数、競合の種類の `switch`、OpenAPI の一覧、2 つのテストに手で書かれていた。
-その後、#540 で ADR-126 の `Idempotency-Key` の 4 つの type を `CommonProblem` に足したので、`CommonProblem` の中身の記述に加えた。
+その後、#540 で [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) の `Idempotency-Key` の type を `CommonProblem` に足したので、`CommonProblem` の記述を中身の一覧から置く規則に変えた。
+同じ #540 で、例外の理由から type を選ぶ `switch` を、競合の種類のほかに `Idempotency-Key` の誤りの理由にも使った。
 
 ## Decision
 
@@ -50,9 +51,8 @@ ADR-058 の「業務固有の problem type は `/problems/<kebab-case>`」を次
   - `<kebab-case>` は、enum の定数の名前を小文字にし、`_` を `-` にしたものである。
   - `FailureReason` は HTTP の語彙（type、`title`）を持たない。
 - モジュールによらない problem のパスは、`error.presentation.web` の enum `CommonProblem` の定数の名前の kebab-case にする。
-  `CommonProblem` は、入力検証、`Idempotency-Key` の誤りと処理中（[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）、CSRF トークン、テナントを選ぶ前の 403 と、409 の競合の種類で、定数ごとに HTTP の status を持つ。
-  409 は、`ConflictException.Kind` から網羅した `switch` で選び、版の不一致を `/problems/version-conflict`、行ロックを待ち切れなかった失敗（`55P03`）を `/problems/lock-timeout`、一意制約の違反（`23505`）を `/problems/unique-violation` にする。
-  `Kind` を足すとコンパイルが止まる。
+  `CommonProblem` には、モジュールの `FailureReason` に属さず、どのモジュールでも同じ意味になる失敗を置き、定数ごとに HTTP の status を持たせる。
+  共通の例外が種類か理由の enum を持つときは、その enum から網羅した `switch` で定数を選び、種類か理由を足すとコンパイルが止まるようにする（`ConflictException.Kind` など）。
 - `title` は、日本語と英語の `messages` に置き、コードに既定の文言を書かない。
   実行時にキーがなければ、`title` は status の文言（`problem.title.422` など）になる。
 - 理由の型の形は、コンパイラと ArchUnit で決める。
@@ -68,7 +68,7 @@ ADR-058 の「業務固有の problem type は `/problems/<kebab-case>`」を次
   `enum` ではなく `x-extensible-enum` にするのは、type の値を足しても、既存のクライアントの型と振る舞いを壊さないためである。
   クライアントは type を応答の文字列のまま比べ（ADR-058）、知らない type は status で扱う。
 - API の 404、409、422 のログに、応答の type と同じ値を属性 `problem.type` で付ける。
-  409 の `conflict.kind`（`version`、`lock`、`unique`）は ADR-062 のとおり残し、`problem.type` の語彙に合わせない。
+  409 の `conflict.kind`（`ConflictException.Kind` の定数の名前の小文字）は ADR-062 のとおり残し、`problem.type` の語彙に合わせない。
 
 ## Consequences
 

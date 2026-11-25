@@ -1,5 +1,6 @@
 package com.example.demo.shared.idempotency;
 
+import com.example.demo.shared.concurrency.ConflictException;
 import java.util.function.Supplier;
 
 /**
@@ -21,8 +22,9 @@ public interface Idempotency {
    * @param resultType 保存した Result を読み直す型
    * @param operation 業務の処理。キーが新しいか期限切れのときだけ呼ぶ
    * @return 業務の処理の Result か、保存した Result
-   * @throws IdempotencyKeyPayloadMismatchException 有効なキーのペイロードが違う場合
-   * @throws IdempotencyKeyInProgressException 同じキーの要求の終わりを待ち切れなかった場合
+   * @throws IdempotencyKeyException 有効なキーのペイロードが違う場合（{@code PAYLOAD_MISMATCH}）
+   * @throws ConflictException 同じキーの要求の終わりを {@code lock_timeout} までに待ち切れなかった場合（種類は {@code
+   *     IDEMPOTENCY_IN_PROGRESS}）。原因は持たない
    * @throws IllegalStateException CommandHandler の外で呼んだ場合、利用者が認証されていない場合
    */
   <R> R execute(IdempotentCommand command, Class<R> resultType, Supplier<R> operation);

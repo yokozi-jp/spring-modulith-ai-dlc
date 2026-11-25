@@ -4,9 +4,7 @@ import com.example.demo.LocaleSupport;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
-import com.example.demo.shared.idempotency.IdempotencyKey;
-import com.example.demo.shared.idempotency.IdempotencyKeyInProgressException;
-import com.example.demo.shared.idempotency.IdempotencyKeyPayloadMismatchException;
+import com.example.demo.shared.idempotency.IdempotencyKeyException;
 import com.example.demo.shared.security.TenantNotSelectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -16,7 +14,6 @@ import java.util.Locale;
 import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
@@ -26,8 +23,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.csrf.CsrfException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
-import org.springframework.web.bind.MissingRequestHeaderException;
-import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.ServletWebRequest;
@@ -56,9 +51,6 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /** 404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-127）。 */
   private static final String PROBLEM_TYPE = "problem.type";
 
-  /** 同じ Idempotency-Key の処理中の 409 に付ける、再試行までの秒数。ADR-055 の lock_timeout の待ちと同じ桁にする。 */
-  private static final String IN_PROGRESS_RETRY_AFTER_SECONDS = "1";
-
   /** Problem Details の共通フィールドを生成する。 */
   private final ApiProblemDetails problemDetails;
 
@@ -79,15 +71,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(AccessDeniedException.class)
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
-    final Locale locale = resolveLocale(request);
     // Invalid と Missing の親にあたる CsrfException で受け、subtype が増えても専用の type にする。
     if (exception instanceof CsrfException) {
-      return problem(
-          exception, problemDetails.problem(CommonProblem.CSRF_TOKEN_INVALID, locale), request);
+      return problem(exception, CommonProblem.CSRF_TOKEN_INVALID, request);
     }
     if (exception instanceof TenantNotSelectedException) {
-      return problem(
-          exception, problemDetails.problem(CommonProblem.TENANT_NOT_SELECTED, locale), request);
+      return problem(exception, CommonProblem.TENANT_NOT_SELECTED, request);
     }
     return problem(exception, HttpStatus.FORBIDDEN, request);
   }
@@ -110,27 +99,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(ConflictException.class)
   /* package */ @Nullable ResponseEntity<Object> handleConflictException(
       final ConflictException exception, final WebRequest request) {
-    return problem(
-        exception,
-        problemDetails.problem(CommonProblem.forConflict(exception.kind()), resolveLocale(request)),
-        request);
+    return problem(exception, CommonProblem.forConflict(exception.kind()), request);
   }
 
-  /** 有効な Idempotency-Key を内容の違う要求に使った 400 を、専用の type にする（ADR-126）。 */
-  @ExceptionHandler(IdempotencyKeyPayloadMismatchException.class)
-  /* package */ @Nullable ResponseEntity<Object> handleIdempotencyKeyPayloadMismatchException(
-      final IdempotencyKeyPayloadMismatchException exception, final WebRequest request) {
-    return problem(
-        exception, CommonProblem.IDEMPOTENCY_KEY_PAYLOAD_MISMATCH, new HttpHeaders(), request);
-  }
-
-  /** 同じ Idempotency-Key の処理中を、lock_no の競合と別の type の 409 にし、Retry-After を付ける（ADR-126）。 */
-  @ExceptionHandler(IdempotencyKeyInProgressException.class)
-  /* package */ @Nullable ResponseEntity<Object> handleIdempotencyKeyInProgressException(
-      final IdempotencyKeyInProgressException exception, final WebRequest request) {
-    final HttpHeaders headers = new HttpHeaders();
-    headers.set(HttpHeaders.RETRY_AFTER, IN_PROGRESS_RETRY_AFTER_SECONDS);
-    return problem(exception, CommonProblem.IDEMPOTENCY_KEY_IN_PROGRESS, headers, request);
+  /** Idempotency-Key の誤りを、理由ごとの type の 400 Problem Details へ変換する（ADR-126）。 */
+  @ExceptionHandler(IdempotencyKeyException.class)
+  /* package */ @Nullable ResponseEntity<Object> handleIdempotencyKeyException(
+      final IdempotencyKeyException exception, final WebRequest request) {
+    return problem(exception, CommonProblem.forIdempotencyKey(exception.reason()), request);
   }
 
   /** 見つからない集約や行を 404 Problem Details へ変換する。例外の内容は応答に入れない。 */
@@ -189,33 +165,6 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return handleExceptionInternal(ex, body, headers, status, request);
   }
 
-  /** Idempotency-Key のヘッダーがない要求を、専用の type の 400 にする。ほかの欠けた値は基底クラスどおりにする（ADR-126）。 */
-  @Override
-  protected @Nullable ResponseEntity<Object> handleServletRequestBindingException(
-      final ServletRequestBindingException ex,
-      final HttpHeaders headers,
-      final HttpStatusCode status,
-      final WebRequest request) {
-    if (ex instanceof MissingRequestHeaderException missing
-        && missing.getParameter().getParameterType() == IdempotencyKey.class) {
-      return problem(ex, CommonProblem.IDEMPOTENCY_KEY_MISSING, headers, request);
-    }
-    return super.handleServletRequestBindingException(ex, headers, status, request);
-  }
-
-  /** Idempotency-Key のヘッダーが引用符で囲んだ UUID でない要求を、専用の type の 400 にする（ADR-126）。 */
-  @Override
-  protected @Nullable ResponseEntity<Object> handleTypeMismatch(
-      final TypeMismatchException ex,
-      final HttpHeaders headers,
-      final HttpStatusCode status,
-      final WebRequest request) {
-    if (ex.getRequiredType() == IdempotencyKey.class) {
-      return problem(ex, CommonProblem.IDEMPOTENCY_KEY_INVALID, headers, request);
-    }
-    return super.handleTypeMismatch(ex, headers, status, request);
-  }
-
   /** 全ての例外が通る。ログを 1 か所で出し、コミット済みの応答では本文を書かない。 */
   @Override
   protected @Nullable ResponseEntity<Object> handleExceptionInternal(
@@ -256,12 +205,13 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         body, ApiProblemDetails.responseHeaders(headers, status, locale), status, request);
   }
 
-  /** モジュールによらない problem を、headers を付けて応答する。 */
+  /** モジュールによらない problem で応答する。problem が {@code Retry-After} を持てば付ける。 */
   private @Nullable ResponseEntity<Object> problem(
-      final Exception exception,
-      final CommonProblem common,
-      final HttpHeaders headers,
-      final WebRequest request) {
+      final Exception exception, final CommonProblem common, final WebRequest request) {
+    final HttpHeaders headers = new HttpHeaders();
+    common
+        .retryAfter()
+        .ifPresent(delay -> headers.set(HttpHeaders.RETRY_AFTER, Long.toString(delay.toSeconds())));
     return handleExceptionInternal(
         exception,
         problemDetails.problem(common, resolveLocale(request)),

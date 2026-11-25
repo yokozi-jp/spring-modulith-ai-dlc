@@ -45,22 +45,21 @@ public class ConfirmOrderCommandHandler {
   /** ロック番号を確かめて注文を確定して保存し、確定のイベントを発行する。同じ冪等性キーの再送には、保存した Result を返す。 */
   @Transactional
   public ConfirmOrderResult handle(final ConfirmOrderCommand command) {
-    return idempotency.execute(
-        command,
-        ConfirmOrderResult.class,
-        () -> {
-          final Order order =
-              orderRepository
-                  .findById(new OrderId(UUID.fromString(command.orderId())))
-                  .orElseThrow(
-                      () -> new NotFoundException("order not found: orderId=" + command.orderId()));
-          order.ensureLockNo(command.expectedLockNo());
-          order.confirm();
-          orderRepository.update(order);
-          events.publishEvent(
-              new OrderConfirmed(
-                  order.id().value().toString(), Instant.now(clock), TenantContext.current()));
-          return new ConfirmOrderResult(order.id().value().toString());
-        });
+    return idempotency.execute(command, ConfirmOrderResult.class, () -> confirm(command));
+  }
+
+  private ConfirmOrderResult confirm(final ConfirmOrderCommand command) {
+    final Order order =
+        orderRepository
+            .findById(new OrderId(UUID.fromString(command.orderId())))
+            .orElseThrow(
+                () -> new NotFoundException("order not found: orderId=" + command.orderId()));
+    order.ensureLockNo(command.expectedLockNo());
+    order.confirm();
+    orderRepository.update(order);
+    events.publishEvent(
+        new OrderConfirmed(
+            order.id().value().toString(), Instant.now(clock), TenantContext.current()));
+    return new ConfirmOrderResult(order.id().value().toString());
   }
 }

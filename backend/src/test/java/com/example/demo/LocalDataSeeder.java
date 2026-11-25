@@ -41,7 +41,7 @@ import org.jooq.impl.DSL;
  * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB の、{@link TenancySeeds#TENANTS} の各テナントに入れる。テナントと所属（{@link
  * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。
  *
- * <p>業務の表は RLS でテナントごとに分かれるため（ADR-107）、「空」の判定と reset の削除は {@code tenancy.m_tenant} のテナントごとに行う。
+ * <p>業務テーブルは RLS でテナントごとに分かれるため（ADR-107）、「空」の判定と reset の削除は {@code tenancy.m_tenant} のテナントごとに行う。
  *
  * <p>Gradle の {@code seedLocalData}（JavaExec、テストの runtime classpath）が {@link #main} を呼ぶ。Spring
  * を起動せず、Bean にもしないので、ほかのテストのコンテキストでは動かない。環境の確認、「空」の判定、reset の削除を 1 つのトランザクションで行う。
@@ -71,14 +71,13 @@ public final class LocalDataSeeder {
     SKIPPED_NOT_MIGRATED
   }
 
-  /** 業務データの表。子から順に並べる。modulith と tenancy と Liquibase の表は含めない。 */
+  /** 代表データを入れる業務テーブル。子から順に並べる。modulith と tenancy と Liquibase の表は含めない。 */
   /* package */ static final List<Table<?>> BUSINESS_TABLES =
       List.of(T_PAYMENT, T_ORDER_LINE, T_ORDER, M_PRODUCT);
 
   /**
-   * reset が消す表。業務データの表と、代表データを入れない Idempotency-Key の表で、この順に DELETE する。
-   *
-   * <p>キーの表を消さないと、消した注文の作成を、同じキーの再送で返し直す（ADR-126）。
+   * reset が消す業務テーブル。代表データを入れない {@code ordering.t_idempotency_key} と、代表データを入れる業務テーブルを、この順に DELETE
+   * する（キーの表を消す理由は ADR-126）。
    */
   /* package */ static final List<Table<?>> RESET_TABLES =
       Stream.concat(Stream.of(T_IDEMPOTENCY_KEY), BUSINESS_TABLES.stream()).toList();

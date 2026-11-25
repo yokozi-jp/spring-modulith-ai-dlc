@@ -51,7 +51,8 @@ CommandHandler は他モジュールから呼ばれない。
   この二つの比較で、[PostgreSQL の排他制御](../../database/postgresql-concurrency-control.md)の楽観的ロック（UPDATE の条件で画面などから受け取った `lock_no` を比べる）を満たす。
 - イベントは、保存の後に `ApplicationEventPublisher` の `publishEvent` で発行する。
 - 現在時刻は、コンストラクタで受け取った `Clock` から `Instant.now(clock)` で取る。
-- Command が `IdempotentCommand` のときは、`handle` の本体を `shared.idempotency` の `Idempotency` の `execute(command, <UseCase>Result.class, () -> ...)` で包む（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+- Command が `IdempotentCommand` のときは、`handle` を `return idempotency.execute(command, <UseCase>Result.class, () -> <動詞>(command));` の 1 文にし、本体を private メソッドに置く（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+  `Idempotency` は `shared.idempotency` のインタフェースで、コンストラクタで受け取る。
   同じキーの再送には、本体を呼ばずに保存した Result を返す。
   本体が例外で終わったら、トランザクションと一緒にキーの行も rollback する。
 - 別の CommandHandler を呼ばない。
@@ -108,19 +109,28 @@ public class CancelOrderCommandHandler {
   /** 取消時刻を取る時計。 */
   private final Clock clock;
 
+  /** 同じ冪等性キーの再送に、保存した Result を返す。 */
+  private final Idempotency idempotency;
+
   /** 依存を受け取る。 */
   public CancelOrderCommandHandler(
       final OrderRepository orderRepository,
       final ApplicationEventPublisher events,
-      final Clock clock) {
+      final Clock clock,
+      final Idempotency idempotency) {
     this.orderRepository = orderRepository;
     this.events = events;
     this.clock = clock;
+    this.idempotency = idempotency;
   }
 
-  /** ロック番号を確かめて注文を取り消して保存し、取消のイベントを発行する。 */
+  /** ロック番号を確かめて注文を取り消して保存し、取消のイベントを発行する。同じ冪等性キーの再送には、保存した Result を返す。 */
   @Transactional
   public CancelOrderResult handle(final CancelOrderCommand command) {
+    return idempotency.execute(command, CancelOrderResult.class, () -> cancel(command));
+  }
+
+  private CancelOrderResult cancel(final CancelOrderCommand command) {
     final Order order =
         orderRepository
             .findById(new OrderId(UUID.fromString(command.orderId())))
@@ -306,7 +316,8 @@ class CancelOrderCommandHandlerTest {
 - [ ] Command の値を `handle` の中で値オブジェクトに変換し、業務規則を集約と Domain Service に任せる。［自分で点検］
 - [ ] 新しい集約を `add` で、既存の集約を `update` で保存し、イベントを保存の後に `ApplicationEventPublisher` で発行する。［自分で点検］
 - [ ] `ApplicationEventPublisher`（`ApplicationContext` を含む）の `publishEvent` を呼ぶのは `application` の CommandHandler だけにする。［ArchUnit で検査：ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers］
-- [ ] Command が `VersionedCommand` のときは、`handle` の中で直接、集約の `ensureLockNo(ExpectedLockNo)` を呼ぶ。［ArchUnit で検査：TableWriterArchTest.commandHandlersEnsureScreenLockNo］
+- [ ] Command が `VersionedCommand` のときは、`handle` か、`handle` が呼ぶ private メソッドの中で直接、集約の `ensureLockNo(ExpectedLockNo)` を呼ぶ。［ArchUnit で検査：TableWriterArchTest.commandHandlersEnsureScreenLockNo］
+- [ ] Command が `IdempotentCommand` のときは、`handle` の中で `Idempotency.execute` を呼ぶ。［ArchUnit で検査：IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotency］
 - [ ] `ensureLockNo` は `findById` の直後、状態を変える操作より前に呼び、`command.expectedLockNo()` を渡す。型はコンパイルで、呼ぶ位置と渡す値はレビューで確かめる。［自分で点検］
 - [ ] 外部システムのインタフェースに依存するのは CommandHandler と Client だけにする。［ArchUnit で検査：ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients］
 - [ ] 外部システムのインタフェースに依存する CommandHandler は、イベントを受けた `application` の Listener からだけ呼び、画面から呼ばれる CommandHandler は外部システムを呼ばない。［ArchUnit で検査：ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners］

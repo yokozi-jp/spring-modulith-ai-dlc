@@ -3,7 +3,8 @@ package com.example.demo.shared.concurrency;
 import java.io.Serial;
 
 /**
- * 読み直せば解消しうる競合を表す。別のリクエストが先に行を更新した場合、行ロックを待ち切れなかった場合、一意制約に違反した場合に投げる。
+ * 読み直すか待てば解消しうる競合を表す。別のリクエストが先に行を更新した場合、行ロックを待ち切れなかった場合、一意制約に違反した場合、同じ {@code Idempotency-Key}
+ * の要求の終わりを待ち切れなかった場合に投げる。
  *
  * <p>HTTP では 409 Conflict になる。どの競合かは {@link Kind} で区別し、API のログには {@code conflict.kind} として記録する。
  *
@@ -22,7 +23,9 @@ public final class ConflictException extends RuntimeException {
     /** 行ロックを待ち切れなかった（{@code 55P03}）。 */
     LOCK,
     /** 一意制約に違反した（{@code 23505}）。 */
-    UNIQUE
+    UNIQUE,
+    /** 同じ {@code Idempotency-Key} の要求がキーの行を持ったまま、{@code lock_timeout} までに終わらなかった（ADR-126）。 */
+    IDEMPOTENCY_IN_PROGRESS
   }
 
   /** 競合の種類。 */

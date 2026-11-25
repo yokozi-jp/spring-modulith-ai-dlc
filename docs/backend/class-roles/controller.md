@@ -56,10 +56,9 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 - ハンドラメソッドは、マッピングのアノテーションの次の行に `/* package */` を書いた package-private のメソッドにする。
 - 状態を変える操作は `@Valid @RequestBody` で Request を受け、`request.toCommand(...)` で Command にする。
   パス変数の値は `toCommand` の引数で渡す（`request.toCommand(orderId)`）。
-  `Idempotency-Key` を求める操作は、`@Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER) final IdempotencyKey idempotencyKey` で受け、`toCommand` の引数で渡す（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
-  ヘッダーがないか、引用符で囲んだ UUID でなければ、`ApiExceptionHandler` が処理の前に専用の type の 400 にする。
-  契約のヘッダーは `OpenApiConfig` が共通の components から付けるので、`hidden` で引数を契約に出さない。
-  再送には CommandHandler が保存した Result を返すので、Controller は 1 回目と同じ方法で応答（201 と `Location`、204）を作る。
+  `Idempotency-Key` を求める操作は、パス変数の次の引数を注釈のない `final IdempotencyKey idempotencyKey` にし、`toCommand` の引数で渡す（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+  ヘッダーを読む注釈も、契約のパラメータの注釈も書かない。
+  応答は、1 回目と再送で同じ方法（201 と `Location`、204）で作る。
   DELETE は本文を持たないため、`@RequestParam @Min(1) long lockNo` で受けた値を Request に渡す（[Request](request.md#delete-の入力)）。
 - 作成は `ServletUriComponentsBuilder.fromCurrentRequest()` で `Location` の URI を作り、`ResponseEntity.created(location).build()` を返す。
 - 本文のない更新は `ResponseEntity.noContent().build()` を返す。
@@ -75,7 +74,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `presentation.web` の Request と Response、同じモジュールの `application` の Command、Result、CommandHandler、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、Spring MVC の型、Jakarta Bean Validation の `@Valid`、`io.swagger.v3.oas.annotations` の `@Operation`、`@Tag`、`@ApiResponse`、`@Header`、`@Content`、`@Schema`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `presentation.web` の Request と Response、同じモジュールの `application` の Command、Result、CommandHandler、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、Spring MVC の型、Jakarta Bean Validation の `@Valid`、`io.swagger.v3.oas.annotations` の `@Operation`、`shared.idempotency` の `IdempotencyKey`、`@Tag`、`@ApiResponse`、`@Header`、`@Content`、`@Schema`。
 - **依存してはいけない型**：Domain の型（集約、値オブジェクト、Repository）、`<Feature>QueryService`、Infrastructure の型、jOOQ の API と生成型、他モジュールの型、`@Transactional`。
 
 ## 最小の例と典型的な例
@@ -259,6 +258,7 @@ class OrderControllerTest {
 - [ ] [OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md) のチェックリストを満たす。［自分で点検］
 - [ ] 集約ごとに一つ作り、`@RequestMapping("/api/<resources>")` を付けた package-private の class にする。［自分で点検］
 - [ ] 状態を変える操作は `@Valid` の Request を `toCommand(...)` で Command にし、パス変数の値は引数で渡す。［自分で点検］
+- [ ] POST、PUT、PATCH、DELETE のハンドラメソッドは、パス変数の次の引数で `IdempotencyKey` を受ける。［ArchUnit で検査：IdempotencyArchTest.unsafeHandlersTakeIdempotencyKey］
 - [ ] 既存の集約を変える操作は、ロック番号を本文の Request で受ける。DELETE はクエリパラメータで受け、Request に渡す。［自分で点検］
 - [ ] 作成は 201 と `Location`、本文のない更新は 204、見つからない参照は 404 を返す。［自分で点検］
 - [ ] 参照は `<Feature>Queries` を呼んで `from(...)` で Response にし、一覧は `items` で包む。［自分で点検］

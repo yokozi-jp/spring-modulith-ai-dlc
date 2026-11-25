@@ -38,23 +38,22 @@ public class ChangeOrderLinesCommandHandler {
   /** ロック番号を確かめ、明細の商品を読み直して明細を置き換え、保存する。同じ冪等性キーの再送には、保存した Result を返す。 */
   @Transactional
   public ChangeOrderLinesResult handle(final ChangeOrderLinesCommand command) {
-    return idempotency.execute(
-        command,
-        ChangeOrderLinesResult.class,
-        () -> {
-          final Order order =
-              orderRepository
-                  .findById(new OrderId(UUID.fromString(command.orderId())))
-                  .orElseThrow(
-                      () -> new NotFoundException("order not found: orderId=" + command.orderId()));
-          order.ensureLockNo(command.expectedLockNo());
-          final List<OrderedItem> items =
-              command.lines().stream()
-                  .map(line -> OrderedItems.item(line.productId(), line.quantity()))
-                  .toList();
-          order.changeLines(items, OrderedItems.offers(productQueries, items));
-          orderRepository.update(order);
-          return new ChangeOrderLinesResult(order.id().value().toString());
-        });
+    return idempotency.execute(command, ChangeOrderLinesResult.class, () -> changeLines(command));
+  }
+
+  private ChangeOrderLinesResult changeLines(final ChangeOrderLinesCommand command) {
+    final Order order =
+        orderRepository
+            .findById(new OrderId(UUID.fromString(command.orderId())))
+            .orElseThrow(
+                () -> new NotFoundException("order not found: orderId=" + command.orderId()));
+    order.ensureLockNo(command.expectedLockNo());
+    final List<OrderedItem> items =
+        command.lines().stream()
+            .map(line -> OrderedItems.item(line.productId(), line.quantity()))
+            .toList();
+    order.changeLines(items, OrderedItems.offers(productQueries, items));
+    orderRepository.update(order);
+    return new ChangeOrderLinesResult(order.id().value().toString());
   }
 }

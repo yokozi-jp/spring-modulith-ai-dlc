@@ -38,6 +38,8 @@ Proposed の間に Decision を書き直した。
 契約を #540 で実装したとき、除外を `operationId` の一覧から operation の印に変え、キーを `apiFetch` で付けない理由を足したためである。
 サーバーを実装したとき、キーの組を主キーからユニークインデックスに変えた。
 [ADR-127](ADR-127-derive-problem-types-from-failure-reasons.md) が problem type の作り方を決めたので、失敗の表現の type をその形に合わせた。
+Pull Request #742 のレビューを受けて、次を足した。
+キーの表の文がテナントを RLS に任せず自分で書くこと、重なったヘッダーの扱い、Controller がキーを受ける形、ペイロードのハッシュが配備をまたぐときの扱い、代表データの reset がキーの表を消す理由である。
 
 ## Decision
 
@@ -62,6 +64,8 @@ Proposed の間に Decision を書き直した。
   例：`Idempotency-Key: "<UUID>"`。
   引用符のない値と UUID でない値は、形式の誤りとして 400 にする。
 - キーがないときも 400 にする（draft 2.7）。
+- ヘッダーの行が 2 つ以上あれば、値が同じでも形式の誤りにする。
+  RFC 9110 5.3 では、行を `,` でつないだ一覧と同じ意味になり、1 つの String ではないためである。
 - キーはクライアントが利用者の操作ごとに採番する。キーを払い出す API を作らない。
 - 利用者がエラーの通知を見て押し直したときは、新しい操作として新しいキーを採る。
   同じキーで送るのは、クライアントの自動の再試行だけにする。
@@ -76,8 +80,9 @@ Proposed の間に Decision を書き直した。
 - 列は、ペイロードのハッシュ、保存した Result、期限を持つ。
 - RLS（`ENABLE` と `FORCE`）で別のテナントの行を隠し、自分のモジュールのロールだけに権限を与える。
   別の利用者の行は、このユニークインデックスで分ける。
-  `tenancy` のスキーマは [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md) が RLS の外に置き、テナントなしでトランザクションを始められる。
-  `tenancy` のキーの表は RLS を付けず、ユニークインデックスの `tenant_public_id` を、検索の条件に必ず入れて分ける。
+- キーの表の文は、`tenant_public_id` を `TenantContext` のテナントで書き、読み書きの条件に入れる。
+  RLS は重ねた守りにし、RLS のない表でも同じ文で別のテナントの行に当たらないようにする。
+  `tenancy` のスキーマは [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md) が RLS の外に置き、テナントなしでトランザクションを始められるので、`tenancy` のキーの表は RLS を付けない。
 - 業務の更新と同じトランザクションに書くので、業務の結果とキーの記録は、一緒に commit されるか一緒に rollback される。
   Servlet の Filter や `HandlerInterceptor` など、トランザクションの外の層には置かない。
 
@@ -110,6 +115,10 @@ Proposed の間に Decision を書き直した。
   操作が自分の権限を外した後の再送は、保存した Result でなく 403 になる。
 - 保存した Result は、24 時間の間に配備をまたいで読み直す。
   Result の型を変えるときは、24 時間は古い形を読めるようにする。
+- ペイロードのハッシュは、操作の名前（`*_pgm_cd`）と Command の JSON の形で決まる。
+  配備でどちらかが変わると、配備をまたいで 24 時間のうちに届いた再送は、ペイロードの不一致の 400 になる。
+  Command の形の変更も、Result の型と同じ 24 時間の互換性の規則に従う。
+  component を足す、消す、名前か順を変える変更は、前の配備で受けた要求の再送をその間 400 にするので、その 400 を許せない操作では避ける。
 - キーの `INSERT` のロック待ちが [ADR-055](ADR-055-set-db-time-limits-per-connection.md) の `lock_timeout` で切れたときだけ、処理中の 409 と `Retry-After` を返す。
   業務の更新のロック待ちは、今の `ConflictException`（`lock_no` の競合）のままにする。
 - 外への副作用は今のまま、イベントの出版の表を通す。
@@ -121,12 +130,16 @@ Proposed の間に Decision を書き直した。
 - 期限切れの行は、[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) と同じ ShedLock の形の定期のジョブで、テナントごとに消す。
   ジョブはテナントとモジュールのロールを設定して動かす。
 - 期限を過ぎて、まだ消えていない行は無いものとして扱い、同じキーは新しいキーとして受ける。
+  取り直した行は、作成のカラムも取り直した操作の値にし、新しいキーを表すようにする。
+- ローカルとテストの代表データの reset は、業務テーブルと一緒にキーの表も消す。
+  消した注文の作成を、同じキーの再送で返し直さないためである。
 
 ### 失敗の表現
 
-次の problem type を、モジュールによらない problem として `CommonProblem` に足す（[ADR-127](ADR-127-derive-problem-types-from-failure-reasons.md)）。
-type と `title` のキーは、定数の名前から `ProblemTypes` が作る。
-処理中の 409 は、`lock_no` の競合の `ConflictException` と別の `type` にする。
+次の problem type を、モジュールによらない problem として `CommonProblem` に足す。
+type と `title` のキーは [ADR-127](ADR-127-derive-problem-types-from-failure-reasons.md) の作り方で決まる。
+処理中の 409 は、`ConflictException` の種類の 1 つにし、`lock_no` の競合と別の `type` にする。
+ログの `problem.type` と `conflict.kind` は、ほかの 409 と同じく ADR-127 のとおり付ける。
 
 - キーがない：400、`/problems/idempotency-key-missing`。
 - キーの形式の誤り：400、`/problems/idempotency-key-invalid`。
@@ -142,6 +155,12 @@ type と `title` のキーは、定数の名前から `ProblemTypes` が作る�
 ### OpenAPI と検査
 
 - OpenAPI の共通の components に、必須のヘッダーのパラメータと、上の 4 つのエラー応答を置く。
+- Controller は、パス変数の次の注釈のない引数で `IdempotencyKey` を受ける。
+  ヘッダーからキーを作る resolver が、ないキーと形式の誤りを 400 にする。
+  Spring MVC は引数を宣言の順に解決するので、本文より前に置けば、キーの誤りが本文の検証の 400 に隠れない。
+  springdoc はこの引数を契約に出さず、契約のヘッダーは customizer が共通の components から付ける。
+  操作ごとに同じ注釈を書かず、契約のヘッダーを 1 か所で決めるためである。
+  付け忘れは、契約では Spectral が、Controller と CommandHandler では ArchUnit が止める。
 - Spectral に、GET と HEAD 以外の業務の operation が `Idempotency-Key` の必須のヘッダーを参照する規則を足し、違反の例を fixture に足す。
   キーを求めない operation（テナントの選択）には印の拡張（`x-idempotency-key: none`）を付け、OpenAPI の customizer と規則はその印で除外する。
   除く操作を Controller の 1 か所で示し、customizer と規則に `operationId` の一覧を持たせないためである。
@@ -172,7 +191,7 @@ type と `title` のキーは、定数の名前から `ProblemTypes` が作る�
 - 利用者がエラーの通知を見て押し直すと、成功済みの操作に対する誤った 409 が残る。
 - キーが効くのは、同じ利用者、同じテナント、同じキーで、24 時間のうちに届いた再送だけである。
 - テナントの選択は、成功して応答を失うと、再送が 422 か 401 になる。
-- Result の型を変えるとき、24 時間の互換性を保つ負担が増える。
+- Result と Command の形を変えるとき、24 時間の互換性を保つ負担が増える。
 - draft 08 は RFC ではない。
 
 ### Neutral

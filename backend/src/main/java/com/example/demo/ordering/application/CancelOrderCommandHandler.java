@@ -29,19 +29,18 @@ public class CancelOrderCommandHandler {
   /** ロック番号を確かめて注文を取り消し、保存する。同じ冪等性キーの再送には、保存した Result を返す。 */
   @Transactional
   public CancelOrderResult handle(final CancelOrderCommand command) {
-    return idempotency.execute(
-        command,
-        CancelOrderResult.class,
-        () -> {
-          final Order order =
-              orderRepository
-                  .findById(new OrderId(UUID.fromString(command.orderId())))
-                  .orElseThrow(
-                      () -> new NotFoundException("order not found: orderId=" + command.orderId()));
-          order.ensureLockNo(command.expectedLockNo());
-          order.cancel();
-          orderRepository.update(order);
-          return new CancelOrderResult(order.id().value().toString());
-        });
+    return idempotency.execute(command, CancelOrderResult.class, () -> cancel(command));
+  }
+
+  private CancelOrderResult cancel(final CancelOrderCommand command) {
+    final Order order =
+        orderRepository
+            .findById(new OrderId(UUID.fromString(command.orderId())))
+            .orElseThrow(
+                () -> new NotFoundException("order not found: orderId=" + command.orderId()));
+    order.ensureLockNo(command.expectedLockNo());
+    order.cancel();
+    orderRepository.update(order);
+    return new CancelOrderResult(order.id().value().toString());
   }
 }

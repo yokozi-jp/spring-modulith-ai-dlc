@@ -24,6 +24,7 @@ backend/src/test/java/com/example/demo/architecture/
 ├── DateTimeConventionsArchTest.java
 ├── DirectWriteFixtureTest.java
 ├── GeneralCodingRulesArchTest.java
+├── IdempotencyArchTest.java
 ├── JooqCommonColumnsArchTest.java
 ├── LambdaFixtureTest.java
 ├── PackageByFeatureOnionArchitectureTest.java
@@ -205,6 +206,9 @@ R2は`ReopenPolicy`（Domain Serviceの`update`と`save`）、`PurgeOrderQuerySe
 R3は`ForgedLockNoCommandHandler`（コンストラクタと`ExpectedLockNo::new`）と`OrderLockController`で確かめる。
 R4は`ApproveOrderCommandHandler`（`handle`から呼ばないprivateメソッドだけが`ensureLockNo`を呼ぶ）と`OverloadedEnsureCommandHandler`で確かめる。
 `LambdaEnsureCommandHandler`は、`Optional.ifPresent`のラムダの中の`ensureLockNo`をR4が満たすものとして数えることを`LambdaFixtureTest`で固定する（違反フィクスチャのパッケージにあるが、R4は検出しない）。
+規約どおりのフィクスチャの`CancelOrderCommandHandler`は、`Idempotency.execute`で包んだprivateメソッドの中で`ensureLockNo`を呼び、R4と`idempotentCommandHandlersExecuteThroughIdempotency`を満たす。
+`unsafeHandlersTakeIdempotencyKey`は、違反フィクスチャの`OrderKeyController`の`place`（キーを受け取らない）と`ship`（本文の後に受け取る）で確かめ、規約どおりのフィクスチャの`OrderController`の`select`（`x-idempotency-key: none`）を除くことを確かめる。
+`idempotentCommandHandlersExecuteThroughIdempotency`は、違反フィクスチャの`RedeliverOrderCommandHandler`（`handle`の外でだけ`execute`を呼ぶ）で確かめる。
 `commandsAndResultsAreApplicationRecords`の型単位の除外は、`shared.concurrency`のrecordではない`ForceUnlockCommand`で確かめる。
 規約どおりのフィクスチャには、`shared.concurrency`と`shared.failure`の型と、Requestが`ExpectedLockNo`を作る`CancelOrderRequest`、Listenerが版のないCommandを作る`OrderPlacedExpiryListener`を置く。
 `archfixture.conforming`と`archfixture.violating`の`shared.persistence`には、規則が名前で見る`TableWriter`のスタブを置く。
@@ -342,7 +346,7 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
 `TableWriterArchTest`は、業務テーブルのINSERTとUPDATEを`shared`の`TableWriter`に集める規則を検査する（[PostgreSQLの排他制御](../database/postgresql-concurrency-control.md)、[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
 集約ルートは、`domain.model`にあり、`shared.concurrency`の`Versioned`を実装する型とする。
 
-- `tableWritesGoThroughTableWriter`：`TableWriter`と、その子の行の書き込み（`ChildWriter`）の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
+- `tableWritesGoThroughTableWriter`：`TableWriter`と、その子の行の書き込み（`ChildWriter`）、`Idempotency-Key`の行の書き込み（`IdempotencyKeyWriter`）の外の本番のコードは、次のAPIを呼ばず、メソッド参照もしない。
   呼び出し先の型が、挙げた型に代入できるかで判定する。
   - `DSLContext`、`DSL`、`WithStep`の`insertInto`、`insertQuery`、`update`、`delete`、`deleteFrom`、`mergeInto`、`updateQuery`、`deleteQuery`
   - `DSLContext`の`batchInsert`、`executeInsert`、`loadInto`、`batchUpdate`、`batchStore`、`batchDelete`、`batchMerge`、`executeUpdate`、`executeDelete`、`connection`、`connectionResult`
@@ -358,7 +362,7 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
 
   `Insert`、`Update`、`Delete`を作る入口をすべて禁じるため、`batch`や`subscribe`のように作った問い合わせを受け取って実行するAPIは禁じない。
 
-  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`ChildWriter`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
+  `tableWritesGoThroughTableWriter`が除外するのは、`TableWriter`、`ChildWriter`、`IdempotencyKeyWriter`と、トランザクションの初めにモジュールのロールへ切り替える`ModuleRoleTransactionManager`とその`Config`の完全修飾型名だけである。
   `ModuleRoleTransactionManager`は業務テーブルに触れず、ロールとテナントを設定する`set_config`だけを実行する（[ADR-094](../adr/ADR-094-switch-to-module-database-roles.md)、[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
   除外を足す、外す、または除外する型を移すときは、先に[ADR-054](../adr/ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)の判断を変える。
   同じ変更で、`tableWritesGoThroughTableWriterRule`の完全修飾型名と、除外する型を置く適合フィクスチャ（`archfixture/conforming/shared/persistence/`）を更新する。
@@ -383,13 +387,23 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
   Repositoryの実装から別のRepositoryの書き込みを呼ぶ経路も止める。
 - `expectedLockNoIsCreatedOnlyByRequests`（R3）：`presentation.web`の`*Request`以外のクラスは、`ExpectedLockNo`のコンストラクタを呼ばず、`ExpectedLockNo::new`も使わない。
   Repository、`TableWriter`、CommandHandler、Controllerが読んだ版から作ることを止める。
-- `commandHandlersEnsureScreenLockNo`（R4）：`*CommandHandler`の、引数のCommandが`VersionedCommand`である`handle`は、その中で直接`domain.model`の型の`ensureLockNo`で、引数に`ExpectedLockNo`を持つものを呼ぶ。
-  別のメソッドの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
+- `commandHandlersEnsureScreenLockNo`（R4）：`*CommandHandler`の、引数のCommandが`VersionedCommand`である`handle`は、その中か、そこから呼ぶ同じクラスのprivateメソッドの中で直接`domain.model`の型の`ensureLockNo`で、引数に`ExpectedLockNo`を持つものを呼ぶ。
+  privateメソッドの中も数えるのは、`Idempotency.execute`で包んだ本体をprivateメソッドに置くためである（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+  `handle`から呼ばないメソッドの中の呼び出しと、`ensureLockNo(long)`のオーバーロードでは満たせない。
   ラムダの本体の呼び出しは`handle`の呼び出しとして数えるため、実行されないことがあるラムダの中でも満たす。
   この扱いは`LambdaFixtureTest`が固定する。
   別の集約のインスタンスに呼ぶ、業務の検査の後に呼ぶ、`command.expectedLockNo()`以外の値を渡す書き方は検査しない（値の流れは追わない）。
 - `jooqVersionIsReviewed`：実行時のjOOQの版が、禁止の一覧を見直した版と一致する。
   版が変わったら[jOOQのSQLの書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従う。
+
+`IdempotencyArchTest`は、GETとHEAD以外の業務のAPIが`Idempotency-Key`を受け取り、保存したResultを返す入口を通ることを検査する（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+
+- `unsafeHandlersTakeIdempotencyKey`：`presentation.web`の、`@PostMapping`、`@PutMapping`、`@PatchMapping`、`@DeleteMapping`を付けたメソッドは、`@PathVariable`の引数の次の引数で`shared.idempotency.IdempotencyKey`を受ける。
+  `@Operation`の拡張に`x-idempotency-key: none`を付けたメソッドは除く。
+  `tenancy`の所属の役割の変更と所属の削除は、[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)のスライス3bまで、`NOT_YET_IDEMPOTENT`で一時的に除く。
+  `temporaryExclusionsStillLackTheKey`が、除いた操作がまだキーを受け取っていないことを確かめ、受け取ったら一覧から消させる。
+  `@RequestMapping(method = ...)`で書いたマッピングは検出しない。
+- `idempotentCommandHandlersExecuteThroughIdempotency`：`*CommandHandler`の、引数のCommandが`IdempotentCommand`である`handle`は、その中で`Idempotency.execute`を呼ぶ。
 
 ## DB
 

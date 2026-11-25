@@ -10,7 +10,6 @@ import com.example.demo.ordering.application.DraftOrderResult;
 import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.shared.idempotency.IdempotencyKey;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -26,19 +25,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-/**
- * 注文の HTTP API。
- *
- * <p>更新の操作は {@code Idempotency-Key} を本文より先に読み、ないか形式が誤っていれば処理の前に 400 にする（ADR-126）。契約のヘッダーは {@code
- * OpenApiConfig} が共通の components から付けるので、引数は契約に出さない。同じキーの再送には CommandHandler が保存した Result を返すので、応答は
- * 1 回目と同じ形で作る。
- */
+/** 注文の HTTP API。 */
 // 起きる応答（404、409、422）をハンドラごとに @ApiResponse で書くため、同じ文字列を繰り返す。
 @SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @RestController
@@ -96,9 +88,7 @@ class OrderController {
   @ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
   @PostMapping
   /* package */ ResponseEntity<Void> draft(
-      @Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER)
-          final IdempotencyKey idempotencyKey,
-      @Valid @RequestBody final DraftOrderRequest request) {
+      final IdempotencyKey idempotencyKey, @Valid @RequestBody final DraftOrderRequest request) {
     final DraftOrderResult result = draftOrder.handle(request.toCommand(idempotencyKey));
     final URI location =
         ServletUriComponentsBuilder.fromCurrentRequest()
@@ -164,8 +154,7 @@ class OrderController {
   @PutMapping("/{orderId}/lines")
   /* package */ ResponseEntity<Void> changeLines(
       @PathVariable final UUID orderId,
-      @Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER)
-          final IdempotencyKey idempotencyKey,
+      final IdempotencyKey idempotencyKey,
       @Valid @RequestBody final ChangeOrderLinesRequest request) {
     changeOrderLines.handle(request.toCommand(orderId, idempotencyKey));
     return ResponseEntity.noContent().build();
@@ -189,8 +178,7 @@ class OrderController {
   @PostMapping("/{orderId}/confirm")
   /* package */ ResponseEntity<Void> confirm(
       @PathVariable final UUID orderId,
-      @Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER)
-          final IdempotencyKey idempotencyKey,
+      final IdempotencyKey idempotencyKey,
       @Valid @RequestBody final ConfirmOrderRequest request) {
     confirmOrder.handle(request.toCommand(orderId, idempotencyKey));
     return ResponseEntity.noContent().build();
@@ -214,8 +202,7 @@ class OrderController {
   @PostMapping("/{orderId}/cancel")
   /* package */ ResponseEntity<Void> cancel(
       @PathVariable final UUID orderId,
-      @Parameter(hidden = true) @RequestHeader(IdempotencyKey.HEADER)
-          final IdempotencyKey idempotencyKey,
+      final IdempotencyKey idempotencyKey,
       @Valid @RequestBody final CancelOrderRequest request) {
     cancelOrder.handle(request.toCommand(orderId, idempotencyKey));
     return ResponseEntity.noContent().build();

@@ -129,7 +129,6 @@ class ConfirmOrderCommandHandlerTest {
 
   /** 共通カラムの trace ID を取れるよう、observation の中で、テストの利用者で認証して処理を呼ぶ。 */
   private <T> T observed(final Supplier<T> action) {
-    return Observation.createNotStarted("order-test", observationRegistry)
-        .observe(() -> AppUsers.signedIn(action));
+    return AppUsers.signedInAndObserved(observationRegistry, action);
   }
 }

@@ -3,6 +3,8 @@ package com.example.demo.testkit;
 import com.example.demo.shared.security.AppUserPrincipal;
 import com.example.demo.tenancy.TestTenancy;
 import com.example.demo.tenancy.presentation.web.TenantMembershipAuthority;
+import io.micrometer.observation.Observation;
+import io.micrometer.observation.ObservationRegistry;
 import java.io.Serial;
 import java.time.Instant;
 import java.util.Collection;
@@ -81,6 +83,17 @@ public final class AppUsers {
    */
   public static <T> T signedIn(final Supplier<T> action) {
     return signedIn(USER_ID, action);
+  }
+
+  /**
+   * 本番の要求と同じく、observation の中で {@link #USER_ID} の利用者で認証して処理を呼び、結果を返す。
+   *
+   * <p>MockMvc を通さずに CommandHandler を呼ぶテストが使う。共通カラムは trace ID を、Idempotency-Key は利用者を要する。
+   */
+  public static <T> T signedInAndObserved(
+      final ObservationRegistry observationRegistry, final Supplier<T> action) {
+    return Observation.createNotStarted("app-user-test", observationRegistry)
+        .observe(() -> signedIn(action));
   }
 
   /**

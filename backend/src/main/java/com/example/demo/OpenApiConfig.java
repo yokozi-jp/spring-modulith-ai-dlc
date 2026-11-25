@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.Operation;
@@ -26,6 +27,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import org.springdoc.core.customizers.OpenApiCustomizer;
+import org.springdoc.core.utils.SpringDocUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -54,9 +56,6 @@ public class OpenApiConfig {
   /** 必須の Idempotency-Key ヘッダーを表す parameter の名前（ADR-126）。 */
   private static final String IDEMPOTENCY_KEY = "IdempotencyKey";
 
-  /** Idempotency-Key のヘッダーの名前。 */
-  private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
-
   /** 値が none の operation には Idempotency-Key を求めない、operation の拡張の名前。 */
   private static final String IDEMPOTENCY_KEY_EXTENSION = "x-idempotency-key";
 
@@ -76,6 +75,12 @@ public class OpenApiConfig {
 
   /** RFC 9457 の problem type のメンバーの名前。 */
   private static final String TYPE_PROPERTY = "type";
+
+  // Controller の IdempotencyKey の引数は IdempotencyKeyConfig がヘッダーから作るので、引数から parameter を作らない。
+  // 契約のヘッダーは commonParametersAndResponses が共通の components から付ける。
+  static {
+    SpringDocUtils.getConfig().addRequestWrapperToIgnore(IdempotencyKey.class);
+  }
 
   /**
    * API の基本情報と RFC 9457 共通 components、認証の securityScheme と既定の security を定義する。
@@ -210,11 +215,7 @@ public class OpenApiConfig {
     operation.setDescription(details);
   }
 
-  /**
-   * Idempotency-Key を求める operation に、必須のキーと処理中の 409 を足す。
-   *
-   * <p>同じ名前のヘッダーを Controller が書いていたら、parameter を重ねて足さない。
-   */
+  /** Idempotency-Key を求める operation に、必須のキーと処理中の 409 を足す。 */
   private static void requireIdempotencyKey(
       final PathItem.HttpMethod method, final Operation operation) {
     final Map<String, Object> extensions = operation.getExtensions();
@@ -222,17 +223,7 @@ public class OpenApiConfig {
         || extensions != null && "none".equals(extensions.get(IDEMPOTENCY_KEY_EXTENSION))) {
       return;
     }
-    final List<Parameter> parameters = operation.getParameters();
-    final boolean declared =
-        parameters != null
-            && parameters.stream()
-                .anyMatch(parameter ->
-                    "header".equals(parameter.getIn())
-                        && IDEMPOTENCY_KEY_HEADER.equalsIgnoreCase(parameter.getName()));
-    if (!declared) {
-      operation.addParametersItem(
-          new Parameter().$ref("#/components/parameters/" + IDEMPOTENCY_KEY));
-    }
+    operation.addParametersItem(new Parameter().$ref("#/components/parameters/" + IDEMPOTENCY_KEY));
     operation.getResponses().putIfAbsent("409", problemRef("ConflictProblem"));
   }
 
@@ -258,7 +249,7 @@ public class OpenApiConfig {
   /** 利用者の操作ごとにクライアントが採番する Idempotency-Key の parameter を作る（ADR-126）。 */
   private static Parameter idempotencyKeyParameter() {
     return new HeaderParameter()
-        .name(IDEMPOTENCY_KEY_HEADER)
+        .name(IdempotencyKey.HEADER)
         .required(true)
         .description(
             "利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。"
