@@ -45,12 +45,13 @@ class IdempotencyArchTest {
    * キーをまだ受け取らない、一時的に除く操作（基底パッケージより下の {@code <クラス>.<メソッド>}）。
    *
    * <p>{@code tenancy} の所属の操作は、RLS のない表にキーを置く #540 のスライス 3b で対応し、そのときにこの一覧から消す。消し忘れは {@link
-   * #temporaryExclusionsStillLackTheKey} が止める。
+   * #temporaryExclusionsStillLackTheKey} が止める。商品の登録は、{@code product} のスキーマにキーの表を足すまで除く（ADR-129）。
    */
   private static final Set<String> NOT_YET_IDEMPOTENT =
       Set.of(
           "tenancy.presentation.web.CurrentTenantMemberController.changeRole",
-          "tenancy.presentation.web.CurrentTenantMemberController.remove");
+          "tenancy.presentation.web.CurrentTenantMemberController.remove",
+          "product.presentation.web.ProductController.register");
 
   /**
    * {@code Idempotency-Key} を求める HTTP メソッドの注釈。

@@ -35,8 +35,9 @@ ADR-073 が代表の注文で確かめていた決済済み、拒否、再投入
 作成だけに絞れば、足すコードは既存の書き込みの経路（`TableWriter`、モジュールのロール、RLS、共通カラム）に乗る。
 認可は、業務の API を役割で分ける仕組みがバックエンドにまだ無い（業務の API は、テナントを選んだかどうかだけを見る）ため、この ADR では決めずに [#758](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/758) に分ける。
 
-ADR-073 の後に入った [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) は Proposed で、契約だけが先に入っている。
-`OpenApiConfig` の customizer が、GET と HEAD 以外の業務の operation に必須の `Idempotency-Key` を付けるが、サーバーはまだキーを検査せず、受ける側のコードも無い。
+ADR-073 の後に入った [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) は Proposed である。
+`OpenApiConfig` の customizer が、GET と HEAD 以外の業務の operation に必須の `Idempotency-Key` を付ける。
+サーバーがキーを検査するのは、キーの表を持つ `ordering` の更新だけで、`product` のスキーマにキーの表は無い。
 
 ## Decision
 
@@ -54,7 +55,7 @@ E2E は開発用のシーダーを使わない。
   ADMIN だけに制限する仕組みはこの ADR で作らず、業務の API の認可と合わせて [#758](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/758) で決める。
 - この API は `Idempotency-Key` を検査しない。
   契約は ADR-126 の customizer が付けるとおり必須にし、Playwright の補助は契約に従ってキーを送る。
-  サーバーの検査は ADR-126 の実装に任せる。
+  サーバーの検査は ADR-126 の実装に任せ、それまで `IdempotencyArchTest` の一時的に除く操作に入れる。
 - テストのための入口を本番に作らない。
   Profile や E2E のためだけのプロパティで入口を切り替えない。
 - 商品は、Playwright の `productFactory` fixture が、ログインしてテナントを選んだ page の Cookie で `POST /api/products` を呼んで作る。

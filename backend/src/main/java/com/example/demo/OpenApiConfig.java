@@ -45,7 +45,7 @@ public class OpenApiConfig {
    *
    * <p>上げ方は docs/web-api/versioning.md に従い、アプリのリリース版と連動させない。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.12.0";
+  /* package */ static final String CONTRACT_VERSION = "0.13.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
