@@ -26,7 +26,6 @@ import com.tngtech.archunit.library.Architectures;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
@@ -104,10 +103,6 @@ class PackageByFeatureOnionArchitectureTest {
   private static final String ADR_048 =
       "docs/adr/ADR-048-add-shared-module-for-jooq-common-code.md";
 
-  /** どの層からも使ってよい shared のパッケージの一覧。層の除外と shared の利用の規則は、ここから組み立てる。 */
-  private static final List<String> ANY_LAYER_SHARED_PACKAGES =
-      List.of("concurrency", "failure", "events", "security", "tenancy", "validation");
-
   /**
    * Domain が使ってよい標準型のパッケージ。{@code java..} 全体は許さず、{@code java.net.http}、{@code java.io}、{@code
    * java.nio} などを止める。
@@ -151,7 +146,7 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule infrastructureDependsOnlyOnDomainModel =
       infrastructureDependsOnlyOnDomainModelRule(BASE_PACKAGE);
 
-  /** shared モジュールを使うクラスを、他のモジュールの Persistence Adapter に限る。 */
+  /** shared の永続化の共通処理を使うクラスを、他のモジュールの Persistence Adapter に限る。 */
   @ArchTest
   /* package */ static final ArchRule sharedModuleIsUsedOnlyByPersistenceAdapters =
       sharedModuleIsUsedOnlyByPersistenceAdaptersRule(BASE_PACKAGE);
@@ -407,9 +402,7 @@ class PackageByFeatureOnionArchitectureTest {
         .adapter("presentation", basePackage + ".*.presentation..")
         .adapter("persistence", persistenceAdapterPackages(basePackage))
         .adapter("external-client", basePackage + ".*.infrastructure.client..")
-        .ensureAllClassesAreContainedInArchitectureIgnoring(
-            Stream.concat(Stream.of(basePackage), Stream.of(anyLayerSharedPackages(basePackage)))
-                .toArray(String[]::new))
+        .ensureAllClassesAreContainedInArchitectureIgnoring(basePackage, basePackage + ".shared..")
         .withOptionalLayers(true)
         .because(
             "Domain と Application を Web、DB、外部 API の技術詳細から独立させ、テストと変更をしやすくするため。"
@@ -449,30 +442,24 @@ class PackageByFeatureOnionArchitectureTest {
   }
 
   /**
-   * shared の外で shared の型に依存するクラスを、{@code infrastructure.persistence} に限る規則を組み立てる。
+   * 永続化の技術的な共通処理を置く shared のパッケージ（{@link #SHARED_ADAPTER_PACKAGES}）に依存するクラスを、{@code
+   * infrastructure.persistence} に限る規則を組み立てる。
    *
-   * <p>shared 自身の中の依存は対象にしない。{@link #ANY_LAYER_SHARED_PACKAGES} のパッケージは、どの層からも使えるため対象にしない。
+   * <p>shared 自身の中の依存は対象にしない。使う場所を限るパッケージだけを名前で持ち、ほかの shared のパッケージは、どの層からも使える。
    */
   /* package */ static ArchRule sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
       final String basePackage) {
-    final String sharedPackage = basePackage + ".shared..";
     return noClasses()
         .that()
-        .resideOutsideOfPackages(sharedPackage, PERSISTENCE_PACKAGE)
+        .resideOutsideOfPackages(basePackage + ".shared..", PERSISTENCE_PACKAGE)
         .should()
-        .dependOnClassesThat(
-            resideInAPackage(sharedPackage)
-                .and(not(resideInAnyPackage(anyLayerSharedPackages(basePackage)))))
+        .dependOnClassesThat()
+        .resideInAnyPackage(sharedAdapterPackages(basePackage))
         .because(
-            "shared は永続化の技術的な共通処理を置くモジュールであり、"
+            "shared の永続化の共通処理は技術的な処理であり、"
                 + "使う場所を他のモジュールの infrastructure.persistence に限って、"
                 + "業務の処理が共通処理と共通カラムに依存しないようにするため。"
-                + "どの層からも使ってよいのは、"
-                + ANY_LAYER_SHARED_PACKAGES.stream()
-                    .map(name -> "shared." + name)
-                    .collect(Collectors.joining("、"))
-                + "だけである。"
-                + "直し方：shared の型を使う処理を <モジュール>.infrastructure.persistence の "
+                + "直し方：shared の永続化の型を使う処理を <モジュール>.infrastructure.persistence の "
                 + "Jooq<Aggregate>Repository へ移し、Application と Domain からは Repository を通して使う。"
                 + "規約：docs/backend/shared-module.md、"
                 + ADR_048);
@@ -715,13 +702,6 @@ class PackageByFeatureOnionArchitectureTest {
     return Stream.concat(
             Stream.of(basePackage + ".*.infrastructure.persistence.."),
             Arrays.stream(sharedAdapterPackages(basePackage)))
-        .toArray(String[]::new);
-  }
-
-  /** どの層からも使ってよい shared のパッケージを、{@code resideInAnyPackage} に渡す形で返す。 */
-  private static String[] anyLayerSharedPackages(final String basePackage) {
-    return ANY_LAYER_SHARED_PACKAGES.stream()
-        .map(name -> basePackage + ".shared." + name + "..")
         .toArray(String[]::new);
   }
 

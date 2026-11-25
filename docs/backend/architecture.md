@@ -55,10 +55,24 @@ backend/src/main/java/com/example/demo/
 │   │   ├── package-info.java
 │   │   ├── BusinessRuleViolationException.java
 │   │   └── NotFoundException.java
-│   └── infrastructure/
-│       └── persistence/
-│           ├── package-info.java
-│           └── <jOOQ の共通処理>.java
+│   ├── events/
+│   │   ├── package-info.java
+│   │   └── ResubmissionPolicy.java
+│   ├── eventresubmission/
+│   │   ├── package-info.java
+│   │   └── EventPublicationResubmitOnce.java
+│   ├── persistence/
+│   │   ├── package-info.java
+│   │   └── <jOOQ の共通処理>.java
+│   ├── security/
+│   │   ├── package-info.java
+│   │   └── AppUserPrincipal.java
+│   ├── tenancy/
+│   │   ├── package-info.java
+│   │   └── <テナントの語彙>.java
+│   └── validation/
+│       ├── package-info.java
+│       └── MailAddress.java
 │
 └── <feature>/
     ├── package-info.java
@@ -188,9 +202,9 @@ infrastructure.client ───────────────────�
 - `batch` は `application` の Command、Result、CommandHandler、自分のモジュールのルート、`tenancy` のルート、`shared.batch` に依存し、Domain と Infrastructure に依存しない。
   `batch` の依存方向はまだ ArchUnit で検査していない（[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)、[バックエンドのアーキテクチャテスト](architecture-tests.md)）。
 - `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
-- `infrastructure.persistence` は `shared.persistence` に依存してよい。
-  ほかの層は `shared.persistence` に依存しない。
-- どの層も、[共有モジュール shared](shared-module.md) の「どの層からも使える」パッケージに依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
+- `infrastructure.persistence` は `shared.persistence` と `shared.eventresubmission` に依存してよい。
+  ほかの層は、この 2 つに依存しない。
+- どの層も、上の 2 つ以外の `shared` のパッケージ（[共有モジュール shared](shared-module.md)）に依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
 - モジュールルートの型は、標準型と同じルートの型のほかに、イベントが運ぶテナントの `shared.tenancy.TenantId` と `shared.tenancy.TenantScoped` だけに依存してよい。`TenantContext` には依存できない。
 - `domain.model` と `domain.service` が使える `shared` の型は、`shared.concurrency`、`shared.failure`、`shared.tenancy.TenantId` に限る（`domain.service` は `shared.failure` と `TenantId`）。
 - Domain と Application は、Presentation、Batch、Infrastructure に依存しない。

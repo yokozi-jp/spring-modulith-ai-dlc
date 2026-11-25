@@ -39,7 +39,9 @@ tags: [architecture, backend, spring-modulith, shared-module]
 - `shared.persistence` を使ってよいのは、他のモジュールの `infrastructure.persistence` だけである。
   `shared.eventresubmission` は `shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
   `shared.batch` を使ってよいのは、機能モジュールの `batch` だけである。
-  `shared.concurrency`、`shared.failure`、`shared.events`、`shared.security`、`shared.tenancy`、`shared.validation` は、どの層からも使える。
+  使う場所を限る `shared` のパッケージは、`shared.persistence`、`shared.eventresubmission`、`shared.batch` だけである。
+  ほかの `shared` のパッケージ（`concurrency`、`failure`、`events`、`security`、`tenancy`、`validation`）は、どの層からも使える。
+  `shared` にパッケージを足すときは、使う場所を限る必要があるときだけ、ArchUnit の規則へ足す。
   ただし `domain.model` と `domain.service` が使える `shared` の型は許可リストに限る（[ArchUnit の規則](architecture-tests.md)）。
 
 使う場所の制限は、`PackageByFeatureOnionArchitectureTest` の `sharedModuleIsUsedOnlyByPersistenceAdapters` が検査する。
