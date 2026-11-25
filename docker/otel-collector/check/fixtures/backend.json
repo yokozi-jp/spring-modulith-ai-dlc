@@ -45,6 +45,7 @@
                 },
                 { "key": "http.response.status_code", "value": { "intValue": "409" } },
                 { "key": "conflict.kind", "value": { "stringValue": "unique" } },
+                { "key": "problem.type", "value": { "stringValue": "/problems/unique-violation" } },
                 { "key": "db.query.text", "value": { "stringValue": "insert into t_order (order_id) values ('secret-value')" } }
               ]
             },

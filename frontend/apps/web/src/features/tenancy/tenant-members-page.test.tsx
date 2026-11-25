@@ -91,7 +91,9 @@ describe("所属の管理の画面の失敗", () => {
       getListTenantMembersMockHandler(members),
       http.put(memberPath, () => {
         requests += 1;
-        return problemResponse(409, "競合が発生しました");
+        return problemResponse(409, "ほかの操作が先に更新しました", {
+          type: "/problems/version-conflict",
+        });
       }),
     );
     const { user } = await renderRoute("/members");
@@ -101,7 +103,7 @@ describe("所属の管理の画面の失敗", () => {
       "ADMIN",
     );
 
-    await expect(screen.findByText("競合が発生しました")).resolves.toBeTruthy();
+    await expect(screen.findByText("ほかの操作が先に更新しました")).resolves.toBeTruthy();
     expect(screen.getByText(/ほかの操作で所属が更新されました/u)).toBeTruthy();
     expect(requests).toBe(1);
   });
@@ -126,7 +128,9 @@ describe("所属の管理の画面の失敗", () => {
         items: [{ userId: adminId, role: "ADMIN" }],
       }),
       http.put(`*/api/current-tenant/members/${adminId}`, () =>
-        problemResponse(422, "処理できない内容です"),
+        problemResponse(422, "テナントには管理者が必要です", {
+          type: "/problems/tenancy/last-admin",
+        }),
       ),
     );
     const { user } = await renderRoute("/members");
@@ -136,7 +140,7 @@ describe("所属の管理の画面の失敗", () => {
       "MEMBER",
     );
 
-    await expect(screen.findByText("処理できない内容です")).resolves.toBeTruthy();
+    await expect(screen.findByText("テナントには管理者が必要です")).resolves.toBeTruthy();
     expect(screen.getByText(/管理者を 1 人以上残す必要があります/u)).toBeTruthy();
   });
 

@@ -18,6 +18,7 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.function.Consumer;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Value;
@@ -37,7 +38,7 @@ public class OpenApiConfig {
    *
    * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
    */
-  /* package */ static final String CONTRACT_VERSION = "0.9.0";
+  /* package */ static final String CONTRACT_VERSION = "0.10.0";
 
   /** 共通の Problem response を参照する接頭辞。 */
   private static final String PROBLEM_RESPONSE_REF = "#/components/responses/";
@@ -50,6 +51,9 @@ public class OpenApiConfig {
 
   /** RFC 9457 の共通 schema の名前。 */
   private static final String PROBLEM_DETAIL = "ProblemDetail";
+
+  /** RFC 9457 の problem type のメンバーの名前。 */
+  private static final String TYPE_PROPERTY = "type";
 
   /**
    * API の基本情報と RFC 9457 共通 components、認証の securityScheme と既定の security を定義する。
@@ -89,9 +93,16 @@ public class OpenApiConfig {
                         + "テナントを選ぶ前に業務の API を呼んだときの type は /problems/tenant-not-selected",
                     PROBLEM_DETAIL))
             .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))
-            .addResponses("ConflictProblem", problemResponse("リソースの現在の状態と競合する", PROBLEM_DETAIL))
             .addResponses(
-                "UnprocessableContentProblem", problemResponse("業務規則に反するため処理できない", PROBLEM_DETAIL))
+                "ConflictProblem",
+                problemResponse(
+                    "ほかの要求と競合した。type は競合の種類ごとに異なり、ProblemDetail.type の x-extensible-enum に載る",
+                    PROBLEM_DETAIL))
+            .addResponses(
+                "UnprocessableContentProblem",
+                problemResponse(
+                    "業務規則に反するため処理できない。type は理由ごとに異なり、ProblemDetail.type の x-extensible-enum に載る",
+                    PROBLEM_DETAIL))
             .addResponses(
                 "InternalServerErrorProblem", problemResponse("サーバーの内部エラー", PROBLEM_DETAIL));
     return new OpenAPI()
@@ -175,16 +186,30 @@ public class OpenApiConfig {
     return new ApiResponse().$ref(PROBLEM_RESPONSE_REF + name);
   }
 
+  /**
+   * components の {@code ProblemDetail} の {@code type} の schema を返す。ほかの設定が type に拡張を足すために使う。
+   *
+   * @param openApi {@link #openApi} が作った文書
+   */
+  public static Schema<?> problemTypeSchema(final OpenAPI openApi) {
+    final Schema<?> problemDetail =
+        Objects.requireNonNull(
+            openApi.getComponents().getSchemas().get(PROBLEM_DETAIL), PROBLEM_DETAIL);
+    return Objects.requireNonNull(problemDetail.getProperties().get(TYPE_PROPERTY), TYPE_PROPERTY);
+  }
+
   /** RFC 9457 の Problem Details の schema を作る。 */
   private static Schema<?> problemDetailSchema() {
     final ObjectSchema schema = new ObjectSchema();
     schema.setDescription("RFC 9457 の Problem Details");
-    schema.setRequired(List.of("type", "title", "status"));
+    schema.setRequired(List.of(TYPE_PROPERTY, "title", "status"));
     schema.addProperty(
-        "type",
+        TYPE_PROPERTY,
         new StringSchema()
             .format("uri-reference")
-            .description("Problem type の識別 URI。about:blank かパスを全部書いた相対 URI")
+            .description(
+                "Problem type の識別 URI。about:blank かパスを全部書いた相対 URI。"
+                    + "x-extensible-enum に今の値を載せる。値は増えることがある")
             .example("about:blank"));
     schema.addProperty("title", new StringSchema().description("Problem type の短い説明"));
     schema.addProperty(
@@ -218,7 +243,7 @@ public class OpenApiConfig {
   private static Schema<?> validationProblemSchema() {
     final ObjectSchema extension = new ObjectSchema();
     extension.addProperty(
-        "type",
+        TYPE_PROPERTY,
         new StringSchema()
             .format("uri-reference")
             .description("入力検証エラーなら /problems/validation-error。それ以外の 400 は about:blank")

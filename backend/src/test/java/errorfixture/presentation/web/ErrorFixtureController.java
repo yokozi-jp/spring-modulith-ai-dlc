@@ -153,7 +153,8 @@ class ErrorFixtureController {
    */
   @GetMapping("/unprocessable")
   /* package */ ResponseEntity<Void> unprocessable() {
-    throw new BusinessRuleViolationException("child row not found: fixture_child id=secret-key");
+    throw new BusinessRuleViolationException(
+        ErrorFixtureFailure.REJECTED, "child row not found: fixture_child id=secret-key");
   }
 
   /**

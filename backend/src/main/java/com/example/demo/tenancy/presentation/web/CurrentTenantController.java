@@ -85,13 +85,16 @@ class CurrentTenantController {
       final HttpServletRequest request,
       final HttpServletResponse response) {
     if (TenantSession.selectedTenant(authentication).isPresent()) {
-      throw new BusinessRuleViolationException("tenant already selected; sign in again to switch");
+      throw new BusinessRuleViolationException(
+          TenantSelectionFailure.TENANT_ALREADY_SELECTED,
+          "tenant already selected; sign in again to switch");
     }
     final MembershipSummary membership =
         tenancyQueries
             .membership(user.userId(), body.tenantId().toString())
             .orElseThrow(() ->
                 new BusinessRuleViolationException(
+                    TenantSelectionFailure.NOT_TENANT_MEMBER,
                     "not a member of the tenant: tenantId=" + body.tenantId()));
     tenantSession.select(request, response, authentication, membership);
     return ResponseEntity.noContent().build();

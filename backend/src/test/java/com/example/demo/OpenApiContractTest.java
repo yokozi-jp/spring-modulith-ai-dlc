@@ -1,5 +1,6 @@
 package com.example.demo;
 
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -75,6 +76,20 @@ class OpenApiContractTest {
                 .value("uri-reference"));
 
     exportWhenRequested();
+  }
+
+  @Test
+  @DisplayName("ProblemDetail の type の x-extensible-enum は、about:blank、競合の種類、理由の problem type を持つ")
+  void problemDetailTypeListsProblemTypes() throws Exception {
+    // 一覧の全体は ProblemTypesTest が固定する。ここでは OpenAPI の文書に載ることを確かめる。
+    mockMvc
+        .perform(get("/v3/api-docs"))
+        .andExpect(status().isOk())
+        .andExpect(
+            jsonPath(
+                "$.components.schemas.ProblemDetail.properties.type['x-extensible-enum']",
+                hasItems(
+                    "about:blank", "/problems/version-conflict", "/problems/ordering/not-draft")));
   }
 
   private static ResultMatcher problemResponseExists(final String name) {

@@ -5,6 +5,6 @@
 import type { ProblemDetail } from './problemDetail.ts';
 
 /**
- * リソースの現在の状態と競合する
+ * ほかの要求と競合した。type は競合の種類ごとに異なり、ProblemDetail.type の x-extensible-enum に載る
  */
 export type ConflictProblemResponse = ProblemDetail;

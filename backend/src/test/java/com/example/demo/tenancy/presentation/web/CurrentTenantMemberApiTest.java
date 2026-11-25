@@ -59,6 +59,9 @@ class CurrentTenantMemberApiTest {
   /** テナントを選ぶ前の 403 の type。 */
   private static final String TENANT_NOT_SELECTED = "/problems/tenant-not-selected";
 
+  /** 最後の管理者を下げるか外す 422 の type。 */
+  private static final String LAST_ADMIN = "/problems/tenancy/last-admin";
+
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
 
@@ -178,8 +181,12 @@ class CurrentTenantMemberApiTest {
   void lastAdminCannotBeDemotedOrRemoved() throws Exception {
     final RequestPostProcessor asAdmin = inTenant(tenant, "ADMIN");
 
-    changeRole(AppUsers.USER_ID, "MEMBER", 1, asAdmin).andExpect(status().isUnprocessableContent());
-    remove(AppUsers.USER_ID, 1, asAdmin).andExpect(status().isUnprocessableContent());
+    changeRole(AppUsers.USER_ID, "MEMBER", 1, asAdmin)
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.type").value(LAST_ADMIN));
+    remove(AppUsers.USER_ID, 1, asAdmin)
+        .andExpect(status().isUnprocessableContent())
+        .andExpect(jsonPath("$.type").value(LAST_ADMIN));
 
     mockMvc
         .perform(get(MEMBERS).with(selectedTenant(tenant, "ADMIN")))

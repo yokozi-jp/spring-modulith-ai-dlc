@@ -1,6 +1,7 @@
 package archfixture.conforming.ordering.domain.service;
 
 import archfixture.conforming.ordering.domain.model.CustomerId;
+import archfixture.conforming.ordering.domain.model.OrderFailure;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.shared.failure.BusinessRuleViolationException;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class OrderLimitPolicy {
   public void ensureCanPlace(final CustomerId customerId) {
     if (orderRepository.countUnshippedByCustomer(customerId) >= MAX_UNSHIPPED_ORDERS) {
       throw new BusinessRuleViolationException(
+          OrderFailure.UNSHIPPED_LIMIT_REACHED,
           "unshipped order limit reached: customerId=" + customerId.value());
     }
   }

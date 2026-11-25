@@ -42,7 +42,8 @@ public final class Order implements Versioned {
   /** 受付の注文を取り消す。 */
   public void cancel() {
     if (status != OrderStatus.PLACED) {
-      throw new BusinessRuleViolationException("order is not placed: orderId=" + id.value());
+      throw new BusinessRuleViolationException(
+          OrderFailure.NOT_PLACED, "order is not placed: orderId=" + id.value());
     }
     status = OrderStatus.CANCELLED;
   }

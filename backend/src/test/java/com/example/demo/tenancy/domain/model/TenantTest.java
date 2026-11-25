@@ -66,7 +66,9 @@ class TenantTest {
         tenant(new TenantMember(ADMIN, Role.ADMIN), new TenantMember(MEMBER, Role.MEMBER));
 
     assertThatThrownBy(() -> tenant.changeRole(ADMIN, Role.MEMBER))
-        .isInstanceOf(BusinessRuleViolationException.class)
+        .isInstanceOfSatisfying(
+            BusinessRuleViolationException.class,
+            exception -> assertThat(exception.reason()).isEqualTo(TenantFailure.LAST_ADMIN))
         .hasMessageContaining("userId=" + ADMIN.value());
     assertThat(tenant.members())
         .containsExactly(
@@ -112,7 +114,9 @@ class TenantTest {
         tenant(new TenantMember(ADMIN, Role.ADMIN), new TenantMember(MEMBER, Role.MEMBER));
 
     assertThatThrownBy(() -> tenant.removeMember(ADMIN))
-        .isInstanceOf(BusinessRuleViolationException.class)
+        .isInstanceOfSatisfying(
+            BusinessRuleViolationException.class,
+            exception -> assertThat(exception.reason()).isEqualTo(TenantFailure.LAST_ADMIN))
         .hasMessageContaining("userId=" + ADMIN.value());
     assertThat(tenant.members()).hasSize(2);
   }

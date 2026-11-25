@@ -96,7 +96,7 @@ class ApiProblemDetailsTest {
   }
 
   @ParameterizedTest
-  @CsvSource({"ja, 入力内容に誤りがあります", "en, Invalid request content"})
+  @CsvSource({"ja, 入力内容に誤りがあります", "en, Bad Request"})
   @DisplayName("入力検証エラーは normalize を通しても type、title、errors を保ち、detail を持たない")
   void validationProblemSurvivesNormalize(final String language, final String title) {
     final StaticMessageSource messages = new StaticMessageSource();
@@ -111,7 +111,7 @@ class ApiProblemDetailsTest {
     problemDetails.normalize(problem, HttpStatus.BAD_REQUEST, locale);
 
     assertEquals(URI.create("/problems/validation-error"), problem.getType(), "type");
-    assertEquals(title, problem.getTitle(), "key がなければ英語の default title");
+    assertEquals(title, problem.getTitle(), "key がなければ status の title");
     assertNull(problem.getDetail(), "detail を付けないこと");
     assertEquals(400, problem.getStatus(), "status");
     assertEquals(Map.of("errors", errors), problem.getProperties(), "errors");

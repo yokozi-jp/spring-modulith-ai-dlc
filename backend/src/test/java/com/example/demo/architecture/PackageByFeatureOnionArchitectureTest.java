@@ -28,11 +28,20 @@ import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
 import org.springframework.stereotype.Controller;
 import org.springframework.stereotype.Repository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.ErrorResponse;
+import org.springframework.web.ErrorResponseException;
+import org.springframework.web.bind.annotation.ControllerAdvice;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * Package by feature で分割した各機能モジュールの内部に、オニオンアーキテクチャとクラスの置き場所を強制する。
@@ -151,6 +160,16 @@ class PackageByFeatureOnionArchitectureTest {
   @ArchTest
   /* package */ static final ArchRule httpTypesAreNotUsedByInnerLayers =
       httpTypesAreNotUsedByInnerLayersRule(BASE_PACKAGE);
+
+  /** Problem Details と HTTP の例外の対応づけを {@code error.presentation.web} の外で書かせない。 */
+  @ArchTest
+  /* package */ static final ArchRule httpErrorsAreMappedOnlyInErrorPresentationWeb =
+      httpErrorsAreMappedOnlyInErrorPresentationWebRule(BASE_PACKAGE);
+
+  /** 422 の理由を、ベースパッケージの下のモジュールに置いた enum に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule failureReasonsAreModuleEnums =
+      failureReasonsAreModuleEnumsRule(BASE_PACKAGE);
 
   /** 機能ルートの公開契約は、標準型、JSpecify、同じルートパッケージの型だけに依存させる。 */
   @ArchTest
@@ -483,6 +502,69 @@ class PackageByFeatureOnionArchitectureTest {
                 + "HTTP のステータスへの対応づけは error の ApiExceptionHandler に置く。"
                 + "規約：docs/backend/layers.md、docs/backend/shared-module.md、"
                 + "docs/backend/class-roles/business-exception.md");
+  }
+
+  /**
+   * {@code error.presentation.web} の外で、Problem Details の型、HTTP のステータスを持つ Spring
+   * の例外、例外を応答へ変える注釈に依存することと、409 と 422 の {@link HttpStatus} の定数を読むことを禁止する規則を組み立てる。
+   *
+   * <p>注釈を付けることも依存に数え、入れ子の型（{@code ErrorResponse.Builder} など）も含める。 整数で書いた status（{@code
+   * sendError(422)}、{@code ResponseEntity.status(409)}）は検出しない。
+   */
+  /* package */ static ArchRule httpErrorsAreMappedOnlyInErrorPresentationWebRule(
+      final String basePackage) {
+    return noClasses()
+        .that()
+        .resideInAPackage(basePackage + "..")
+        .and()
+        .resideOutsideOfPackage(basePackage + ".error.presentation.web..")
+        .should()
+        .dependOnClassesThat()
+        .belongToAnyOf(
+            ProblemDetail.class,
+            ErrorResponse.class,
+            ErrorResponseException.class,
+            ResponseStatusException.class,
+            ExceptionHandler.class,
+            ControllerAdvice.class,
+            RestControllerAdvice.class,
+            ResponseStatus.class)
+        .orShould()
+        .accessField(HttpStatus.class, HttpStatus.CONFLICT.name())
+        .orShould()
+        .accessField(HttpStatus.class, HttpStatus.UNPROCESSABLE_CONTENT.name())
+        .because(
+            "失敗から status、problem type、title、ログへの対応づけを ApiExceptionHandler の 1 か所に置き、"
+                + "422 と 409 の type が about:blank に戻ることと、ログの記録が食い違うことを防ぐため。"
+                + "成功の応答の @ResponseStatus（CREATED など）も禁じる。"
+                + "直し方：業務上の失敗は shared.failure の BusinessRuleViolationException と NotFoundException、"
+                + "shared.concurrency の ConflictException で投げ、422 の理由はモジュールの FailureReason の enum で渡す。"
+                + "成功の status は ResponseEntity.created や noContent で返す。"
+                + "例外の変換と Problem Details の組み立ては error.presentation.web の ApiExceptionHandler と "
+                + "ApiProblemDetails に置く。"
+                + "規約：docs/backend/class-roles/business-exception.md、docs/web-api/status-codes.md");
+  }
+
+  /**
+   * {@code shared.failure.FailureReason} を実装する型を、ベースパッケージの下のモジュールに置いた enum に限る規則を組み立てる。
+   *
+   * <p>フィクスチャは自分の {@code shared.failure} に同じ名前の interface を持つため、型を名前で指す。
+   */
+  /* package */ static ArchRule failureReasonsAreModuleEnumsRule(final String basePackage) {
+    return classes()
+        .that()
+        .implement(basePackage + ".shared.failure.FailureReason")
+        .should()
+        .beEnums()
+        .andShould()
+        .resideInAPackage(basePackage + ".*..")
+        .allowEmptyShould(true)
+        .because(
+            "problem type は理由を置いたモジュールの名前と enum の定数の名前から作り、"
+                + "enum でない型やモジュールの外の型では type が定まらないため。"
+                + "直し方：理由を enum にし、com.example.demo.<module> の下の、理由を投げる層のパッケージに置く。"
+                + "規約：docs/backend/class-roles/business-exception.md、"
+                + "docs/adr/ADR-127-derive-problem-types-from-failure-reasons.md");
   }
 
   /**

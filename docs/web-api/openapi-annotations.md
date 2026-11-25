@@ -71,6 +71,8 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
 - 404、409、422は、起きるoperationにだけ`@ApiResponse(responseCode, ref = "#/components/responses/<Name>Problem")`で書く。
   `<Name>`は`NotFound`、`Conflict`、`UnprocessableContent`のいずれかである。
 - `springdoc.override-with-generic-response`は`false`であり、`ApiExceptionHandler`の応答は自動では付かない。
+- `ProblemDetail`の`type`の`x-extensible-enum`は、`error.presentation.web`の`ProblemDetailsConfig`が付ける。
+  422の理由の値は、`FailureReason`を実装するenumから集まるため、operationごとに書かない（[ADR-127](../adr/ADR-127-derive-problem-types-from-failure-reasons.md)）。
 
 ステータスコードの選び方は[HTTPステータスコードの選択](status-codes.md)に従う。
 
@@ -84,7 +86,8 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
 - **201**：`ResponseEntity<Void>`を返し、`Location`ヘッダーを持つ`@ApiResponse(responseCode = "201", headers = @Header(...))`を書く。
 - **204**：`ResponseEntity<Void>`を返し、`@ApiResponse(responseCode = "204")`を書く。
 
-この形では`200`が残らず、`@ResponseStatus`は要らない。
+この形では`200`が残らない。
+成功の応答にも`@ResponseStatus`を付けない（ArchUnitの`httpErrorsAreMappedOnlyInErrorPresentationWeb`が拒否する）。
 `@ApiResponse`を書かないハンドラには、springdocが200を付ける。
 
 ## 例
@@ -139,7 +142,7 @@ class OrderController {
   /**
    * 注文を取り消す。
    *
-   * <p>取り消せない状態なら 409 を返す。
+   * <p>注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、取り消せない状態なら 422 を返す。
    *
    * @param orderId 取り消す注文の ID
    * @param request 画面が読んだ注文のロック番号
@@ -147,7 +150,9 @@ class OrderController {
    */
   @Operation(operationId = "cancelOrder")
   @ApiResponse(responseCode = "204")
+  @ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
   @ApiResponse(responseCode = "409", ref = "#/components/responses/ConflictProblem")
+  @ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
   @PostMapping("/{orderId}/cancel")
   /* package */ ResponseEntity<Void> cancel(
       @PathVariable final UUID orderId, @Valid @RequestBody final CancelOrderRequest request) {

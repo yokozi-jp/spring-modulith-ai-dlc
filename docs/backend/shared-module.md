@@ -17,7 +17,7 @@ tags: [architecture, backend, spring-modulith, shared-module]
   `EventPublicationResubmitOnce` 以外のクラスは package-private にし、他のモジュールから使えないようにする。
   `EventPublicationResubmitOnce` は、他のモジュールの結合テストがリスナーの回復を確かめるため public にする。
 - 楽観的ロックの語彙（`ConflictException`、`ExpectedLockNo`、`VersionedCommand`）を `shared.concurrency` に置き、このパッケージも `@NamedInterface("concurrency")` で公開する。
-- 業務上の失敗の例外（`NotFoundException`、`BusinessRuleViolationException`）を `shared.failure` に置き、このパッケージも `@NamedInterface("failure")` で公開する（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+- 業務上の失敗の例外（`NotFoundException`、`BusinessRuleViolationException`）と、422 の理由の interface `FailureReason` を `shared.failure` に置き、このパッケージも `@NamedInterface("failure")` で公開する（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   `shared` は Spring Web、Spring の HTTP、Servlet の型に依存しない。
   `shared` は Domain と `error` の型、ルートパッケージの型に依存しない。
 - リスナーが失敗した出版の再投入の方針を選ぶ注釈（`ResubmissionPolicy`）を `shared.events` に置き、このパッケージも `@NamedInterface("events")` で公開する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。

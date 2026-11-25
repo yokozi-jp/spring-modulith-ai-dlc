@@ -10,7 +10,11 @@ import { createTestQueryClient } from "@/testing/query-client";
 
 // Node の fetch は相対 URL を解決しないため、絶対 URL にする。
 const itemsUrl = "http://localhost/api/items";
-const conflict = { type: "about:blank", title: "Conflict", status: 409 };
+const conflict = {
+  type: "/problems/version-conflict",
+  title: "Updated by another request",
+  status: 409,
+};
 
 function respondToUpdate(status: 204 | 409) {
   if (status === 409) {

@@ -288,7 +288,7 @@ class ApiContractTest {
   }
 
   @Test
-  @DisplayName("ConflictException は日本語の 409 Problem Details になり、例外の内容を含まない")
+  @DisplayName("版の不一致の ConflictException は version-conflict の日本語の 409 になり、例外の内容を含まない")
   void conflictExceptionReturnsProblemDetailsWithoutImplementationDetails() throws Exception {
     final String body =
         mockMvc
@@ -297,8 +297,8 @@ class ApiContractTest {
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
             .andExpect(header().string(HttpHeaders.VARY, HttpHeaders.ACCEPT_LANGUAGE))
-            .andExpect(jsonPath("$.type").value("about:blank"))
-            .andExpect(jsonPath("$.title").value("競合が発生しました"))
+            .andExpect(jsonPath("$.type").value("/problems/version-conflict"))
+            .andExpect(jsonPath("$.title").value("ほかの操作が先に更新しました"))
             .andExpect(jsonPath("$.status").value(409))
             .andExpect(jsonPath("$.detail").doesNotExist())
             .andExpect(jsonPath("$.exception").doesNotExist())
@@ -311,7 +311,7 @@ class ApiContractTest {
   }
 
   @Test
-  @DisplayName("行ロックを待ち切れなかった ConflictException は英語の 409 になり、例外の内容を含まない")
+  @DisplayName("行ロックを待ち切れなかった ConflictException は lock-timeout の英語の 409 になり、例外の内容を含まない")
   void lockedConflictExceptionReturnsEnglishProblemDetailsWithoutImplementationDetails()
       throws Exception {
     final String body =
@@ -323,8 +323,8 @@ class ApiContractTest {
             .andExpect(status().isConflict())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "en"))
-            .andExpect(jsonPath("$.type").value("about:blank"))
-            .andExpect(jsonPath("$.title").value("Conflict"))
+            .andExpect(jsonPath("$.type").value("/problems/lock-timeout"))
+            .andExpect(jsonPath("$.title").value("Being updated by another request"))
             .andExpect(jsonPath("$.status").value(409))
             .andExpect(jsonPath("$.detail").doesNotExist())
             .andExpect(jsonPath("$.exception").doesNotExist())
