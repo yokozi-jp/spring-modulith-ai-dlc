@@ -171,7 +171,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 
 ## 同期の記録
 
-同期コミット：`62d0618f603f33861f01c57de9bbf1b1f1b29281`（main。#551 の Pull Request の土台）
+同期コミット：`e4b52ee7cb70d32e6ca6062a7064d607b5f56074`（main。#551 の Pull Request の土台）
 
 #551 の Pull Request のコード（決済記録を `INSERT ... ON CONFLICT DO NOTHING` で入れ、0 件なら 1 回目の決済記録を返すようにした後）で、`ChargeOrderCommandHandler`、`PaymentRepository`、`JooqPaymentRepository`、`TableWriter.insertIfAbsent` を読み、対応表の `DReadPayment`、`DReply`、`DInsert` がモデルと一致することを確かめた。
 同時の 2 回目の INSERT は 1 回目のトランザクションの終わりを待ち、例外にならずに完了する。
