@@ -290,7 +290,7 @@ Stale ==
   /\ UNCHANGED <<orderStatus, orderLock, cmdPc, cmdLock, payments, gateway,
                  dpc, dres, launched, rpc>>
 
-\* EventPublicationResubmitter.resubmit -> FailedEventPublications.resubmit
+\* FailedPublicationSweep.tryOnce / waitUpTo -> FailedEventPublications.resubmit
 \* reads FAILED rows and ResubmissionPolicies.isDue accepts this one.
 \* MaxDeliveries stands in for abandon-after-attempts + 1 (the first delivery).
 RPick ==

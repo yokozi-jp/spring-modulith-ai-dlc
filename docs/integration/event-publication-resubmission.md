@@ -22,10 +22,12 @@ tags: [architecture, integration, async, spring-modulith, resilience]
 構成要素は次のとおりである。
 
 - **定期の再投入のジョブ**（`EventPublicationResubmitter`）：`FAILED` の出版を条件に合うものだけ再投入する。
+- **失敗した出版の掃き取り**（`FailedPublicationSweep`）：ロックを取り、選んだ `FAILED` の出版を `max-per-run` 件まで再投入し、`RESUBMITTED` へ進んだ出版を返す。
+  定期のジョブと手での 1 回の再投入が、選ぶ条件、ロックの取り方（1 回だけ試す、取れるまで待つ）、再投入のあとの扱いだけを変えて同じ手順を使う。
 - **ShedLock**：ロックの行で、定期のジョブを同時に 1 つのインスタンスへ絞る。
 - **リスナーの方針**（`ResubmissionPolicies`）：出版をリスナーの待ち時間の方針に対応づけ、再投入してよいかを決める。
 - **回数の上限**（`spring.modulith.events.resubmission.abandon-after-attempts`）：Spring Modulith が、上限の回数目の再投入で失敗した出版を `ABANDONED` にする。
-- **手での 1 回の再投入のジョブ**（`EventPublicationResubmitOnce`）：運用者が 1 回だけ起動し、同じロックを取って再投入する。
+- **手での 1 回の再投入のジョブ**（`EventPublicationResubmitOnce`）：運用者が 1 回だけ起動し、同じロックを取って再投入する。対象は `all`、`policy:<名前>`、`event-type:<クラス>` で、起動時に `Target` に読む。
 - **Staleness Monitor**：落ちたまま残った出版を `FAILED` に戻す。
 - **`in-flight-staleness`**：`PROCESSING` と `RESUBMITTED` の出版を、最後の出版か再投入の時刻から数えて `FAILED` に戻すまでの時間である。
 

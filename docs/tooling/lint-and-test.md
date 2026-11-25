@@ -65,6 +65,9 @@ compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプ�
   テストは対象のクラスのパッケージ以下のものだけを使う。
   対象のクラスがないときはPITを実行せず、差分を取れないときは失敗する。
   minionは1つにし、Springの起動を待てるようにtimeoutを既定より広げる。
+  PITは既定の`FRECORD`のfilterで、recordのコンパクトコンストラクタと自動生成の`equals`、`hashCode`、`toString`を変異させない。
+  コンパクトコンストラクタの変異を確かめるときは、`./gradlew pitest`に`-PpitFeatures=-FRECORD`と`-PpitTargetClasses`、`-PpitTargetTests`を渡し、対象のrecordに絞って実行する。
+  既定でfilterを外さないのは、外すとdomain.modelの27クラスだけで変異が85個から193個に増え、増えた分の大半が自動生成のメソッドの覆われない変異になるためである。
 - **`task test`**：slotの取得、compose-testのPostgreSQLの起動、`be-verify-migrations`、PostgreSQLの停止、`be-test`、`api-lint`を実行し、最後にslotのプロジェクトを片付ける。
   PostgreSQLの停止はコンテナを消さないので、最後の片付けまでslotを持つ。
 - **`task test-deps-leftover-check`**：名前に`spring-modulith-test`を含むコンテナかvolumeが残っていれば失敗する。

@@ -2,6 +2,7 @@ package com.example.demo.shared.eventresubmission;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -38,7 +39,6 @@ import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.modulith.events.ApplicationModuleListener;
-import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.config.FixedDelayTask;
@@ -129,7 +129,7 @@ class EventPublicationResubmissionConfigTest {
         .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
         .withUserConfiguration(EventPublicationResubmitter.class, ResubmissionPolicies.class)
         // 初回の遅延が 1 分あり、テストの間にタスクは動かないため、依存は mock で足りる。
-        .withBean(FailedEventPublications.class, () -> Mockito.mock(FailedEventPublications.class))
+        .withBean(FailedPublicationSweep.class, () -> Mockito.mock(FailedPublicationSweep.class))
         .withBean(
             Clock.class,
             () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
@@ -403,16 +403,23 @@ class EventPublicationResubmissionConfigTest {
   @DisplayName("手での 1 回の再投入の終了コードは、すべて完了なら 0、未完了や例外なら 1 である")
   void resubmitOnceExitCode() {
     final EventPublicationResubmitOnce job = Mockito.mock(EventPublicationResubmitOnce.class);
-    Mockito.when(job.run("all")).thenReturn(new EventPublicationResubmitOnce.Outcome(2, 2, 0, 0));
-    Mockito.when(job.run("policy:payment"))
+    Mockito.when(job.run(Target.parse("all")))
+        .thenReturn(new EventPublicationResubmitOnce.Outcome(2, 2, 0, 0));
+    Mockito.when(job.run(Target.parse("policy:payment")))
         .thenReturn(new EventPublicationResubmitOnce.Outcome(2, 1, 1, 0));
-    Mockito.when(job.run("policy:missing")).thenThrow(new IllegalArgumentException("unknown"));
+    Mockito.when(job.run(Target.parse("policy:missing")))
+        .thenThrow(new IllegalArgumentException("unknown"));
 
     assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "all")).isZero();
     assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "policy:payment"))
         .isEqualTo(1);
     assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "policy:missing"))
         .isEqualTo(1);
+    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "OrderConfirmed"))
+        .as("読めない対象は、job を呼ばずに 1 を返す")
+        .isEqualTo(1);
+    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, null)).isEqualTo(1);
+    Mockito.verify(job, Mockito.times(3)).run(Mockito.any());
   }
 
   @Test

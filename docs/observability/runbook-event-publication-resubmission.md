@@ -43,7 +43,7 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
   リスナーの名前を変えたデプロイで、古い出版のリスナーが見つからない。
 - **対応**：「上限に達した出版の調べ方」の SQL で出版とリスナーを特定し、リスナーの ERROR のログと trace で原因を確かめる。
   原因を直したら「上限に達した出版の戻し方」で `FAILED` に戻してから「手での再投入」で再投入し、再投入しないと決めた出版は「再投入しない出版の片付け」で消す。
-- **通知**：再投入したインスタンスがその前に落ちると出ないため、`failed.oldest.age{state=exhausted}` の警報が補う（「メトリクスの見方」）。
+- **通知**：再投入したインスタンスがその前に落ちたときと、その回のロックの解放に失敗したときは出ないため、`failed.oldest.age{state=exhausted}` の警報が補う（「メトリクスの見方」）。
   監視の通知は `event_publication.id` でまとめる。
 
 ## Failed event publications exceed the resubmission limit
@@ -119,6 +119,7 @@ Staleness Monitor が処理中の出版を `FAILED` に戻すまでの `in-fligh
 - **レベル**：`WARN`
 - **事象**：手での 1 回の再投入で、再投入した出版の一部が完了しなかったか、`max-per-run` を超えて再投入しなかった出版が残った。終了コードは 1 である。
 - **属性**：`event_publication.resubmitted.count`、`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`
+  `resubmitted` は、再投入して `RESUBMITTED` へ進んだ出版の数である。選ばれても進まなかった出版は、どの属性にも数えない。
 - **発生原因**：原因が直っておらずリスナーがまた失敗した（`incomplete`）。
   リスナーが `completion-timeout`（10 分）を過ぎても終わらない（`incomplete`）。
   対象が `max-per-run`（100 件）より多い（`remaining`）。

@@ -31,9 +31,17 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.application.OrderAuditColumns"),
         row(
-            "sharedModuleDoesNotDependOnHttp",
-            PackageByFeatureOnionArchitectureTest.sharedModuleDoesNotDependOnHttpRule(VIOLATING),
+            "httpTypesAreNotUsedByInnerLayers: shared",
+            PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(VIOLATING),
             "shared.persistence.ChildRowWriter"),
+        row(
+            "httpTypesAreNotUsedByInnerLayers: application",
+            PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(VIOLATING),
+            "ordering.application.HttpStatusCommandHandler"),
+        row(
+            "httpTypesAreNotUsedByInnerLayers: infrastructure.persistence",
+            PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(VIOLATING),
+            "ordering.infrastructure.persistence.HttpStatusOrderReader"),
         row(
             "noSuchElementExceptionIsNotThrown",
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
@@ -62,6 +70,21 @@ final class ClassRoleFixtureRows {
             PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
                 VIOLATING),
             "ordering.domain.model.OrderRetryPolicy"),
+        row(
+            "domainModelDependsOnlyOnAllowedTypes: SLF4J の Logger",
+            PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
+                VIOLATING),
+            "ordering.domain.model.LoggingOrder"),
+        row(
+            "domainModelDependsOnlyOnAllowedTypes: java.net.http の HttpClient",
+            PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
+                VIOLATING),
+            "ordering.domain.model.RemoteOrderLookup"),
+        row(
+            "domainModelDependsOnlyOnAllowedTypes: shared.tenancy.TenantContext",
+            PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
+                VIOLATING),
+            "ordering.domain.model.TenantReadingOrder"),
         row(
             "applicationDependsOnlyOnAllowedTypes",
             PackageByFeatureOnionArchitectureTest.applicationDependsOnlyOnAllowedTypesRule(

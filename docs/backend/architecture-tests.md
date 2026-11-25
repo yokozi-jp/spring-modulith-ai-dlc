@@ -54,16 +54,16 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で、どの層からも使える`shared`のパッケージ以外の`shared`の型に依存するクラスは、`infrastructure.persistence`に置く。
   `shared`の中の依存は対象にしない。
   どの層からも使えるパッケージの一覧は、`PackageByFeatureOnionArchitectureTest`の`ANY_LAYER_SHARED_PACKAGES`が持つ。この規則と`dependenciesPointInward`の所属検査の除外が、そこから組み立てる（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)、[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)、[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
-- `sharedModuleDoesNotDependOnHttp`：`shared`の型は、Spring Web、Springの HTTP、Servletの型に依存しない。
+- `httpTypesAreNotUsedByInnerLayers`：`shared`と各モジュールの`domain`、`application`、`infrastructure.persistence`は、Spring Web、Springの HTTP、Servletの型に依存しない。HTTPの型を使うのは`presentation.web`、`infrastructure.client`、ベースパッケージ直下の設定に限る意図だが、規則が検査するのは上の4つのパッケージである。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenancy.TenantId`と`shared.tenancy.TenantScoped`だけに依存する。
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
 - `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`と、同じ層に入る`shared.persistence`と`shared.eventresubmission`だけで使う。
-- `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java..`、`org.jspecify..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy`、`lombok.Generated`だけに依存する。
+- `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java.lang..`、`java.util..`、`java.math..`、`java.time..`、`org.jspecify..`、`lombok..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy.TenantId`だけに依存する。`shared.tenancy.TenantContext`は、ScopedValueの暗黙の文脈で引数に現れない入力になるため許さない。
   許可の一覧で止めるため、外部システムのSDKや生成型も、Spring、jOOQ、JPA、Jacksonの型と同じく落ちる。
-  Lombokの注釈のうち、許すのは生成したコードに付く`lombok.Generated`だけである（`lombok.NonNull`など、クラスファイルに残るほかの注釈は落ちる）。
+  Lombokは`lombok..`を許す。
 - `applicationDependsOnlyOnAllowedTypes`：`application`は、このアプリケーションの型のほかに、`java..`、`org.jspecify..`、`lombok.Generated`、`org.slf4j..`、`org.springframework.stereotype..`、`org.springframework.transaction.annotation..`、`org.springframework.modulith.events..`、`org.springframework.context`（パッケージ直下）だけに依存する。
-- `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java..`、`org.jspecify..`、`lombok..`、Domainの型、`shared.failure`の例外、`@Service`だけに依存する。
+- `domainServicesDependOnlyOnDomainAndJava`：`domain.service`は`java.lang..`、`java.util..`、`java.math..`、`java.time..`、`org.jspecify..`、`lombok..`、Domainの型、`shared.failure`の例外、`shared.tenancy.TenantId`、`@Service`だけに依存する。
 - `domainServicesAreAnnotatedWithService`：`domain.service`のトップレベルのクラスに`@Service`を付ける。
 - `servicesResideInApplicationOrDomainService`：`@Service`を付けた型は`application`か`domain.service`に置く。
 - `controllersResideInPresentationWeb`：`@Controller`と`@RestController`を付けた型は`presentation.web`に置き、名前を`Controller`で終える。
@@ -149,7 +149,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 
 ## 許可する外部ライブラリの型を足す
 
-`domain.model`と`application`が使える外部ライブラリの型は、`PackageByFeatureOnionArchitectureTest`の`domainModelDependsOnlyOnAllowedTypesRule`と`applicationDependsOnlyOnAllowedTypesRule`の`resideInAnyPackage`が持つ。
+`domain.model`と`application`が使える外部ライブラリの型と、`domain.model`と`domain.service`が使える標準型は、`PackageByFeatureOnionArchitectureTest`の`DOMAIN_JAVA_PACKAGES`と`allowedInDomain`（`domain.model`と`domain.service`）、`applicationDependsOnlyOnAllowedTypesRule`の`resideInAnyPackage`（`application`）が持つ。
 `@PreAuthorize`のような型を使うときは、次の順で直す。
 
 1. 型を使う層が、その型を使ってよい理由を、層の規約（[layers.md](layers.md)とクラスの役割の「依存してよい型」）に書く。
@@ -209,7 +209,8 @@ H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を�
 `noSuchElementExceptionIsNotThrown`は、違反フィクスチャの`LegacyOrderFinder`の`notFound`（`NoSuchElementException`の生成）と`firstOrFail`（引数なしの`orElseThrow()`）で確かめる。
 規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
 `allowedUsagesAreNotDetected`の別の一行は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
-`sharedModuleDoesNotDependOnHttp`は、違反フィクスチャの`shared.persistence`の`ChildRowWriter`が`ResponseStatusException`を投げることを検出する。
+`httpTypesAreNotUsedByInnerLayers`は、違反フィクスチャの`shared.persistence`の`ChildRowWriter`と`application`の`HttpStatusCommandHandler`が`ResponseStatusException`を投げること、`infrastructure.persistence`の`HttpStatusOrderReader`が`HttpStatus`を使うことを検出する。
+`domainModelDependsOnlyOnAllowedTypes`は、違反フィクスチャの`LoggingOrder`（SLF4Jの`Logger`）、`RemoteOrderLookup`（`java.net.http.HttpClient`）、`TenantReadingOrder`（`TenantContext`）を検出する。規約どおりの`OrderTenantPolicy`（Domain Serviceが`TenantId`を使う）は`domainServicesDependOnlyOnDomainAndJava`が通す。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 
 `TestConventionsArchTest`の`sleepIsNotUsedInTests`は、`SleepRuleFixtureTest`が`archfixture.sleep`のクラスで確かめる。

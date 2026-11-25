@@ -14,7 +14,7 @@
 - [ADR-010: プロジェクトのタスクランナーに Task を採用する](ADR-010-adopt-task-as-project-task-runner.md)（Proposed, 2026-09-13）
 - [ADR-011: モジュール所有のデータベーススキーマを使う](ADR-011-use-module-owned-database-schemas.md)（Proposed, 2026-09-14）
 - [ADR-012: プロパティベーステストとミューテーションテストを採用する](ADR-012-adopt-property-based-and-mutation-testing.md)（Proposed, 2026-09-14）
-- [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, Amended by ADR-117, 2026-09-14）
+- [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, Amended by ADR-117, Amended by ADR-126, 2026-09-14）
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, 2026-09-14）
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, Amended by ADR-110, 2026-09-15）
 - [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, Amended by ADR-047, 2026-09-15）
@@ -125,3 +125,4 @@
 - [ADR-123: メールアドレスの形式の検査で、サーバーの式をクライアントの Zod の式に揃える](ADR-123-align-server-email-validation-with-zod.md)（Proposed, 2026-11-24）
 - [ADR-124: mise の版の更新だけを Renovate に任せ、Dependabot と併存させる](ADR-124-update-mise-pinned-versions-with-renovate.md)（Proposed, 2026-11-24）
 - [ADR-125: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける](ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)（Proposed, 2026-11-24）
+- [ADR-126: GET と HEAD 以外のすべての業務の API に Idempotency-Key を必須にし、モジュールごとの表に Result を保存する](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)（Proposed, 2026-11-24）

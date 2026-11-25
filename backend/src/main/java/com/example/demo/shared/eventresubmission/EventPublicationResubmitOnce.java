@@ -1,22 +1,13 @@
 package com.example.demo.shared.eventresubmission;
 
 import com.example.demo.shared.eventresubmission.EventPublicationStates.State;
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.List;
+import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
-import net.javacrumbs.shedlock.core.LockConfiguration;
-import net.javacrumbs.shedlock.core.LockingTaskExecutor;
 import org.jooq.DSLContext;
 import org.springframework.modulith.events.EventPublication;
-import org.springframework.modulith.events.FailedEventPublications;
-import org.springframework.modulith.events.ResubmissionOptions;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -37,9 +28,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @Component
 public class EventPublicationResubmitOnce {
 
-  /** ロックと完了を確かめる間隔。 */
-  private static final Duration POLL_INTERVAL = Duration.ofSeconds(1);
-
   /** すべての FAILED の出版を対象にする指定。 */
   private static final String ALL = "all";
 
@@ -52,17 +40,11 @@ public class EventPublicationResubmitOnce {
   /** Spring Boot が構成した jOOQ。 */
   private final DSLContext dsl;
 
-  /** Spring Modulith の失敗した出版の再投入。 */
-  private final FailedEventPublications failedEventPublications;
-
-  /** ロックの実行。 */
-  private final LockingTaskExecutor lockingTaskExecutor;
+  /** ロックを取って、失敗した出版を再投入する。 */
+  private final FailedPublicationSweep sweep;
 
   /** リスナーの再投入の方針。 */
   private final ResubmissionPolicies policies;
-
-  /** 現在時刻。 */
-  private final Clock clock;
 
   /** 定期の再投入の設定値。 */
   private final EventPublicationResubmissionConfig.Properties properties;
@@ -72,75 +54,91 @@ public class EventPublicationResubmitOnce {
 
   /* package */ EventPublicationResubmitOnce(
       final DSLContext dsl,
-      final FailedEventPublications failedEventPublications,
-      final LockingTaskExecutor eventPublicationLockingTaskExecutor,
+      final FailedPublicationSweep sweep,
       final ResubmissionPolicies policies,
-      final Clock clock,
       final EventPublicationResubmissionConfig.Properties properties,
       final EventPublicationResubmissionConfig.ResubmitOnceProperties onceProperties) {
     this.dsl = dsl;
-    this.failedEventPublications = failedEventPublications;
-    this.lockingTaskExecutor = eventPublicationLockingTaskExecutor;
+    this.sweep = sweep;
     this.policies = policies;
-    this.clock = clock;
     this.properties = properties;
     this.onceProperties = onceProperties;
   }
 
   /**
+   * 再投入の対象。環境変数の文字列は {@link #parse} で 1 回だけ型にする。
+   *
+   * <p>{@link Policy} の名前が設定にあるかは、{@link EventPublicationResubmitOnce#run} が対象を選ぶときに確かめる。
+   */
+  public sealed interface Target {
+
+    /** すべての {@code FAILED} の出版。 */
+    record All() implements Target {}
+
+    /** 方針の名前で選ぶ出版。 */
+    record Policy(String name) implements Target {}
+
+    /** イベントの完全修飾名で選ぶ出版。 */
+    record EventType(String className) implements Target {}
+
+    /**
+     * {@code all}、{@code policy:<方針の名前>}、{@code event-type:<イベントの完全修飾名>} のいずれかを読む。
+     *
+     * @throws IllegalArgumentException どれにも合わないとき
+     */
+    static Target parse(final String raw) {
+      if (ALL.equals(raw)) {
+        return new All();
+      }
+      if (raw.startsWith(POLICY_PREFIX) && raw.length() > POLICY_PREFIX.length()) {
+        return new Policy(raw.substring(POLICY_PREFIX.length()));
+      }
+      if (raw.startsWith(EVENT_TYPE_PREFIX) && raw.length() > EVENT_TYPE_PREFIX.length()) {
+        return new EventType(raw.substring(EVENT_TYPE_PREFIX.length()));
+      }
+      throw new IllegalArgumentException(
+          "event-publication.resubmit-once.target must be all, policy:<name> or event-type:<class>: "
+              + raw);
+    }
+  }
+
+  /**
    * 対象の FAILED の出版を再投入し、リスナーの処理が終わるか {@code completion-timeout} を過ぎるまで待つ。
    *
-   * @param target {@code all}、{@code policy:<方針の名前>}、{@code event-type:<イベントの完全修飾名>} のいずれか
+   * @param target 再投入する対象
    * @return 再投入した件数と、その処理の結果
-   * @throws IllegalArgumentException 対象の指定が不正なとき
+   * @throws IllegalArgumentException 方針の名前が設定にないとき
    * @throws IllegalStateException トランザクションの中で呼んだとき、{@code lock-at-most-for} の間にロックを取れなかったとき
    */
-  public Outcome run(final String target) {
+  public Outcome run(final Target target) {
     // トランザクションの中で呼ぶと、再投入の印がコミットされず、別のスレッドのリスナーが進めないまま待ち続ける。
     if (TransactionSynchronizationManager.isActualTransactionActive()) {
       throw new IllegalStateException("resubmit-once must not run inside a transaction");
     }
-    final Predicate<EventPublication> selected = selector(target);
-    final List<UUID> resubmitted = new CopyOnWriteArrayList<>();
-    final AtomicInteger remaining = new AtomicInteger();
-    final int lockAttempts = pollsWithin(properties.lockAtMostFor());
-    boolean locked = tryResubmit(selected, resubmitted, remaining);
-    for (int attempt = 0; attempt < lockAttempts && !locked; attempt++) {
-      sleep();
-      locked = tryResubmit(selected, resubmitted, remaining);
-    }
-    if (!locked) {
-      throw new IllegalStateException(
-          "lock "
-              + EventPublicationResubmitter.LOCK_NAME
-              + " was not acquired within "
-              + properties.lockAtMostFor());
-    }
-    final Outcome result = awaitCompletion(List.copyOf(resubmitted), remaining.get());
-    record(result);
-    return result;
+    final FailedPublicationSweep.Swept swept = sweep.waitUpTo(selector(target));
+    final Outcome outcome = awaitCompletion(swept.advanced(), swept.remaining());
+    record(outcome);
+    return outcome;
   }
 
-  private Predicate<EventPublication> selector(final String target) {
-    if (ALL.equals(target)) {
-      return publication -> true;
-    }
-    if (target.startsWith(POLICY_PREFIX)) {
-      final String name = target.substring(POLICY_PREFIX.length());
-      if (!properties.policies().containsKey(name)) {
-        throw new IllegalArgumentException(
-            "unknown resubmission policy: " + name + " " + properties.policies().keySet());
+  private Predicate<EventPublication> selector(final Target target) {
+    return switch (target) {
+      case Target.All _ -> publication -> true;
+      case Target.Policy policy -> {
+        requireKnownPolicy(policy);
+        yield publication ->
+            policy.name().equals(policies.nameOf(ResubmissionPolicies.listenerIdOf(publication)));
       }
-      return publication ->
-          name.equals(policies.nameOf(ResubmissionPolicies.listenerIdOf(publication)));
+      case Target.EventType type ->
+          publication -> type.className().equals(publication.getEvent().getClass().getName());
+    };
+  }
+
+  private void requireKnownPolicy(final Target.Policy policy) {
+    if (!properties.policies().containsKey(policy.name())) {
+      throw new IllegalArgumentException(
+          "unknown resubmission policy: " + policy.name() + " " + properties.policies().keySet());
     }
-    if (target.startsWith(EVENT_TYPE_PREFIX) && target.length() > EVENT_TYPE_PREFIX.length()) {
-      final String eventType = target.substring(EVENT_TYPE_PREFIX.length());
-      return publication -> eventType.equals(publication.getEvent().getClass().getName());
-    }
-    throw new IllegalArgumentException(
-        "event-publication.resubmit-once.target must be all, policy:<name> or event-type:<class>: "
-            + target);
   }
 
   /** 結果の件数を記録する。すべて完了したら INFO、それ以外は WARN にする。 */
@@ -156,91 +154,29 @@ public class EventPublicationResubmitOnce {
                 : "Event publication resubmit-once incomplete");
   }
 
-  /** ロックを取れたら再投入し、取れたかを返す。下限は置かず、終わったらすぐ放す。 */
-  private boolean tryResubmit(
-      final Predicate<EventPublication> selected,
-      final List<UUID> resubmitted,
-      final AtomicInteger remaining) {
-    final AtomicBoolean locked = new AtomicBoolean();
-    lockingTaskExecutor.executeWithLock(
-        (Runnable)
-            () -> {
-              locked.set(true);
-              resubmit(selected, resubmitted, remaining);
-            },
-        new LockConfiguration(
-            Instant.now(clock),
-            EventPublicationResubmitter.LOCK_NAME,
-            properties.lockAtMostFor(),
-            Duration.ZERO));
-    return locked.get();
-  }
-
-  /** 対象に合う出版を max-per-run 件まで再投入し、ID を集める。超えた件数は remaining に数える。 */
-  private void resubmit(
-      final Predicate<EventPublication> selected,
-      final List<UUID> resubmitted,
-      final AtomicInteger remaining) {
-    // 定期の再投入と同じく、LIMIT が条件の関数より先に掛かるのを避けるため、FAILED の行をすべて読む。
-    failedEventPublications.resubmit(
-        ResubmissionOptions.defaults()
-            .withBatchSize(Integer.MAX_VALUE)
-            .withFilter(publication -> {
-              if (!selected.test(publication)) {
-                return false;
-              }
-              if (resubmitted.size() >= properties.maxPerRun()) {
-                remaining.incrementAndGet();
-                return false;
-              }
-              resubmitted.add(publication.getIdentifier());
-              return true;
-            }));
-  }
-
   /**
    * 再投入した出版の処理が終わるまで待ち、結果を数える。完了した出版は archive の {@code COMPLETED} の行で数える。
    *
    * <p>回数の上限を超えて失敗した出版は、{@code ABANDONED} で archive へ移り、完了と数えない。
    */
-  private Outcome awaitCompletion(final List<UUID> ids, final int remaining) {
-    final int polls = pollsWithin(onceProperties.completionTimeout());
+  private Outcome awaitCompletion(final Set<UUID> ids, final int remaining) {
+    final int polls = Polling.pollsWithin(onceProperties.completionTimeout());
     for (int poll = 0; poll < polls && count(ids, State::isInFlight) > 0; poll++) {
-      sleep();
+      Polling.sleep();
     }
     final int completed = count(ids, state -> state.status() == EventPublication.Status.COMPLETED);
     return new Outcome(ids.size(), completed, ids.size() - completed, remaining);
   }
 
   /** 出版のうち、状態が条件に合う数。 */
-  private int count(final List<UUID> ids, final Predicate<State> condition) {
+  private int count(final Collection<UUID> ids, final Predicate<State> condition) {
     return (int) EventPublicationStates.read(dsl, ids).values().stream().filter(condition).count();
-  }
-
-  /**
-   * {@code limit} の間に確かめる回数。int を超える上限は切り捨てず {@link ArithmeticException} で失敗する。
-   *
-   * <p>回数を int にするのは、PIT が int のループの増分の変異を無限ループとして除くためである。long の増分は除かれず、待ちの上限まで止まる。
-   */
-  private static int pollsWithin(final Duration limit) {
-    return Math.toIntExact(limit.dividedBy(POLL_INTERVAL));
-  }
-
-  // ロックの解放とリスナーの完了を、短い間隔で確かめるため待つ。
-  @SuppressWarnings("PMD.DoNotUseThreads")
-  private static void sleep() {
-    try {
-      Thread.sleep(POLL_INTERVAL);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("interrupted while resubmitting once", e);
-    }
   }
 
   /**
    * 1 回の再投入の結果。
    *
-   * @param resubmitted 再投入した出版の数
+   * @param resubmitted 再投入して {@code RESUBMITTED} へ進んだ出版の数。選ばれても進まなかった出版は数えない
    * @param completed そのうち処理を完了した数
    * @param incomplete そのうち FAILED に戻るか ABANDONED になった数と、待つ上限を過ぎても処理中の数
    * @param remaining 対象に合うが、{@code max-per-run} を超えたため再投入しなかった数

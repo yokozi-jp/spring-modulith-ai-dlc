@@ -53,7 +53,7 @@ CommandHandler は Domain Service に、必要な値を Domain の型で渡す�
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、`lombok..`、同じモジュールの `domain.model` と `domain.service` の型（Repository を含む）、`shared.failure` の例外、`org.springframework.stereotype.Service`。
+- **依存してよい型**：`java.lang..`、`java.util..`、`java.math..`、`java.time..` の標準型、`org.jspecify..`、`lombok..`、同じモジュールの `domain.model` と `domain.service` の型（Repository を含む）、`shared.failure` の例外、`shared.tenancy.TenantId`、`org.springframework.stereotype.Service`。
 - **依存してはいけない型**：`@Service` 以外の Spring の型（`@Transactional`、`ApplicationEventPublisher`）、`org.slf4j`、モジュールルートの型と他モジュールの `<Feature>Queries`、`application`、Infrastructure、外部システムのインタフェース（`PaymentGateway`）。
 
 ## 最小の例と典型的な例
@@ -162,7 +162,7 @@ class DiscountPolicyTest {
 - [ ] 規則を値オブジェクトか Entity に置けず、三つの場合のどれかに当てはまることを確かめた。［自分で点検］
 - [ ] `domain.service` に置き、`@Service` を付ける。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesAreAnnotatedWithService］
 - [ ] `@Service` を付けた型は `application` か `domain.service` にだけ置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService］
-- [ ] 依存は Java の標準型、Domain の型、`shared.failure` の例外、`@Service` だけにし、`@Transactional`、`ApplicationEventPublisher`、ロガー、モジュールルートの型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJava］
+- [ ] 依存は Java の標準型、Domain の型、`shared.failure` の例外、`shared.tenancy.TenantId`、`@Service` だけにし、`@Transactional`、`ApplicationEventPublisher`、ロガー、モジュールルートの型を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJava］
 - [ ] `application` と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 外部システムのインタフェースに依存しない。［ArchUnit で検査：ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients］
 - [ ] Repository は読み取り（`count*`、`find*`）にだけ使い、`add` を呼ばない。［自分で点検］

@@ -5,6 +5,7 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.shared.tenancy.TenantScoped;
@@ -60,14 +61,14 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * 定期の再投入（{@link EventPublicationResubmitter#resubmitOnce()}）と手での 1 回の再投入（{@link
- * EventPublicationResubmitOnce#run(String)}）を、リスナーの呼び出しの回数、出版の状態と {@code
- * completion_attempts}、メトリクス、ログで検証する。
+ * EventPublicationResubmitOnce#run(EventPublicationResubmitOnce.Target)}）を、リスナーの呼び出しの回数、出版の状態と
+ * {@code completion_attempts}、メトリクス、ログで検証する。
  *
  * <p>定期の実行は {@code .env.test} で無効なので、テストが直接呼ぶ。本番と同じくトランザクションの外から呼び、{@link Scenario} は完了を待つだけに使う。出版は
  * {@link Scenario} でテストのイベントを発行して作り、時刻は差し替えられる固定の時計で進める。
  *
  * <p>ロックの期限は DB の時刻で決まり、固定の時計では進まない。定期の再投入と手での 1 回の再投入を続けて呼ぶテストは、呼ぶ前にロックの期限を過去にする（{@link
- * #runJob()}、{@link #runOnce(String)}）。DB の壁時計は NTP の同期で戻ることがあり、ShedLock の解放だけでは期限が残りうるためでもある。
+ * #runJob()}、{@link #runOnce(Target)}）。DB の壁時計は NTP の同期で戻ることがあり、ShedLock の解放だけでは期限が残りうるためでもある。
  */
 // 一つの文脈で出版の状態、メトリクス、ログ、ロック、方針を確かめるため、型とメソッドの数が多い。
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
@@ -99,8 +100,8 @@ class EventPublicationResubmitterTest {
   /** {@code completion_attempts} の説明。 */
   private static final String ATTEMPTS = "id=%s の attempts";
 
-  /** すべての FAILED の出版を対象にする手での 1 回の再投入の指定。 */
-  private static final String ALL = "all";
+  /** テスト用のリスナーに付ける再投入の方針の名前。 */
+  private static final String PROBE_POLICY = "probe";
 
   /** Gauge の state の値。上限に達した出版。 */
   private static final String STATE_EXHAUSTED = "exhausted";
@@ -194,7 +195,7 @@ class EventPublicationResubmitterTest {
         .isEqualTo(
             ResubmissionPolicies.listenerId(
                 ProbeListener.class.getDeclaredMethod("on", ResubmissionProbe.class)));
-    assertThat(policies.nameOf(listenerId)).isEqualTo("probe");
+    assertThat(policies.nameOf(listenerId)).isEqualTo(PROBE_POLICY);
     assertThat(policies.nameOf("unknown.Listener.on(java.lang.Object)")).isEqualTo("default");
   }
 
@@ -263,7 +264,7 @@ class EventPublicationResubmitterTest {
     runJob();
 
     assertThat(state(id).attempts()).as("id=%s の上限の後の attempts", id).isEqualTo(3);
-    assertThat(runOnce(ALL).resubmitted()).as("手での 1 回の再投入").isZero();
+    assertThat(runOnce(new Target.All()).resubmitted()).as("手での 1 回の再投入").isZero();
     assertThat(listener.calls()).as(CALLS, id).isEqualTo(3);
     assertThat(gauge(STATE_EXHAUSTED)).as("上限に達した出版の数").isEqualTo(1.0);
     assertThat(gauge(STATE_RETRYING)).as("自動の再投入を待つ出版の数").isZero();
@@ -343,7 +344,7 @@ class EventPublicationResubmitterTest {
 
     assertThatThrownBy(() ->
             new TransactionTemplate(transactionManager)
-                .executeWithoutResult(status -> resubmitOnce.run(ALL)))
+                .executeWithoutResult(status -> resubmitOnce.run(new Target.All())))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("transaction");
     assertThat(state(id).attempts()).as(ATTEMPTS, id).isEqualTo(1);
@@ -420,7 +421,8 @@ class EventPublicationResubmitterTest {
     final String id = failedOnce(scenario);
     final CountDownLatch gate = listener.close();
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
-        ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run("policy:probe"));
+        ResubmissionTestSupport.onVirtualThread(
+            () -> resubmitOnce.run(new Target.Policy(PROBE_POLICY)));
     awaitListenerAtGate(id);
     assertThat(future).as("門で待つ間の手での再投入").isNotDone();
     gate.countDown();
@@ -447,7 +449,8 @@ class EventPublicationResubmitterTest {
             .plus(Duration.ofMinutes(1)));
     final CountDownLatch gate = listener.close();
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
-        ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run("policy:probe"));
+        ResubmissionTestSupport.onVirtualThread(
+            () -> resubmitOnce.run(new Target.Policy(PROBE_POLICY)));
     awaitListenerAtGate(id);
 
     registry.markStalePublicationsFailed(staleness);
@@ -464,25 +467,17 @@ class EventPublicationResubmitterTest {
   void resubmitOnceSelectsByTarget(final Scenario scenario) {
     final String id = failedOnce(scenario);
 
-    assertThat(runOnce("policy:payment").resubmitted()).as("payment の方針").isZero();
-    assertThat(runOnce("event-type:java.lang.String").resubmitted()).as("他の型").isZero();
-    assertThat(runOnce("event-type:" + EVENT_TYPE).resubmitted()).as("同じ型").isEqualTo(1);
+    assertThat(runOnce(new Target.Policy("payment")).resubmitted()).as("payment の方針").isZero();
+    assertThat(runOnce(new Target.EventType("java.lang.String")).resubmitted()).as("他の型").isZero();
+    assertThat(runOnce(new Target.EventType(EVENT_TYPE)).resubmitted()).as("同じ型").isEqualTo(1);
     awaitState(scenario.stimulate(() -> {}), id, COMPLETED, s -> s.archived() == 1);
 
     listener.failTimes(1);
     final String other = failedOnce(scenario);
-    assertThat(runOnce(ALL).completed()).as("all").isEqualTo(1);
+    assertThat(runOnce(new Target.All()).completed()).as("all").isEqualTo(1);
     assertThat(state(other).archived()).as(ARCHIVED, other).isEqualTo(1);
-    assertThatThrownBy(() -> resubmitOnce.run("policy:missing"))
+    assertThatThrownBy(() -> resubmitOnce.run(new Target.Policy("missing")))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> resubmitOnce.run("OrderConfirmed"))
-        .isInstanceOf(IllegalArgumentException.class);
-    // 空白以外で対象として読めない値は、false も含めて黙って何もしないのではなく失敗する。
-    for (final String invalid : List.of("false", "", "event-type:")) {
-      assertThatThrownBy(() -> resubmitOnce.run(invalid))
-          .as("対象 '%s'", invalid)
-          .isInstanceOf(IllegalArgumentException.class);
-    }
   }
 
   @Test
@@ -492,9 +487,9 @@ class EventPublicationResubmitterTest {
 
     holdLock();
     try {
-      assertThatThrownBy(() -> resubmitOnce.run(ALL))
+      assertThatThrownBy(() -> resubmitOnce.run(new Target.All()))
           .isInstanceOf(IllegalStateException.class)
-          .hasMessageContaining(EventPublicationResubmitter.LOCK_NAME);
+          .hasMessageContaining(FailedPublicationSweep.LOCK_NAME);
     } finally {
       ResubmissionTestSupport.expireLock(dsl);
     }
@@ -502,7 +497,7 @@ class EventPublicationResubmitterTest {
 
     holdLock();
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
-        ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run(ALL));
+        ResubmissionTestSupport.onVirtualThread(() -> resubmitOnce.run(new Target.All()));
     Awaitility.await("ロックを持つ間の手での再投入")
         .during(Duration.ofSeconds(1))
         .atMost(Duration.ofSeconds(3))
@@ -530,15 +525,15 @@ class EventPublicationResubmitterTest {
             lockProvider.lock(
                 new LockConfiguration(
                     Instant.now(clock),
-                    EventPublicationResubmitter.LOCK_NAME,
+                    FailedPublicationSweep.LOCK_NAME,
                     HELD_LOCK,
                     Duration.ZERO)))
-        .as("テストのロック %s", EventPublicationResubmitter.LOCK_NAME)
+        .as("テストのロック %s", FailedPublicationSweep.LOCK_NAME)
         .isPresent();
   }
 
   /** ロックの期限を過去にしてから、手での 1 回の再投入を呼ぶ。前の呼び出しの解放は、DB の壁時計が戻ると期限が残るため（{@link #holdLock}）。 */
-  private EventPublicationResubmitOnce.Outcome runOnce(final String target) {
+  private EventPublicationResubmitOnce.Outcome runOnce(final Target target) {
     ResubmissionTestSupport.expireLock(dsl);
     return resubmitOnce.run(target);
   }
@@ -748,7 +743,7 @@ class EventPublicationResubmitterTest {
     // 門で待つ間に割り込まれたら、割り込みの状態を戻して失敗させる。
     @SuppressWarnings("PMD.DoNotUseThreads")
     @ApplicationModuleListener
-    @ResubmissionPolicy("probe")
+    @ResubmissionPolicy(PROBE_POLICY)
     /* package */ void on(final ResubmissionProbe event) {
       callCount.incrementAndGet();
       try {

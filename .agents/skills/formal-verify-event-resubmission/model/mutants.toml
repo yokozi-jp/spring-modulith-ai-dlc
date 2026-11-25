@@ -3,7 +3,7 @@
 
 [[mutant]]
 name = "no-time-budget"
-change = "EventPublicationResubmitter.resubmit drops the lock-at-most-for / 2 budget from withFilter"
+change = "EventPublicationResubmitter.dueAt drops the lock-at-most-for / 2 budget from withFilter"
 config = "run-overruns-lock"
 invariants = ["ResubmissionsCapped", "OneDeliveryAtATime"]
 

@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
@@ -91,11 +90,9 @@ final class ResubmissionTracker {
     return byLock.compareTo(byStaleness) > 0 ? byLock : byStaleness;
   }
 
-  /** 候補のうち実際に {@code RESUBMITTED} へ進んだ出版を覚え、その数を返す。 */
-  /* package */ int track(final Map<UUID, Integer> candidates, final Instant now) {
-    final Set<UUID> advanced = advancedAmong(candidates);
+  /** {@code RESUBMITTED} へ進んだ出版を覚える。 */
+  /* package */ void remember(final Set<UUID> advanced, final Instant now) {
     advanced.forEach(id -> inFlight.put(id, now));
-    return advanced.size();
   }
 
   /**
@@ -144,26 +141,5 @@ final class ResubmissionTracker {
     if (Duration.between(resubmittedAt, now).compareTo(lifetime) > 0) {
       inFlight.remove(id);
     }
-  }
-
-  /**
-   * 候補のうち、実際に {@code RESUBMITTED} へ進んだ出版の ID を返す。
-   *
-   * <p>{@code FailedEventPublications.resubmit} は件数を返さず、{@code markResubmitted} は他の更新で偽になりうる（{@code
-   * completion_date} が空で {@code RESUBMITTED} でない行だけを更新する）。 そのため、再投入のあとに読み戻し、{@code
-   * completion_attempts} が増えた行と、すでに完了するか ABANDONED になって archive に移った行を「進んだ」とする。 進んだ行は {@code
-   * markResubmitted} が必ず {@code completion_attempts} を 1 増やす。
-   */
-  private Set<UUID> advancedAmong(final Map<UUID, Integer> candidates) {
-    final Map<UUID, EventPublicationStates.State> states =
-        EventPublicationStates.read(dsl, candidates.keySet());
-    return candidates.entrySet().stream()
-        .filter(candidate -> {
-          final EventPublicationStates.@Nullable State state = states.get(candidate.getKey());
-          return state != null
-              && (state.isArchived() || state.completionAttempts() > candidate.getValue());
-        })
-        .map(Map.Entry::getKey)
-        .collect(Collectors.toUnmodifiableSet());
   }
 }
