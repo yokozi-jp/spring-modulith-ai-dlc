@@ -19,7 +19,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.jooq.DSLContext;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,10 +26,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
-import org.springframework.security.oauth2.client.oidc.authentication.OidcAuthorizationCodeAuthenticationProvider;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
@@ -79,7 +76,7 @@ class SignInOidcUserLoginTest {
             .flatMap(chain -> chain.getFilters().stream())
             .filter(OAuth2LoginAuthenticationFilter.class::isInstance)
             .map(filter -> ReflectionTestUtils.getField(filter, "authenticationManager"))
-            .map(SignInOidcUserLoginTest::oidcProvider)
+            .map(OidcProviders::oidcProvider)
             .map(provider -> ReflectionTestUtils.getField(provider, "userService"))
             .toList();
 
@@ -217,23 +214,5 @@ class SignInOidcUserLoginTest {
                 .on(M_USER_IDENTITY.USER_ID.eq(M_USER.USER_ID))
                 .where(M_USER_IDENTITY.SUBJECT_CODE.eq(subject))
                 .fetchOptional(M_USER.PUBLIC_ID));
-  }
-
-  private static OidcAuthorizationCodeAuthenticationProvider oidcProvider(
-      final @Nullable Object manager) {
-    Object current = manager;
-    // 観測のための ObservationAuthenticationManager が ProviderManager を包んでいる。
-    while (current != null && !(current instanceof ProviderManager)) {
-      current = ReflectionTestUtils.getField(current, "delegate");
-    }
-    if (current == null) {
-      throw new AssertionError("ProviderManager が見つからない: manager=" + manager);
-    }
-    return ((ProviderManager) current)
-        .getProviders().stream()
-            .filter(OidcAuthorizationCodeAuthenticationProvider.class::isInstance)
-            .map(OidcAuthorizationCodeAuthenticationProvider.class::cast)
-            .findFirst()
-            .orElseThrow(() -> new AssertionError("OIDC の認証プロバイダーがない: manager=" + manager));
   }
 }

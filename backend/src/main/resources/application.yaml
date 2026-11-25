@@ -116,6 +116,11 @@ spring:
   # 送信 HTTP クライアントの共通設定。Boot の RestClient.Builder を使う Client すべてに効く。
   http:
     clients:
+      # 外向きの呼び出しすべての上限。値は相手ごとに決める（ADR-019）。ここの値は IdP のトークンの取得と
+      # OIDC discovery が使う。ログインは利用者が待つが、トランザクションの外なので、read-timeout は
+      # 決済代行（2s）より長く 5s にする。決済代行とメールは自分の値で上書きする。
+      connect-timeout: 1s
+      read-timeout: 5s
       # request factory を JDK の HttpClient に固定する（classpath にほかのクライアントがあっても変わらない）
       imperative:
         factory: jdk

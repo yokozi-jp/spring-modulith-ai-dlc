@@ -43,7 +43,17 @@ class SignInOidcUserService implements OAuth2UserService<OidcUserRequest, OidcUs
   /** 標準の実装で IdP の利用者を読む。 */
   /* package */ @Autowired
   SignInOidcUserService(final SignInUserCommandHandler signInUser) {
-    this(new OidcUserService(), signInUser);
+    this(withoutUserInfo(), signInUser);
+  }
+
+  /**
+   * UserInfo を読まない標準の実装。使うのは ID トークンの {@code iss} と {@code sub} だけで、UserInfo の HTTP
+   * クライアントはタイムアウトを持たないため、呼び出しごとなくす。
+   */
+  private static OidcUserService withoutUserInfo() {
+    final OidcUserService service = new OidcUserService();
+    service.setRetrieveUserInfo(request -> false);
+    return service;
   }
 
   /** IdP の利用者を読む実装を差し替える。テストが使う。 */

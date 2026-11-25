@@ -91,7 +91,17 @@ maximum-pool-size × 最大アプリケーションタスク数
 
 ### Neutral
 
-- 現在の PostgreSQL、OIDC 通信は Resilience4j の対象にせず、各 starter の timeout と再接続設定を使う。
+- 現在の PostgreSQL、OIDC 通信は Resilience4j の対象にしない。呼び出しごとのタイムアウトは次の値と置き場所で持つ。
+
+  | 呼び出し | 接続 | 応答 | 置き場所 |
+  | --- | --- | --- | --- |
+  | 認可コードをトークンに替える（ログインのコールバック） | 1 秒 | 5 秒 | `spring.http.clients.*`。`OidcTokenClientConfig` が Boot の `RestClient.Builder` から作った `RestClient` を、`RestClientAuthorizationCodeTokenResponseClient` に渡す |
+  | UserInfo を読む | なし | なし | 呼び出さない。`SignInOidcUserService` が使うのは ID トークンの `iss` と `sub` だけで、`OidcUserService.setRetrieveUserInfo` で止める。UserInfo の HTTP クライアントは `new RestTemplate()` で、タイムアウトを足すには request factory を持つ `RestTemplate` が別に要るため、読まない |
+  | ID トークンの JWK Set を読む | 30 秒 | 30 秒 | Spring Security の `NimbusJwtDecoder` の既定。上限があり、署名の鍵は読んだ後に cache されるため残す。変えるには `JwtDecoderFactory` の差し替えが要り、得るものより手間が大きい |
+  | 起動のときの discovery | 30 秒 | 30 秒 | Spring Security の `ClientRegistrations` の既定。起動だけで、利用者を待たせないため残す。`oidc.discovery-uri` を渡す E2E の `OidcDiscoveryLocationConfig` は `spring.http.clients.*`（1 秒、5 秒）に従う |
+  | PostgreSQL | `DB_POOL_CONNECTION_TIMEOUT_MS` | `DB_STATEMENT_TIMEOUT_MS` | HikariCP とセッションの `SET`（`application.yaml`）。セッションの読み書きも同じ |
+
+  応答の 5 秒は、決済代行の 2 秒より長い。ログインは利用者が画面で待つが、トランザクションの外にあり、IdP の一時的な遅延でログインを落とさないよう余裕を持たせる。決済代行とメールは自分の値（`payment-gateway.*`、`mail-sender.*`）で上書きする。
 - bulkhead と rate limiter は依存先の同時実行上限が判明した時点で、名前付き instance へ追加する。
 - JFR の pinning 検証は常時有効化せず、負荷スモークと障害調査で実行する。
 
