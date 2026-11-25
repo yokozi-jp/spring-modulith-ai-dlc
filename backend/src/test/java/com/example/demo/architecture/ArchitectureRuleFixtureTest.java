@@ -72,6 +72,13 @@ class ArchitectureRuleFixtureTest {
   private static final String SCRIPTED_AUTHORIZATION =
       "ordering.application.ScriptedAuthorizationCommandHandler";
 
+  /** 役割の判断の宣言の規則を、違反フィクスチャに当てたもの。 */
+  private static final ArchRule AUTHORIZATION_DECLARED =
+      ProxyRulesArchTest.applicationHandlersDeclareAuthorizationRule(VIOLATING);
+
+  /** {@code @NoRoleRequired} の reason を空と空白だけにする違反フィクスチャのクラス名。 */
+  private static final String BLANK_REASON = "ordering.application.BlankReasonCommandHandler";
+
   /** モジュールのロールの規則が、違反フィクスチャの各メソッドを検出することを確かめる行。 */
   private static final List<Arguments> MODULE_ROLE_ROWS =
       List.of(
@@ -300,7 +307,23 @@ class ArchitectureRuleFixtureTest {
           row(
               "preAuthorizeUsesOnlyRoleOrAuthorityNames: 空の式",
               ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
-              SCRIPTED_AUTHORIZATION + ".release("));
+              SCRIPTED_AUTHORIZATION + ".release("),
+          row(
+              "applicationHandlersDeclareAuthorization: CommandHandler の宣言がない",
+              AUTHORIZATION_DECLARED,
+              "ordering.application.UndeclaredRoleCommandHandler.handle() とそのクラスに"),
+          row(
+              "applicationHandlersDeclareAuthorization: QueryService の interface の実装の宣言がない",
+              AUTHORIZATION_DECLARED,
+              "ordering.application.UndeclaredRoleQueryService.run()"),
+          row(
+              "applicationHandlersDeclareAuthorization: メソッドの reason が空",
+              AUTHORIZATION_DECLARED,
+              BLANK_REASON + ".handle()> の @NoRoleRequired(reason = \"\")"),
+          row(
+              "applicationHandlersDeclareAuthorization: クラスの reason が空白だけ",
+              AUTHORIZATION_DECLARED,
+              BLANK_REASON + "> の @NoRoleRequired(reason = \"  \")"));
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")
@@ -679,6 +702,7 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
         ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(basePackage),
         ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+        ProxyRulesArchTest.applicationHandlersDeclareAuthorizationRule(basePackage),
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
         ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(

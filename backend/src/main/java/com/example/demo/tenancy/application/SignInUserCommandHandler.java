@@ -1,5 +1,6 @@
 package com.example.demo.tenancy.application;
 
+import com.example.demo.shared.security.NoRoleRequired;
 import com.example.demo.tenancy.domain.model.ExternalIdentity;
 import com.example.demo.tenancy.domain.model.User;
 import com.example.demo.tenancy.domain.model.UserRepository;
@@ -25,6 +26,7 @@ public class SignInUserCommandHandler {
    * @throws com.example.demo.shared.concurrency.ConflictException 同じ識別での初めてのログインが同時に 2
    *     つあり、相手が先に対応づけた場合。呼び直すと相手の利用者を引く
    */
+  @NoRoleRequired(reason = "OIDC のログインの途中で呼ぶ。役割とテナントはまだない")
   @Transactional
   public SignInUserResult handle(final SignInUserCommand command) {
     final ExternalIdentity identity = new ExternalIdentity(command.issuer(), command.subject());

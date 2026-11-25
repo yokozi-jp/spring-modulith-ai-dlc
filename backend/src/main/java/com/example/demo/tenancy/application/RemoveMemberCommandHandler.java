@@ -6,6 +6,7 @@ import com.example.demo.tenancy.domain.model.Tenant;
 import com.example.demo.tenancy.domain.model.TenantRepository;
 import com.example.demo.tenancy.domain.model.UserId;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,7 @@ public class RemoveMemberCommandHandler {
   }
 
   /** ロック番号を確かめて所属を外し、保存する。 */
+  @PreAuthorize("hasRole('ADMIN')")
   @Transactional
   public RemoveMemberResult handle(final RemoveMemberCommand command) {
     final Tenant tenant =

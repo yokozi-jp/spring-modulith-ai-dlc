@@ -1,5 +1,6 @@
 package com.example.demo.tenancy.application;
 
+import com.example.demo.shared.security.NoRoleRequired;
 import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
@@ -12,6 +13,7 @@ import com.example.demo.tenancy.domain.model.UserId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,6 +35,7 @@ class TenancyQueryService implements TenancyQueries {
   }
 
   @Override
+  @NoRoleRequired(reason = "テナントを選ぶ前の filter、ログインの処理、所属の API から呼び、役割はまだない。見える範囲は利用者の ID で絞る")
   @Transactional(readOnly = true)
   public List<MembershipSummary> memberships(final String userId) {
     return membershipRepository.findByUser(new UserId(UUID.fromString(userId))).stream()
@@ -41,6 +44,7 @@ class TenancyQueryService implements TenancyQueries {
   }
 
   @Override
+  @NoRoleRequired(reason = "テナントを選ぶ前の filter、ログインの処理、所属の API から呼び、役割はまだない。見える範囲は利用者の ID で絞る")
   @Transactional(readOnly = true)
   public Optional<MembershipSummary> membership(final String userId, final String tenantId) {
     return membershipRepository
@@ -50,6 +54,7 @@ class TenancyQueryService implements TenancyQueries {
   }
 
   @Override
+  @PreAuthorize("hasRole('ADMIN')")
   @Transactional(readOnly = true)
   public Optional<TenantMembersDetails> findMembers(final String tenantId) {
     return tenantRepository

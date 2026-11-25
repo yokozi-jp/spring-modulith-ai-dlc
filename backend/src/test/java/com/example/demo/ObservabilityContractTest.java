@@ -239,15 +239,33 @@ class ObservabilityContractTest {
   }
 
   @Test
-  @DisplayName("認可が拒否した 403 のログは、user.id を持ち、拒否がテナントの束縛の外で記録されるので tenant.id を持たない")
-  void authorizationDenialLogCarriesUserWithoutTenant() throws Exception {
-    final String path = "/api/current-tenant/members/" + UUID.randomUUID();
+  @DisplayName(
+      "AuthorizationFilter が拒否した 403 のログは、user.id を持ち、拒否がテナントの束縛の外で記録されるので tenant.id を持たない")
+  void authorizationFilterDenialLogCarriesUserWithoutTenant() throws Exception {
+    // ログイン済みでも誰にも許可しない health の配下（ADR-061）。他のテストの受信の span と分けるため、パスを一意にする。
+    final String path = "/actuator/health/" + UUID.randomUUID();
 
     mockMvc
         .perform(MockMvcRequestBuilders.get(path).with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isForbidden());
 
     assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
+  }
+
+  @Test
+  @DisplayName("@PreAuthorize が拒否した 403 のログは、テナントの束縛の中で記録されるので、user.id と tenant.id を持つ")
+  void methodSecurityDenialLogCarriesUserAndTenant() throws Exception {
+    final String path = "/api/current-tenant/members";
+
+    mockMvc
+        .perform(MockMvcRequestBuilders.get(path).with(AppUsers.oidcLogin()))
+        .andExpect(MockMvcResultMatchers.status().isForbidden())
+        .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("about:blank"));
+
+    final Attributes attributes = clientErrorAttributes(path);
+    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
+    assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
+    assertNull(MDC.get(TENANT_ID.getKey()), "要求の後の MDC の tenant.id");
   }
 
   @Test

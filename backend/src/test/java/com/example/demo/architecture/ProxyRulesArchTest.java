@@ -6,6 +6,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.DemoApplication;
+import com.example.demo.shared.security.NoRoleRequired;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.base.HasDescription;
 import com.tngtech.archunit.core.domain.JavaAnnotation;
@@ -69,6 +70,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Spring と Resilience4j がアノテーションと Aspect で足す振る舞いが、黙って効かなくなる書き方を禁止する。 */
 @AnalyzeClasses(packagesOf = DemoApplication.class, importOptions = ProductionCodeOnly.class)
+// 規則ごとに違反の文を組み立てる ArchCondition を持つため、規則の数だけメソッドが増える。
+@SuppressWarnings("PMD.TooManyMethods")
 class ProxyRulesArchTest {
 
   /** リポジトリのルート。Gradle はテストを backend で実行する。 */
@@ -147,6 +150,10 @@ class ProxyRulesArchTest {
   /** {@link #METHOD_SECURITY_ANNOTATIONS} のどれかを、直接かメタアノテーションとして持つクラスとメソッド。 */
   private static final DescribedPredicate<CanBeAnnotated> METHOD_SECURED =
       metaAnnotatedWithOneOf(METHOD_SECURITY_ANNOTATIONS);
+
+  /** 役割を確かめるか、確かめないかの宣言を、直接かメタアノテーションとして持つクラスとメソッド。 */
+  private static final DescribedPredicate<CanBeAnnotated> DECLARES_AUTHORIZATION =
+      metaAnnotatedWithOneOf(List.of(PreAuthorize.class, NoRoleRequired.class));
 
   /** {@code @PreAuthorize} に書いてよい式。引用符で囲んだ役割か権限の名前を、1 つの関数に並べるだけにする。 */
   private static final Pattern ROLE_OR_AUTHORITY_NAMES =
@@ -320,6 +327,15 @@ class ProxyRulesArchTest {
                   + "本人や持ち主の確かめは、利用者の ID を Repository の WHERE に入れて行う。"
                   + LAYERS_DOC);
 
+  /**
+   * application の CommandHandler と QueryService の public
+   * メソッドは、役割を確かめるか（{@code @PreAuthorize}）、確かめないか（{@link NoRoleRequired}）を宣言する。{@link
+   * NoRoleRequired#reason()} は空白だけにしない。
+   */
+  @ArchTest
+  /* package */ static final ArchRule applicationHandlersDeclareAuthorization =
+      applicationHandlersDeclareAuthorizationRule(BASE_PACKAGE);
+
   /** {@link Async} のメソッドは、Spring が受け付ける void か {@link Future} を返す。 */
   @ArchTest
   /* package */ static final ArchRule asyncMethodsReturnVoidOrFuture =
@@ -396,6 +412,50 @@ class ProxyRulesArchTest {
                 + LAYERS_DOC);
   }
 
+  /**
+   * application の CommandHandler と QueryService の public メソッドに、役割の判断の宣言を求める規則を組み立てる。
+   *
+   * <p>宣言は、メソッドかクラスに、直接かメタアノテーションとして付ける。static のメソッドはプロキシが横取りしないので除く。 {@link NoRoleRequired} の
+   * {@code reason} の検査は、合成アノテーションに付けたものも見るため、パッケージを問わずクラスとメソッドに当てる。
+   */
+  /* package */ static ArchRule applicationHandlersDeclareAuthorizationRule(
+      final String basePackage) {
+    return CompositeArchRule.of(
+            methods()
+                .that()
+                .arePublic()
+                .and()
+                .areNotStatic()
+                .and()
+                .areDeclaredInClassesThat(
+                    JavaClass.Predicates.resideInAPackage(basePackage + ".*.application..")
+                        .and(
+                            JavaClass.Predicates.simpleNameEndingWith("CommandHandler")
+                                .or(JavaClass.Predicates.simpleNameEndingWith("QueryService"))))
+                .should(declareAuthorization())
+                .allowEmptyShould(true))
+        .and(
+            classes()
+                .that()
+                .areAnnotatedWith(NoRoleRequired.class)
+                .should(giveNoRoleRequiredReason())
+                .allowEmptyShould(true))
+        .and(
+            methods()
+                .that()
+                .areAnnotatedWith(NoRoleRequired.class)
+                .should(giveNoRoleRequiredReason())
+                .allowEmptyShould(true))
+        .because(
+            "認可の表のテストは operation を足したときだけ期待の書き忘れを止め、"
+                + "operation を通らずに呼ぶメソッド（Listener から呼ぶ CommandHandler）と、既存の operation の後ろに足したメソッドでは、"
+                + "役割を判断しないまま @PreAuthorize のないメソッドが残るため（ADR-129）。"
+                + "直し方：役割で許すメソッドには @PreAuthorize(\"hasRole('<役割>')\") を、"
+                + "役割を問わないメソッドには @NoRoleRequired(reason = \"<理由>\") を、メソッドかクラスに付ける。"
+                + "reason には、見える範囲の絞り方や呼び出し元（ログインの処理、Listener）など、役割を問わずに呼んでよい理由を書く。"
+                + LAYERS_DOC);
+  }
+
   @Test
   @DisplayName("プロキシの規則が見るアノテーションは、Java の実装規約の一覧と一致する")
   void interceptedAnnotationsMatchJavaCodingList() throws IOException {
@@ -448,6 +508,42 @@ class ProxyRulesArchTest {
                             + " の @PreAuthorize(\""
                             + expression
                             + "\") は、役割か権限の名前だけの式でない。")));
+      }
+    };
+  }
+
+  private static ArchCondition<JavaMethod> declareAuthorization() {
+    return new ArchCondition<>("be annotated with @PreAuthorize or @NoRoleRequired") {
+      @Override
+      public void check(final JavaMethod item, final ConditionEvents events) {
+        if (!DECLARES_AUTHORIZATION.test(item) && !DECLARES_AUTHORIZATION.test(item.getOwner())) {
+          events.add(
+              SimpleConditionEvent.violated(
+                  item,
+                  item.getFullName()
+                      + " とそのクラスに、@PreAuthorize も @NoRoleRequired もない。 "
+                      + item.getSourceCodeLocation()));
+        }
+      }
+    };
+  }
+
+  private static <T extends HasAnnotations<?> & HasDescription>
+      ArchCondition<T> giveNoRoleRequiredReason() {
+    return new ArchCondition<>("give a non-blank reason in @NoRoleRequired") {
+      @Override
+      public void check(final T item, final ConditionEvents events) {
+        item.tryGetAnnotationOfType(NoRoleRequired.class)
+            .map(NoRoleRequired::reason)
+            .filter(String::isBlank)
+            .ifPresent(reason ->
+                events.add(
+                    SimpleConditionEvent.violated(
+                        item,
+                        item.getDescription()
+                            + " の @NoRoleRequired(reason = \""
+                            + reason
+                            + "\") は、理由が空か空白だけである。")));
       }
     };
   }

@@ -8,6 +8,7 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderId;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.ordering.domain.model.OrderStatus;
+import com.example.demo.shared.security.NoRoleRequired;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 注文の参照を、Repository で読んだ集約から作る。 */
+@NoRoleRequired(
+    reason = "注文の参照はテナントの全員に許し、決済の Listener からも呼ぶ。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
 @Service
 class OrderQueryService implements OrderQueries {
 
@@ -67,14 +70,13 @@ class OrderQueryService implements OrderQueries {
         order.total().amount(),
         order.lockNo(),
         order.lines().stream()
-            .map(
-                line ->
-                    new OrderDetails.Line(
-                        line.lineNumber(),
-                        line.productId().value().toString(),
-                        line.quantity().value(),
-                        line.unitPrice().amount(),
-                        line.amount().amount()))
+            .map(line ->
+                new OrderDetails.Line(
+                    line.lineNumber(),
+                    line.productId().value().toString(),
+                    line.quantity().value(),
+                    line.unitPrice().amount(),
+                    line.amount().amount()))
             .toList());
   }
 }

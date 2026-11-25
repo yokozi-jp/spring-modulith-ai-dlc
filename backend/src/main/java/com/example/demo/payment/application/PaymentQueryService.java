@@ -7,12 +7,14 @@ import com.example.demo.payment.domain.model.GatewayPaymentCode;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.Payment;
 import com.example.demo.payment.domain.model.PaymentRepository;
+import com.example.demo.shared.security.NoRoleRequired;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 決済記録の参照を、Repository で読んだ集約から作る。 */
+@NoRoleRequired(reason = "決済の参照はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
 @Service
 class PaymentQueryService implements PaymentQueries {
 

@@ -2,6 +2,7 @@ package archfixture.conforming.inventory.application;
 
 import archfixture.conforming.ordering.OrderQueries;
 import archfixture.conforming.shared.failure.NotFoundException;
+import com.example.demo.shared.security.NoRoleRequired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ public class ReserveStockCommandHandler {
   }
 
   /** 注文の明細を読み、在庫を引き当てる。 */
+  @NoRoleRequired(reason = "Listener から呼ぶ。認証がない")
   @Transactional
   public ReserveStockResult handle(final ReserveStockCommand command) {
     return orderQueries

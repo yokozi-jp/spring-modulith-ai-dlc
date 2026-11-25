@@ -5,12 +5,14 @@ import com.example.demo.product.ProductSummary;
 import com.example.demo.product.domain.model.Product;
 import com.example.demo.product.domain.model.ProductId;
 import com.example.demo.product.domain.model.ProductRepository;
+import com.example.demo.shared.security.NoRoleRequired;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 商品の参照を、Repository で読んだ集約から作る。 */
+@NoRoleRequired(reason = "商品の参照はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る")
 @Service
 class ProductQueryService implements ProductQueries {
 

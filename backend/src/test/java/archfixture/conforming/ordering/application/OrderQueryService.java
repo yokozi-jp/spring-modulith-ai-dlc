@@ -8,6 +8,7 @@ import archfixture.conforming.ordering.domain.model.CustomerId;
 import archfixture.conforming.ordering.domain.model.OrderId;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.shared.idempotency.IdempotencyKey;
+import com.example.demo.shared.security.NoRoleRequired;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 注文の読み取り窓口を実装する。 */
+@NoRoleRequired(reason = "見える範囲は SQL で絞る")
 @Service
 class OrderQueryService implements OrderQueries {
 

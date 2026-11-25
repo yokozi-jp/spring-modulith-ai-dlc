@@ -2,6 +2,7 @@ package archfixture.conforming.ordering.application;
 
 import archfixture.conforming.ordering.domain.model.OrderId;
 import archfixture.conforming.ordering.domain.model.PaymentGateway;
+import com.example.demo.shared.security.NoRoleRequired;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class CapturePaymentCommandHandler {
   }
 
   /** 注文の代金を請求する。 */
+  @NoRoleRequired(reason = "Listener から呼ぶ。認証がない")
   @Transactional
   public CapturePaymentResult handle(final CapturePaymentCommand command) {
     return new CapturePaymentResult(

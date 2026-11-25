@@ -6,6 +6,7 @@ import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.ordering.domain.model.OrderedItem;
 import com.example.demo.product.ProductQueries;
 import com.example.demo.shared.failure.NotFoundException;
+import com.example.demo.shared.security.NoRoleRequired;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,7 @@ public class ChangeOrderLinesCommandHandler {
   }
 
   /** ロック番号を確かめ、明細の商品を読み直して明細を置き換え、保存する。 */
+  @NoRoleRequired(reason = "注文の操作はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
   @Transactional
   public ChangeOrderLinesResult handle(final ChangeOrderLinesCommand command) {
     final Order order =

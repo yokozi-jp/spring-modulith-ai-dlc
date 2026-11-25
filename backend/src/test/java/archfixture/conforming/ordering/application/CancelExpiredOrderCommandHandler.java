@@ -4,6 +4,7 @@ import archfixture.conforming.ordering.domain.model.Order;
 import archfixture.conforming.ordering.domain.model.OrderId;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
 import archfixture.conforming.shared.failure.NotFoundException;
+import com.example.demo.shared.security.NoRoleRequired;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ public class CancelExpiredOrderCommandHandler {
   }
 
   /** 注文を取り消し、読み込んだ版で保存する。 */
+  @NoRoleRequired(reason = "Listener から呼ぶ。認証がない")
   @Transactional
   public CancelExpiredOrderResult handle(final CancelExpiredOrderCommand command) {
     final Order order =

@@ -24,7 +24,10 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * セッションで選んだテナントの所属の HTTP API。テナントの管理者だけが呼べる。
  *
- * <p>対象のテナントは、リクエストの値ではなく、セッションで選んだテナントから取る。管理者のロールの判定は {@link TenantSecurityCustomizer} が行う。
+ * <p>対象のテナントは、リクエストの値ではなく、セッションで選んだテナントから取る。
+ *
+ * <p>{@code @PreAuthorize} を付けた application のメソッドが、管理者のロールを確かめる（ADR-129）。ロールは {@link
+ * TenantSelectionFilter} がリクエストのたびに引き直した所属から来る。
  */
 @RestController
 @RequestMapping(CurrentTenantMemberController.PATH)

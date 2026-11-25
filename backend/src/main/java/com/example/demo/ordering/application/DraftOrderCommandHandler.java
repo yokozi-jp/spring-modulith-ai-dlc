@@ -4,6 +4,7 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.ordering.domain.model.OrderedItem;
 import com.example.demo.product.ProductQueries;
+import com.example.demo.shared.security.NoRoleRequired;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -34,6 +35,7 @@ public class DraftOrderCommandHandler {
   }
 
   /** 明細の商品を読んで下書きの注文を作り、保存する。 */
+  @NoRoleRequired(reason = "注文の操作はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
   @Transactional
   public DraftOrderResult handle(final DraftOrderCommand command) {
     final List<OrderedItem> items =

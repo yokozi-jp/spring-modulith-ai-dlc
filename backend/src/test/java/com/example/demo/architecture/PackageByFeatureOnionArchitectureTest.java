@@ -13,6 +13,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.methods;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 import com.example.demo.DemoApplication;
+import com.example.demo.shared.security.NoRoleRequired;
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.Dependency;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -620,6 +621,8 @@ class PackageByFeatureOnionArchitectureTest {
                     "org.springframework.context",
                     basePackage + "..")
                 .or(type(PreAuthorize.class))
+                // 本番では basePackage.. に含まれる。フィクスチャの basePackage の外にあるため、型で許す。
+                .or(type(NoRoleRequired.class))
                 .or(LOMBOK_GENERATED))
         .allowEmptyShould(true)
         .because(
