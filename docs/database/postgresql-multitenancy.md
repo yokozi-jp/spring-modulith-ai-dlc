@@ -76,6 +76,10 @@ RLSの外に置く表は、`modulith`と`tenancy`のスキーマの表だけに�
   テナントが決まる前に引く。
   触れるのは`tenancy_module`だけである（[DB接続情報とロール分離](connections.md#モジュールのロール)）。
 
+`tenancy.t_idempotency_key`は`tenant_public_id`を持つが、RLSの外に置き、`tenant_public_id`に既定値を付けない（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「保存先」）。
+`tenancy`のトランザクションはテナントなしで始められ、既定値の`current_setting`がエラーになるためである。
+キーの表の文が`tenant_public_id`を`TenantContext`のテナントで書き、読み書きの条件に入れて、別のテナントの行に当たらないようにする。
+
 ## テナントの設定
 
 トランザクションマネージャーは、トランザクションを始めた直後に接続を準備する箇所で、モジュールのロールとテナントを1つのSQLで設定する。
@@ -124,7 +128,7 @@ RLSの規則は次の検査で確かめる。
   表の所有者のマイグレーションロールの接続でも、テナントを設定しない読み取りがエラーになり、設定したテナントの行だけを読むことを確かめ、`FORCE ROW LEVEL SECURITY`の効き目を見る。
   トランザクションマネージャーを通らない読み取りが、汎用の実行計画が残った接続ではエラーにならず0件を返すことも確かめ、マネージャーの検査が要る前提を示す。
   テナントのないトランザクションの中で、テストの補助の`AsModule`がテナントを設定して戻した後も、テナントのない読み取りがエラーになることを確かめる。
-  業務テーブルは、`tenant_public_id`を持つjOOQの生成した表から導く。
+  業務テーブルは、`ModuleRoles.TENANT_SCOPED_MODULES`のスキーマのjOOQの生成した表から導く。
 - **`@CommittedDatabaseTest`**：`ModuleRoleTransactionTest`が、commitとrollbackの後、プールの接続にロールとテナントが残らないことと、テナントを束縛しない`product`、`ordering`、`payment`のトランザクションを始めないことを確かめる。
   設定の後に空文字列が残る接続でも、ポリシーが失敗する側に倒れることを、残った設定ごとのSQLSTATE（未設定なら`42704`、空文字列なら`22P02`）で確かめる。
 

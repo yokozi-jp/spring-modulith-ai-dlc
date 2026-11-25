@@ -242,12 +242,17 @@ final class SchemaTableConventions {
     return violations;
   }
 
-  /** T13：uuidのDEFAULT。テナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。 */
+  /**
+   * T13：uuidのDEFAULT。テナントで分ける表のテナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。
+   *
+   * <p>RLSの外の表は、テナントを設定しないトランザクションでも書くので、テナントの列にも既定値を付けず、文が値を書く。
+   */
   private static void uuidDefault(
       final ColumnRow row, final String target, final List<ConventionViolation> violations) {
     final String defaultExpression = row.defaultExpression();
     final boolean tenantDefault =
-        TenantIsolation.TENANT_COLUMN.equals(row.column())
+        TenantIsolation.isTenantScoped(row.schema())
+            && TenantIsolation.TENANT_COLUMN.equals(row.column())
             && TenantIsolation.CATALOG_TENANT_DEFAULT.equals(defaultExpression);
     if ("uuid".equals(row.typeName()) && defaultExpression != null && !tenantDefault) {
       violations.add(

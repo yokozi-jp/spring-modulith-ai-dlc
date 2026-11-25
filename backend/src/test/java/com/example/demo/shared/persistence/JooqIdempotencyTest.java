@@ -1,7 +1,6 @@
 package com.example.demo.shared.persistence;
 
 import static com.example.demo.jooq.ordering.Tables.T_IDEMPOTENCY_KEY;
-import static com.example.demo.jooq.tables.FixtureIdempotencyKeyTable.FIXTURE_IDEMPOTENCY_KEY;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -15,14 +14,12 @@ import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.DatabaseTest;
-import com.example.demo.testkit.FixtureTablesExtension;
 import com.example.demo.testkit.IdempotencyKeys;
 import errorfixture.presentation.web.ErrorFixtureFailure;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
@@ -30,19 +27,17 @@ import org.jooq.DSLContext;
 import org.jooq.Record2;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * {@link JooqIdempotency} が、ordering のキーの表で、同じキーの再送に保存した Result を返すことを、時刻を固定して確かめる（ADR-126）。
  *
- * <p>各テストはロールバックする。同じトランザクションの中で呼ぶので、自分の入れた行は待たずに見える。テナントの分け方は、RLS のない fixture の表でも確かめる。
+ * <p>各テストはロールバックする。同じトランザクションの中で呼ぶので、自分の入れた行は待たずに見える。テナントの分け方は、RLS のない tenancy のキーの表でも確かめる。
  */
 // 処理ごとの値と失敗の説明は、テストごとに読み下せるよう、定数にせず文字列のまま書く。
 // 呼び出しの束縛（テナント、ロール、利用者、操作の名前）を補助のメソッドにまとめるため、メソッドの数の上限を外す。
 @SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.TooManyMethods"})
 @DatabaseTest
-@ExtendWith(FixtureTablesExtension.class)
 class JooqIdempotencyTest {
 
   /** 1 回目の要求の時刻。 */
@@ -149,7 +144,7 @@ class JooqIdempotencyTest {
   @Test
   @DisplayName("RLS のない表でも、別のテナントの同じ利用者と同じキーの行に当たらず、それぞれの Result を返す")
   void tenantsAreSeparatedWithoutRowLevelSecurity() {
-    // ordering の表は RLS も別のテナントの行を隠すので、RLS も既定値もない fixture の表で、文が書くテナントだけで分かれることを確かめる。
+    // ordering の表は RLS も別のテナントの行を隠すので、RLS も既定値もない tenancy の表で、文が書くテナントだけで分かれることを確かめる。
     final IdempotencyKey key = IdempotencyKeys.next();
     final Result first = executeWithoutRls(AsTenant.TENANT, new Order("A", key), "tenant");
     final Result other = executeWithoutRls(OTHER_TENANT, new Order("A", key), "other tenant");
@@ -254,27 +249,29 @@ class JooqIdempotencyTest {
                                         .execute(command, resultType, operation)))));
   }
 
-  /** RLS のない fixture のキーの表で、テナントを束縛して呼ぶ。DB のテナントの設定はテストのトランザクションのままにする。 */
+  /** RLS のない tenancy のキーの表で、テナントを束縛して呼ぶ。DB のテナントの設定は変えず、表の行のテナントは束縛からだけ決まるようにする。 */
   private Result executeWithoutRls(final TenantId tenant, final Order command, final String value) {
-    final JooqIdempotency idempotency =
-        new JooqIdempotency(
-            dsl,
-            TestCommonColumns.at(NOW),
-            Clock.fixed(NOW, ZoneOffset.UTC),
-            Map.of("fixture", IdempotencyKeyTable.from(FIXTURE_IDEMPOTENCY_KEY)));
     return TenantContext.call(
         tenant,
         () ->
-            AppUsers.signedIn(() ->
-                ScopedValue.where(PgmCdAspect.PGM_CD, "fixture.IdempotencyTest")
-                    .call(() ->
-                        idempotency.execute(
-                            command,
-                            Result.class,
-                            () -> {
-                              runs.incrementAndGet();
-                              return new Result(value);
-                            }))));
+            AsModule.callWithoutTenant(
+                dsl,
+                "tenancy",
+                tx ->
+                    AppUsers.signedIn(() ->
+                        ScopedValue.where(PgmCdAspect.PGM_CD, "tenancy.IdempotencyTest")
+                            .call(() ->
+                                new JooqIdempotency(
+                                        tx,
+                                        TestCommonColumns.at(NOW),
+                                        Clock.fixed(NOW, ZoneOffset.UTC))
+                                    .execute(
+                                        command,
+                                        Result.class,
+                                        () -> {
+                                          runs.incrementAndGet();
+                                          return new Result(value);
+                                        })))));
   }
 
   /**

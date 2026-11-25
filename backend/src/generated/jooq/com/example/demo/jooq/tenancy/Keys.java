@@ -8,10 +8,12 @@ import com.example.demo.jooq.tenancy.tables.MMembership;
 import com.example.demo.jooq.tenancy.tables.MTenant;
 import com.example.demo.jooq.tenancy.tables.MUser;
 import com.example.demo.jooq.tenancy.tables.MUserIdentity;
+import com.example.demo.jooq.tenancy.tables.TIdempotencyKey;
 import com.example.demo.jooq.tenancy.tables.records.MMembershipRecord;
 import com.example.demo.jooq.tenancy.tables.records.MTenantRecord;
 import com.example.demo.jooq.tenancy.tables.records.MUserIdentityRecord;
 import com.example.demo.jooq.tenancy.tables.records.MUserRecord;
+import com.example.demo.jooq.tenancy.tables.records.TIdempotencyKeyRecord;
 
 import javax.annotation.processing.Generated;
 
@@ -45,6 +47,7 @@ public class Keys {
     public static final UniqueKey<MTenantRecord> PK_M_TENANT = Internal.createUniqueKey(MTenant.M_TENANT, DSL.name("pk_m_tenant"), new TableField[] { MTenant.M_TENANT.TENANT_ID }, true);
     public static final UniqueKey<MUserRecord> PK_M_USER = Internal.createUniqueKey(MUser.M_USER, DSL.name("pk_m_user"), new TableField[] { MUser.M_USER.USER_ID }, true);
     public static final UniqueKey<MUserIdentityRecord> PK_M_USER_IDENTITY = Internal.createUniqueKey(MUserIdentity.M_USER_IDENTITY, DSL.name("pk_m_user_identity"), new TableField[] { MUserIdentity.M_USER_IDENTITY.USER_IDENTITY_ID }, true);
+    public static final UniqueKey<TIdempotencyKeyRecord> PK_T_IDEMPOTENCY_KEY = Internal.createUniqueKey(TIdempotencyKey.T_IDEMPOTENCY_KEY, DSL.name("pk_t_idempotency_key"), new TableField[] { TIdempotencyKey.T_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY_ID }, true);
 
     // -------------------------------------------------------------------------
     // FOREIGN KEY definitions

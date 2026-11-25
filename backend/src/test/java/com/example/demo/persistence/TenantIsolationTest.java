@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.catchThrowable;
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.persistence.ModuleRoleTransactionManager;
+import com.example.demo.shared.persistence.ModuleRoles;
 import com.example.demo.shared.persistence.TestCommonColumns;
 import com.example.demo.shared.tenancy.TenantId;
 import com.example.demo.testkit.AsModule;
@@ -97,10 +98,14 @@ class TenantIsolationTest {
   /** 表の所有者の接続先と資格情報。 */
   @Autowired private Environment environment;
 
+  /**
+   * RLS でテナントを分けるモジュールのスキーマの表。{@code tenancy} のキーの表は {@code tenant_public_id} を持つが、RLS
+   * の外に置く（ADR-107）。
+   */
   /* package */ static List<Table<?>> businessTables() {
     return DefaultCatalog.DEFAULT_CATALOG.getSchemas().stream()
+        .filter(schema -> ModuleRoles.TENANT_SCOPED_MODULES.contains(schema.getName()))
         .flatMap(schema -> schema.getTables().stream())
-        .filter(table -> table.field(TENANT_COLUMN) != null)
         .toList();
   }
 

@@ -9,6 +9,7 @@ import com.example.demo.jooq.tenancy.tables.MMembership;
 import com.example.demo.jooq.tenancy.tables.MTenant;
 import com.example.demo.jooq.tenancy.tables.MUser;
 import com.example.demo.jooq.tenancy.tables.MUserIdentity;
+import com.example.demo.jooq.tenancy.tables.TIdempotencyKey;
 
 import java.util.Arrays;
 import java.util.List;
@@ -63,6 +64,11 @@ public class Tenancy extends SchemaImpl {
     public final MUserIdentity M_USER_IDENTITY = MUserIdentity.M_USER_IDENTITY;
 
     /**
+     * 冪等性キー
+     */
+    public final TIdempotencyKey T_IDEMPOTENCY_KEY = TIdempotencyKey.T_IDEMPOTENCY_KEY;
+
+    /**
      * No further instances allowed
      */
     private Tenancy() {
@@ -83,7 +89,8 @@ public class Tenancy extends SchemaImpl {
             MMembership.M_MEMBERSHIP,
             MTenant.M_TENANT,
             MUser.M_USER,
-            MUserIdentity.M_USER_IDENTITY
+            MUserIdentity.M_USER_IDENTITY,
+            TIdempotencyKey.T_IDEMPOTENCY_KEY
         );
     }
 }

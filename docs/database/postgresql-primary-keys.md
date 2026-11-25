@@ -89,7 +89,7 @@ Javaの型は`java.util.UUID`にし、`String`にしない。
 jOOQは`uuid`を`UUID`に対応づける。
 
 `uuid`カラムの`DEFAULT`は、`SchemaConventionsTest`と`SchemaInspectionTest`が使う`SchemaTableConventions.columns`（規則T13）が検査する。
-T13は、`tenant_public_id`の既定値が`current_setting('app.current_tenant')::uuid`のときだけ除く。
+T13は、業務テーブルの`tenant_public_id`の既定値が`current_setting('app.current_tenant')::uuid`のときだけ除く。
 Spring Modulithのイベント出版テーブルは対象にしない。
 
 UUID v7の生成方法は決めていない。
