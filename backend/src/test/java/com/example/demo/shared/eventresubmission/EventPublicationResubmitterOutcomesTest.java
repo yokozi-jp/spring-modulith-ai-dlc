@@ -27,7 +27,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
-import org.springframework.modulith.events.core.EventPublicationRegistry;
 
 /**
  * 定期の再投入が数える {@code event.publication.resubmissions} と、再投入の結果の Counter を、DB の行を直接動かして検証する。
@@ -80,8 +79,8 @@ class EventPublicationResubmitterOutcomesTest {
   /** 差し替えられる時計。 */
   @Autowired private MutableClock clock;
 
-  /** Spring Modulith の、古い出版を FAILED に戻す処理。時計は {@link #clock} である。 */
-  @Autowired private EventPublicationRegistry registry;
+  /** 古い出版を FAILED に戻す処理。時計は {@link #clock} である。 */
+  @Autowired private StalePublications stalePublications;
 
   /** 出版の行を動かす DB。 */
   @Autowired private DSLContext dsl;
@@ -368,7 +367,7 @@ class EventPublicationResubmitterOutcomesTest {
         ResubmissionTestSupport.noStaleCheck());
   }
 
-  /** 古い出版を FAILED に戻す処理を Spring Modulith の本物にしたジョブ。 */
+  /** 古い出版を FAILED に戻す処理を本物にしたジョブ。 */
   private EventPublicationResubmitter withStaleCheck(final SimpleMeterRegistry jobMeterRegistry) {
     return ResubmissionTestSupport.resubmitter(
         dsl,
@@ -378,7 +377,7 @@ class EventPublicationResubmitterOutcomesTest {
         properties,
         policies,
         jobMeterRegistry,
-        registry);
+        stalePublications);
   }
 
   /** 今の時刻を、in-flight-staleness より 1 マイクロ秒だけ後にした時刻。今の時刻に再投入した出版が古くなる。 */

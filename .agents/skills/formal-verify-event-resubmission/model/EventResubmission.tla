@@ -3,8 +3,8 @@
 (* One event publication in modulith.event_publication, two app instances, *)
 (* and discrete time. Covers the periodic resubmission job                 *)
 (* (EventPublicationResubmitter) under the ShedLock lock, which first      *)
-(* marks stale publications FAILED with Spring Modulith 2.2.0's            *)
-(* markStalePublicationsFailed and then resubmits, listener deliveries     *)
+(* marks stale publications FAILED with one UPDATE                         *)
+(* (StalePublications.markFailed) and then resubmits, listener deliveries  *)
 (* with the abandon-after-attempts default AbandonPolicy, and instance     *)
 (* crashes. The built-in staleness monitor is off: setting its thresholds  *)
 (* fails startup (EventPublicationResubmissionConfig.                      *)
@@ -102,7 +102,7 @@ TypeOK ==
   /\ row.status \in Statuses
   /\ row.attempts \in 1..(MaxResubmissions + 3)
   /\ \A i \in Instances:
-       inst[i].phase \in {"idle", "locked", "found", "checked", "read"}
+       inst[i].phase \in {"idle", "locked", "checked", "read"}
   /\ \A k \in Slots: exec[k].st \in {"none", "queued", "running", "done"}
   /\ \A k \in Slots: exec[k].seen \in 0..(MaxResubmissions + 3)
 
@@ -131,7 +131,7 @@ SetStatus(s) == [row EXCEPT !.status = s]
 -----------------------------------------------------------------------------
 (* EventPublicationResubmitter.resubmitOnce: one run of one instance.      *)
 (* Phases of a run that took the lock: locked (stale check to come),       *)
-(* found (the check listed the row, the mark is to come), checked, read.   *)
+(* checked (stale check done), read.                                       *)
 (* SimpleAsyncTaskScheduler (spring.threads.virtual.enabled) runs the      *)
 (* fixed-delay job on its single scheduler thread, so an instance has at   *)
 (* most one run.                                                           *)
@@ -154,17 +154,14 @@ RunStart(i) ==
 
 -----------------------------------------------------------------------------
 (* The stale check inside the lock, before the resubmission:               *)
-(* FailedPublicationSweep calls DefaultEventPublicationRegistry            *)
-(* .markStalePublicationsFailed with Properties.staleness (PUBLISHED:      *)
-(* wait-age, PROCESSING and RESUBMITTED: in-flight-staleness). For each    *)
-(* of PUBLISHED, PROCESSING, RESUBMITTED, markFailed(Status, Staleness)    *)
-(* runs findByStatus, keeps the rows whose getLastPublicationDate()        *)
-(* (last_resubmission_date, which the insert sets to publication_date) is  *)
-(* before now - staleness, then calls                                      *)
-(* JdbcEventPublicationRepositoryV2.markFailed(id) for each of them:       *)
-(* UPDATE SET status = 'FAILED' WHERE id = ? AND completion_date IS NULL   *)
-(* AND status != 'FAILED'. The UPDATE does not check the status or the     *)
-(* date again, so the row can change between the find and the mark.        *)
+(* FailedPublicationSweep calls StalePublications.markFailed with          *)
+(* Properties.waitAge and Properties.inFlightStaleness. It is one UPDATE   *)
+(* SET status = 'FAILED' WHERE completion_date IS NULL AND ((status =      *)
+(* 'PUBLISHED' AND coalesce(last_resubmission_date, publication_date) <    *)
+(* now - wait-age) OR (status IN ('PROCESSING', 'RESUBMITTED') AND         *)
+(* coalesce(...) < now - in-flight-staleness)). The statement checks the   *)
+(* status and the date as it writes, so the row cannot change between a    *)
+(* find and a mark.                                                        *)
 
 Threshold(st) == IF st = "PUBLISHED" THEN WaitAge ELSE InFlightStaleness
 
@@ -172,18 +169,11 @@ StaleNow ==
   /\ row.status \in {"PUBLISHED", "PROCESSING", "RESUBMITTED"}
   /\ now > row.lastAttempt + Threshold(row.status)
 
-\* findByStatus and the date filter. One row, so the find lists it or not.
-\* The three finds of one check are one find at a time the run chooses.
-StaleFind(i) ==
-  /\ inst[i].up /\ inst[i].phase = "locked"
-  /\ inst' = [inst EXCEPT ![i].phase = IF StaleNow THEN "found" ELSE "checked"]
-  /\ UNCHANGED <<now, row, lock, exec, crashes, staleHitInFlight>>
-
-\* markFailed(id) for the listed row, whatever its status is now.
+\* The one UPDATE. One row, so it marks the row or matches nothing.
 StaleMark(i) ==
-  /\ inst[i].up /\ inst[i].phase = "found"
+  /\ inst[i].up /\ inst[i].phase = "locked"
   /\ inst' = [inst EXCEPT ![i].phase = "checked"]
-  /\ IF RowExists /\ row.status # "FAILED"
+  /\ IF StaleNow
        THEN /\ row' = SetStatus("FAILED")
             /\ staleHitInFlight' = (staleHitInFlight \/ \E k \in Slots: InFlight(k))
        ELSE UNCHANGED <<row, staleHitInFlight>>
@@ -311,7 +301,7 @@ AtHorizon == now = Horizon /\ ~MustActNow /\ UNCHANGED vars
 Next ==
   \/ \E i \in Instances:
        \/ RunStart(i) \/ RunRead(i) \/ RunFinish(i) \/ Crash(i) \/ Restart(i)
-       \/ StaleFind(i) \/ StaleMark(i)
+       \/ StaleMark(i)
   \/ \E k \in Slots: ExecStart(k) \/ ExecSucceed(k) \/ ExecFail(k)
   \/ Tick \/ AtHorizon
 

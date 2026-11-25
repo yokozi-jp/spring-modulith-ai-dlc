@@ -80,7 +80,12 @@ Proposed の間に、上限を超えて `FAILED` に残った出版の知らせ�
 
 Proposed の間に、古い出版を `FAILED` に戻す処理を、組み込みの Staleness Monitor から、再投入のジョブがロックの中で呼ぶ形へ書き直した（[#556](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/556)）。
 組み込みの Staleness Monitor は全インスタンスがロックの外で動かし、古い出版を読んだ後に状態を確かめずに `markFailed` を呼ぶ。
-そのため、その間に別のインスタンスが再投入した出版を処理中のまま `FAILED` に戻し、同じ出版のリスナーを同時に 2 本動かしうる（`ResubmissionOptionsLearningTest` の `stalenessMarksPublicationResubmittedAfterRead`、形式検証の当時の既知の発見）。
+そのため、その間に別のインスタンスが再投入した出版を処理中のまま `FAILED` に戻し、同じ出版のリスナーを同時に 2 本動かしうる（形式検証の当時の既知の発見）。
+
+Proposed の間に、古い出版を `FAILED` に戻す処理を、`markStalePublicationsFailed` の呼び出しから、状態と `last_resubmission_date` を確かめる 1 文の UPDATE へ書き直した（[#740](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/740)）。
+ロックの中でも、一つの回が古い出版を読んでから `markFailed(id)` を 1 行ずつ実行するまでの間に `lock-at-most-for` を超えて止まると、ロックが切れ、別のインスタンスが再投入した処理中の出版を `FAILED` に戻していた（形式検証の既知の発見 1 と 2）。
+この窓は、読んでから更新する 2 つの手順があるために生まれる。
+更新で状態と時刻を確かめれば、窓は生まれない。
 
 ## Decision
 
@@ -122,7 +127,7 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、組み込み�
   条件の関数（`ResubmissionPolicies.isDue`）で、回数の上限に達しておらず、待ち時間を過ぎた出版だけを選ぶ。
   待ち時間は条件の関数だけで強制し、Spring Modulith の最小の経過時間には頼らない。
   `LIMIT` は掛けず、1 回の件数の上限は条件の関数で数える。
-- `LIMIT` が条件の関数より先に掛かること、既定の最小の経過時間でも `publication_date` が今と同じ出版を読まないこと、`markStalePublicationsFailed` が状態ごとの閾値より古い出版だけを `FAILED` にし、処理中の出版を `last_resubmission_date` から測ること、読んだ後に再投入された出版も `FAILED` にすること、`AbandonPolicy` に渡る出版の値（Context の表）は、学習テスト（`ResubmissionOptionsLearningTest`）で固定する。
+- `LIMIT` が条件の関数より先に掛かること、既定の最小の経過時間でも `publication_date` が今と同じ出版を読まないこと、`AbandonPolicy` に渡る出版の値（Context の表）は、学習テスト（`ResubmissionOptionsLearningTest`）で固定する。
   `EventPublicationRegistry` は Spring Modulith の `core` のパッケージにあり、版を上げたときに変わりうる。
   Spring Modulith の版を上げて振る舞いが変わると、このテストが失敗して、読み方を見直す合図になる。
 - 試行の回数は Spring Modulith の `completion_attempts` で持ち、表を足さない。
@@ -192,12 +197,15 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、組み込み�
   `ABANDONED` は終端の状態で、`AbandonedEventPublications` は読むことと消すことだけを持ち、`FailedEventPublications.resubmit` は未完了の表の `FAILED` だけを読み、`EventPublicationRepository.markFailed` は archive の行に届かない。
   SQL は `completion_attempts` を残すため、戻した出版は定期のジョブでなく手での 1 回の再投入だけが扱い、また失敗すればすぐに `ABANDONED` に戻る。
   SQL の手順と確かめ方は Runbook の「上限に達した出版の戻し方」にある。
-- 落ちたまま残った `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版は、Spring Modulith の `EventPublicationRegistry.markStalePublicationsFailed(Staleness)` で `FAILED` に戻す。
+- 落ちたまま残った `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の出版は、`StalePublications` の 1 文の UPDATE で `FAILED` に戻す。
   定期のジョブと手での 1 回の再投入が、ロックを取った中で、再投入の前に呼ぶ（`FailedPublicationSweep`）。
-  一つの回が古い出版を読んでから `FAILED` にするまでの間、別のインスタンスはロックを取れず、その出版を再投入できない。
+  Spring Modulith の `EventPublicationRegistry.markStalePublicationsFailed` は呼ばない（選択肢16）。
+  UPDATE は `completion_date IS NULL` と、状態ごとの `coalesce(last_resubmission_date, publication_date) < now - 閾値` を更新と同じ時点で確かめる。
+  古い出版を読んでから更新するまでの隙間がなく、回が `lock-at-most-for` を超えて止まってロックが切れても、別のインスタンスが再投入した出版を `FAILED` に戻さない。
   `FAILED` に戻した出版は、同じ回の再投入の候補になる。
-  閾値は `EventPublicationResubmissionConfig.Properties.staleness` が返し、`PUBLISHED` は `wait-age`、`PROCESSING` と `RESUBMITTED` は `event-publication.resubmission.in-flight-staleness` にする。
+  閾値は `PUBLISHED` が `wait-age`、`PROCESSING` と `RESUBMITTED` が `event-publication.resubmission.in-flight-staleness` である。
   `PROCESSING` と `RESUBMITTED` に `wait-age` を使わないのは、再投入して処理中の出版を `FAILED` に戻さないためである。
+  更新は Spring Modulith の表の列と状態の文字列に直接書くため、上流が表の定義を変えたら追従する（Negative）。
 - 組み込みの Staleness Monitor（`StalenessMonitorConfiguration`）は使わない（Context）。
   2.2.0 は `spring.modulith.events.staleness` の閾値のどれかを書いたときだけ、全インスタンスで `markStalePublicationsFailed` をロックの外から呼ぶ定期のタスクを登録する。
   閾値を書くと起動に失敗させる（`EventPublicationResubmissionConfig.StalenessMonitorProperties`）。
@@ -207,7 +215,7 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、組み込み�
   ロックを他のインスタンスが持つ回は省かれ、落ちたインスタンスがロックを残すと `lock-at-most-for` まで止まる。
   間隔の設定（`check-interval`）は要らなくなる。
 - `in-flight-staleness` は `lock-at-most-for` の 2 倍より長くし、短いと起動に失敗する。
-  古い出版を `FAILED` に戻す処理がロックの中で動いても、この検査は要る。
+  古い出版を `FAILED` に戻す更新が状態と時刻を確かめても、この検査は要る。
   再投入の時刻を書いてから、executor の空きの待ちはその回の中で `lock-at-most-for` まで、リスナーの処理はロックを放した後も続くためである。
   形式検証で起動時の検査を 1 倍に緩めると、処理中の出版を `FAILED` に戻す（変異 `startup-check-too-weak`）。
   リスナーの処理の上限は別に持たず、1 回の実行の上限としてすでに concurrency-limit の空きを待つ時間を含めている `lock-at-most-for` で代える。
@@ -218,7 +226,7 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、組み込み�
 - 2.2 に代わる仕組みがないため、次は自作のまま残す。
   - 指数的な待ち時間（`multiplier`、`max-wait`）：`ResubmissionOptions` は件数（`withBatchSize`、`withMaxInFlight`）、`publication_date` からの最小の経過時間（`withMinAge`）、条件の関数（`withFilter`）だけを持ち、最後の試行からの待ち時間も倍率も持たない。
   - 定期の実行と ShedLock のロック：2.2 で定期に動くのは組み込みの Staleness Monitor だけで、失敗した出版の再投入を定期に動かす仕組みも、複数のインスタンスで排他する仕組みもない。
-  - 古い出版を `FAILED` に戻す処理をロックの中で呼ぶこと（`Properties.staleness`、`StalenessMonitorProperties`）：2.2 の Staleness Monitor は排他せずに全インスタンスで動く。
+  - 古い出版を `FAILED` に戻す処理をロックの中で呼ぶこと（`StalePublications`、`StalenessMonitorProperties`）：2.2 の Staleness Monitor は排他せずに全インスタンスで動き、状態を確かめずに更新する。
   - 手での 1 回の再投入（`EventPublicationResubmitOnce`）：2.2 の `FailedEventPublications` は再投入するだけで、リスナーの完了を待つことも、結果を終了コードで返すこともしない。
   - リスナーごとの方針の対応づけ（`@ResubmissionPolicy` と `ResubmissionPolicies`）：2.2 はリスナーごとの待ち時間の設定を持たない。
   - メトリクス（`runs`、`resubmissions`、`outcomes`、`exhausted`、`failed`、`failed.oldest.age`）と結果の読み戻し（`ResubmissionTracker`）：2.2 の可観測性はモジュールの境界の trace とイベントの Counter で、出版の状態の件数も再投入の結果も出さず、成功を知らせる hook もない。
@@ -234,9 +242,10 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 
 - 外部 API の一時的な障害で失敗した出版が、人の操作なしで回復する。
 - 同時に再投入するインスタンスが 1 つになり、重複の処理と DB の負荷が増えない。
-- 古い出版を `FAILED` に戻す処理と再投入が、全インスタンスで 1 本のロックの下に並ぶ。
-  一つの回が古い出版を読んでから `FAILED` にするまでに、別のインスタンスが再投入した出版を、処理中のまま `FAILED` に戻さない（`EventPublicationResubmitterStalenessTest`、形式検証の `InFlightNeverMarkedStale`）。
-  古い出版を読む問い合わせも、各インスタンスの `check-interval` ごとから、ロックを取った回だけに減る。
+- 古い出版を `FAILED` に戻す更新が、状態と時刻を更新の時点で確かめる。
+  回が `lock-at-most-for` を超えて止まりロックが切れても、別のインスタンスが再投入した出版を、処理中のまま `FAILED` に戻さない（`StalePublicationsTest`、形式検証の `InFlightNeverMarkedStale` と `OneDeliveryAtATime`）。
+- 古い出版を `FAILED` に戻す更新と再投入が、全インスタンスで 1 本のロックの下に並ぶ。
+  更新も、各インスタンスの `check-interval` ごとから、ロックを取った回だけに減る。
 - 接続が直結でも、接続を多重化するプロキシの後ろでも、インスタンスがいくつでも同じ設定で動く。
 - ロックの期限を DB の時刻で決めるため、インスタンスの時計のずれで排他が崩れない。
 - ジョブは接続を固定せず、`TableWriter` の規則（H1）の例外も要らない。
@@ -273,8 +282,8 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   定期のジョブは再投入しないが、運用者が手で再投入すると二重に呼ぶ。
   冪等でないリスナーは、リスナー側で送信済みを記録するか、運用者が外部システムの状態を確かめてから再投入する。
 - 2 以上の方針の値のリスナーは、配信の途中で落ちて古い出版として `FAILED` に戻った出版を、上限まで再投入する。
-  最初の配信が executor の空きを `wait-age` より長く待つか、実行がロックの上限を超えると、配信の途中の出版を再投入しうる（形式検証の既知の発見 1 と 2）。
-  どちらも、二重の呼び出しをリスナーの冪等性に頼る。
+  最初の配信が executor の空きを `wait-age` より長く待つと、配信の途中の出版を再投入しうる。
+  この場合は、二重の呼び出しをリスナーの冪等性に頼る。
 - 最初の配信で諦めた出版は、`ResubmissionTracker` を通らないため、`Event publication resubmission exhausted` の ERROR も `event.publication.resubmission.exhausted` の Counter も数えない。
   知らせは、`ResubmissionPolicies` の ERROR と、最古の経過時間の警報（`state=exhausted`）である。
 - `markAbandoned` のトランザクションが失敗すると、出版は処理中のまま残り、古い出版として `FAILED` に戻る。
@@ -301,15 +310,13 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 - executor の空きの待ちかリスナーの処理が `lock-at-most-for` の前提を破り、再投入から `in-flight-staleness` を超えると、古い出版を `FAILED` に戻す処理が処理中の出版を `FAILED` に戻す。
   結果の Counter は、戻した出版を同じ回にどのインスタンスが再投入し直しても、前の再投入を `failed` と数える。
 - 最初の配信が `concurrency-limit` の空きを待つ間に `wait-age` を過ぎた出版は、古い出版として `FAILED` に戻り、同じ回の再投入が重ねて再投入しうる。その場合はリスナーの冪等性に頼る。その間、`FAILED` の出版の Gauge は処理中の出版も数える。
-- 一つの回が古い出版を読んでから `FAILED` にするまでの間に `lock-at-most-for` を超えて止まると、ロックが切れ、別のインスタンスがその出版を `FAILED` に戻して再投入しうる。
-  遅れて届いた `markFailed` は、読んだときの状態も `last_resubmission_date` も確かめないため、処理中の出版を `FAILED` に戻す（形式検証の既知の発見 1）。
-  さらに配信が方針の待ち時間より長く続くと、同じ出版のリスナーが同時に二つ動く（既知の発見 2）。
-  時間の予算（`lock-at-most-for / 2`）は候補を選ぶのを止めるだけで、古い出版を `FAILED` に戻す処理を止めない。
-  回が 10 分止まる必要があるため、組み込みの Staleness Monitor のときより窓は狭く、残りはリスナーの冪等性に頼る。
-  戻った出版も、動いていたリスナーが成功すれば、`markCompleted` が状態を見ずに完了にする。
-  同じ型の競合は上流でも扱われている（[#1971](https://github.com/spring-projects/spring-modulith/issues/1971)、`markAbandoned` の [#1764](https://github.com/spring-projects/spring-modulith/issues/1764)）。
-- 古い出版を `FAILED` に戻す処理は、回ごとに `PUBLISHED`、`PROCESSING`、`RESUBMITTED` の行をすべて読み、その時間は回の時間に入る。
-  この処理が DB の失敗で終わると、その回の再投入も動かず、`runs{outcome=failed}` に数える。
+- 古い出版を `FAILED` に戻す更新は、Spring Modulith が持つ表への書き込みが、Runbook の SQL に加えてコードにも入る。
+  `event_publication` の列（`status`、`completion_date`、`last_resubmission_date`、`publication_date`）と状態の文字列（`PUBLISHED`、`PROCESSING`、`RESUBMITTED`、`FAILED`）に頼るため、上流が表の定義を変えたら追従する。
+  `StalePublicationsTest` が、Spring Modulith 2.2.0 の `markStalePublicationsFailed` と同じ条件（閾値ちょうどは残し、最後の再投入の時刻から測る）を固定する。
+  アプリの DB ロールは `event_publication` の UPDATE を持ち、Spring Modulith も同じロールで書く（changeset 001）。
+  `tableWritesGoThroughTableWriter`（H1）は jOOQ の UPDATE を `TableWriter` などの外で禁じるため、`StalePublications` を除外に足した（[ADR-054](ADR-054-detect-optimistic-lock-conflicts-by-update-count.md)）。
+- 古い出版を `FAILED` に戻す更新は、回ごとに `event_publication` を状態と時刻で絞り、その時間は回の時間に入る。
+  この更新が DB の失敗で終わると、その回の再投入も動かず、`runs{outcome=failed}` に数える。
 - 決済の circuit breaker（`payment-gateway`）が open の間の再投入は、外部を呼ばずに `CallNotPermittedException` で `FAILED` になり、`completion_attempts` を 1 消費する。
   コードで確認したのは次の 3 点である。
   `OrderConfirmedListener.on` と `ChargeOrderCommandHandler` はこの例外を捕まえず（main に捕まえる箇所はない）、`PaymentGatewayClientIntegrationTest.consecutiveFailuresOpenCircuitBreaker` が open のときにこの例外が出て決済代行を呼ばないことを確かめている。
@@ -434,11 +441,21 @@ Resilience4j は再投入と補完関係にあり、ADR-019 のとおり client 
 - **Pros**：手での 1 回の再投入が、対象（`target`）の外の出版の状態を変えない。
 - **Cons**：定期の実行を無効にした環境では、落ちたまま残った出版を戻す手段が SQL の手作業だけになる。`FailedPublicationSweep` に、どちらの入口かを渡す引数が要る。定期のジョブを動かす環境では、次の回が同じ出版を `FAILED` に戻すため、対象の外の出版の状態を変えないという利点は残らない。
 
-### 選択肢15: 古い出版を `FAILED` に戻す更新を、状態と `last_resubmission_date` を確かめる 1 文にする
+### 選択肢15: 古い出版を `FAILED` に戻す更新を、状態と `last_resubmission_date` を確かめる 1 文にする（採用）
 
-- **Description**：`markStalePublicationsFailed` を呼ばず、`completion_date IS NULL` と、状態ごとの `last_resubmission_date < now - 閾値` を 1 文の UPDATE で確かめて `FAILED` にする。
-- **Pros**：更新の時点で状態と時刻を確かめるため、回が `lock-at-most-for` を超えて止まっても、再投入した直後の出版を `FAILED` に戻さない。既知の発見 1 と 2 が消える。
-- **Cons**：Spring Modulith が持つ表への書き込みが、Runbook の SQL に加えてコードにも入り、上流の表の定義の変更に追従する責任が増える。この PR は組み込みの呼び出しを残し、窓を回が 10 分止まる場合に限り、残りをリスナーの冪等性に頼る。置き換えは [#740](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/740) で扱う。
+- **Description**：`markStalePublicationsFailed` を呼ばず、`completion_date IS NULL` と、状態ごとの `coalesce(last_resubmission_date, publication_date) < now - 閾値` を 1 文の UPDATE で確かめて `FAILED` にする（`StalePublications`）。
+- **Pros**：更新の時点で状態と時刻を確かめるため、回が `lock-at-most-for` を超えて止まっても、再投入した直後の出版を `FAILED` に戻さない。既知の発見 1 と 2 が消え、形式検証の 2 つの設定（`run-overruns-lock-stale-mark.cfg`、`run-overruns-lock-long-listener.cfg`）と、時間の窓をリスナーの冪等性に頼る記述が要らなくなる。古い出版を読んで行のイベントを読み戻す処理も、行ごとの `markFailed` も要らず、読めない型の行（イベントの型の名前を変えた出版）でも `FAILED` に戻る。
+- **Cons**：Spring Modulith が持つ表への書き込みが、Runbook の SQL に加えてコードにも入り、上流の表の定義の変更に追従する責任が増える。上流が閾値の測り方を変えても、この更新は追従しない。`StalePublicationsTest` が、2.2.0 と同じ条件を固定する。
+- **採用に変えた理由**：当初は、組み込みの呼び出しを残し、窓を回が 10 分止まる場合に限って、残りをリスナーの冪等性に頼った。
+  二重の呼び出しを設定の前提で防げず、1 文の UPDATE が窓を作らない（[#740](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/740)）。
+  表への書き込みが増える責任は、更新が列 4 つと状態の文字列 4 つに頼るだけで、`StalePublicationsTest` が条件を固定するため、負えると判断した。
+
+### 選択肢16: 古い出版を `FAILED` に戻す処理を、Spring Modulith の `markStalePublicationsFailed` でロックの中から呼ぶ
+
+- **Description**：`EventPublicationRegistry.markStalePublicationsFailed(Staleness)` を、再投入の前にロックの中で呼ぶ。閾値は `Staleness` の関数で渡す。
+- **Pros**：古さの測り方と更新を上流が持ち、表の定義の変更に追従しなくてよい。組み込みの Staleness Monitor と違い、ロックの外で動かさない。
+- **Cons**：古い出版を読んでから 1 行ずつ `markFailed(id)` を実行し、更新で状態も `last_resubmission_date` も確かめない。回が `lock-at-most-for` を超えて止まりロックが切れると、別のインスタンスが再投入した出版を `FAILED` に戻す（既知の発見 1 と 2）。
+  行のイベントを読み戻すため、読めない型の行を落とす。
 
 ## References
 

@@ -20,7 +20,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
-import org.springframework.modulith.events.core.EventPublicationRegistry;
 
 /**
  * 定期の再投入の時間予算（{@code lock-at-most-for} の半分）を、{@link FailedEventPublications} と古い出版を FAILED
@@ -107,14 +106,14 @@ class EventPublicationResubmitterBudgetTest {
     clock.set(start);
     expireLock();
     final Duration budget = properties.lockAtMostFor().dividedBy(2);
-    final EventPublicationRegistry slowStaleCheck = Mockito.mock(EventPublicationRegistry.class);
+    final StalePublications slowStaleCheck = Mockito.mock(StalePublications.class);
     Mockito.doAnswer(
             invocation -> {
               clock.set(start.plus(budget).plus(1, ChronoUnit.MICROS));
               return null;
             })
         .when(slowStaleCheck)
-        .markStalePublicationsFailed(Mockito.any());
+        .markFailed();
     final List<Boolean> accepted = new ArrayList<>();
     final FailedEventPublications failed = Mockito.mock(FailedEventPublications.class);
     Mockito.doAnswer(

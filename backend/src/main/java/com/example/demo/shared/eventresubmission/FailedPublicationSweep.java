@@ -18,7 +18,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.events.ResubmissionOptions;
-import org.springframework.modulith.events.core.EventPublicationRegistry;
 import org.springframework.stereotype.Component;
 
 /**
@@ -28,9 +27,8 @@ import org.springframework.stereotype.Component;
  * <p>定期の再投入（{@link EventPublicationResubmitter}）は {@link #tryOnce}、手での 1 回の再投入（{@link
  * EventPublicationResubmitOnce}）は {@link #waitUpTo} で呼ぶ。2 つは選ぶ条件、ロックの取り方、再投入のあとの扱いだけが違い、ほかはここに集める。
  *
- * <p>古い出版を {@code FAILED} に戻す処理（{@link
- * EventPublicationRegistry#markStalePublicationsFailed}）は、Spring Modulith の組み込みの Staleness Monitor
- * を使わず、ここでロックの中で呼ぶ（ADR-079）。
+ * <p>古い出版を {@code FAILED} に戻す処理（{@link StalePublications}）は、Spring Modulith の組み込みの Staleness
+ * Monitor を使わず、ここでロックの中で呼ぶ（ADR-079）。
  *
  * <p>{@code FailedEventPublications.resubmit} は件数を返さず、{@code markResubmitted} は他の更新で偽になりうる（{@code
  * completion_date} が空で {@code RESUBMITTED} でない行だけを更新する）。そのため、再投入のあとに読み戻し、{@code
@@ -58,8 +56,8 @@ final class FailedPublicationSweep {
   /** 設定値。 */
   private final EventPublicationResubmissionConfig.Properties properties;
 
-  /** Spring Modulith の、古い出版を FAILED に戻す処理。 */
-  private final EventPublicationRegistry registry;
+  /** 古い出版を FAILED に戻す処理。 */
+  private final StalePublications stalePublications;
 
   /* package */ FailedPublicationSweep(
       final DSLContext dsl,
@@ -67,13 +65,13 @@ final class FailedPublicationSweep {
       final LockingTaskExecutor eventPublicationLockingTaskExecutor,
       final Clock clock,
       final EventPublicationResubmissionConfig.Properties properties,
-      final EventPublicationRegistry registry) {
+      final StalePublications stalePublications) {
     this.dsl = dsl;
     this.failedEventPublications = failedEventPublications;
     this.lockingTaskExecutor = eventPublicationLockingTaskExecutor;
     this.clock = clock;
     this.properties = properties;
-    this.registry = registry;
+    this.stalePublications = stalePublications;
   }
 
   /**
@@ -153,11 +151,7 @@ final class FailedPublicationSweep {
         (Runnable)
             () -> {
               locked.set(true);
-              // markStalePublicationsFailed は、読んだ出版の状態を確かめずに FAILED にする。
-              // 読んでから FAILED にするまでに回が lock-at-most-for を超えて止まるとロックが切れ、
-              // 別のインスタンスが再投入した処理中の出版も FAILED に戻しうる（ADR-079）。
-              // 状態と last_resubmission_date を確かめる更新に替えるのは #740 で扱う。
-              registry.markStalePublicationsFailed(properties.staleness());
+              stalePublications.markFailed();
               failedEventPublications.resubmit(
                   ResubmissionOptions.defaults()
                       .withBatchSize(Integer.MAX_VALUE)

@@ -28,6 +28,7 @@ Proposed
 また、ADR-062 が集約ルートの INSERT の入口 `TableWriter.insert` を足したため、INSERT は `TableWriter` を通さないとしていた決定を、この版で書き直す。
 その後、ArchUnit がラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えると分かったため、R4 の記述を、この版で書き直す。
 [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) の `Idempotency-Key` の行の書き込みを `TableWriter` から `IdempotencyKeyWriter` に分けたため、H1 の除外にそれを足し、CommandHandler が本体を private メソッドに置けるよう R4 の記述を、この版で書き直す。
+[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) の古い出版を `FAILED` に戻す更新（`shared.eventresubmission` の `StalePublications`）は、Spring Modulith の `modulith.event_publication` だけを 1 文で更新し、業務テーブルに触れないため、H1 の除外にそれを足した（[#740](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/740)）。
 さらに、Repository が 5 つの手順（ルートの更新、内部の主キーの読み直し、保存済みの子の読み取り、子の削除、子ごとの更新か追加）を並べ、子の書き込みが任意の `Condition` を受け取り、INSERT が別の弱い入口になっていたため、入口を集約の宣言と `insert`、`update` の二つにまとめる決定を、この版で書き直す。
 
 利用者は、共通基盤に次の順で重みを置く。
@@ -101,7 +102,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
   `CommonColumns.forInsert` は、テストのデータ作成のために public のままにするが、本番の Repository は `insertInto` を呼べないため使えない（H1）。
 - ArchUnit の `TableWriterArchTest` で次を検査する。
-  - `TableWriter` と、その子の行の書き込み（`ChildWriter`）、`Idempotency-Key` の行の書き込み（`IdempotencyKeyWriter`、ADR-126）の外の本番のコードは、jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`TableRecord`、`UpdatableRecord`、`DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
+  - `TableWriter` と、その子の行の書き込み（`ChildWriter`）、`Idempotency-Key` の行の書き込み（`IdempotencyKeyWriter`、ADR-126）、古い出版を `FAILED` に戻す更新（`StalePublications`、ADR-079）の外の本番のコードは、jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`TableRecord`、`UpdatableRecord`、`DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
     判定は、呼び出し先の型が禁じる型に代入できるかで行う。
     `DataSource`、`Connection`、`ConnectionProvider` を引数に取るメソッドとコンストラクタも呼ばない。
     接続の元を受け取るライブラリ（Spring Boot の `DataSourceScriptDatabaseInitializer` など）は、パッケージを選ばずに任意の SQL を流せるため、パッケージの一覧ではなく引数の型で禁じる。

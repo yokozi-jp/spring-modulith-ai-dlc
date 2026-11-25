@@ -82,6 +82,9 @@ class TableWriterArchTest {
   /** 書き込みの入口を置く shared のパッケージ（基底パッケージからの相対）。 */
   private static final String WRITER_PACKAGE = ".shared.persistence.";
 
+  /** 古い出版を FAILED に戻す 1 文の UPDATE を持つ、H1 の例外の型（基底パッケージからの完全修飾型名）。 */
+  private static final String STALE_PUBLICATIONS = ".shared.eventresubmission.StalePublications";
+
   /** 楽観的ロックの語彙を置く shared のパッケージ（基底パッケージからの相対）。 */
   private static final String CONCURRENCY_PACKAGE = ".shared.concurrency.";
 
@@ -206,6 +209,9 @@ class TableWriterArchTest {
    *
    * <p>トランザクションの初めにモジュールのロールとテナントを設定する ModuleRoleTransactionManager は、業務テーブルに触れず、設定の名前を固定した 1 つの
    * {@code set_config} の文だけを実行するため対象にしない（ADR-094、ADR-107）。
+   *
+   * <p>落ちたまま残った出版を FAILED に戻す StalePublications は、Spring Modulith の {@code
+   * modulith.event_publication} だけを 1 文の UPDATE で更新し、業務テーブルに触れないため対象にしない（ADR-079）。
    */
   @ArchTest
   /* package */ static final ArchRule tableWritesGoThroughTableWriter =
@@ -265,7 +271,7 @@ class TableWriterArchTest {
 
   /**
    * H1 の規則を組み立てる。例外は基底パッケージの shared にある TableWriter、ChildWriter、IdempotencyKeyWriter、
-   * ModuleRoleTransactionManager だけにする。
+   * ModuleRoleTransactionManager と、shared.eventresubmission の StalePublications だけにする。
    */
   /* package */ static ArchRule tableWritesGoThroughTableWriterRule(final String basePackage) {
     final String writerPackage = basePackage + WRITER_PACKAGE;
@@ -280,6 +286,8 @@ class TableWriterArchTest {
         .doNotHaveFullyQualifiedName(writerPackage + "ModuleRoleTransactionManager")
         .and()
         .doNotHaveFullyQualifiedName(writerPackage + "ModuleRoleTransactionManager$Config")
+        .and()
+        .doNotHaveFullyQualifiedName(basePackage + STALE_PUBLICATIONS)
         .should()
         .accessTargetWhere(
             DescribedPredicate.describe(

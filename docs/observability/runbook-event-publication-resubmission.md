@@ -13,7 +13,7 @@ tags: [runbook, observability, logging, operations, integration, spring-modulith
 その後は運用者がこの文書の手順で扱う。
 仕組みの全体像は[イベント出版の再投入の全体像](../integration/event-publication-resubmission.md)を参照する。
 運用定義の項目は[運用者が対応するログイベントの管理](log-operational-events.md)に従う。
-`Event publications resubmitted` と `Event publications resubmitted once`（`INFO`）、`Event publication resubmission skipped`（`DEBUG`）は運用定義を要求しないため書かない。
+`Event publications resubmitted` と `Event publications resubmitted once` と `Stale event publications marked failed`（`INFO`）、`Event publication resubmission skipped`（`DEBUG`）は運用定義を要求しないため書かない。
 
 ## リスナーの方針
 
