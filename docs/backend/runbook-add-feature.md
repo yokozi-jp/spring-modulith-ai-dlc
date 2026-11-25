@@ -28,6 +28,15 @@ tags: [runbook, backend, spring-modulith]
 8. 作成した各 Java パッケージへ `@NullMarked` の `package-info.java` を追加する。
 9. アーキテクチャテストと対象機能のテストを実行する。
 
+## パッケージの外で直す場所
+
+機能モジュールが DB のスキーマを持つときは、パッケージの外も直す。
+足し忘れたときに止まるものを、直す場所ごとに示す。
+
+- `backend/gradle/database.gradle` の `databaseSchemas` にスキーマ名を足す。足し忘れると、jOOQ の型が生成されず、コンパイルで止まる。
+- Liquibase の changeset に、`CREATE SCHEMA` とアプリのロールへの `GRANT` を書く（[ADR-011](../adr/ADR-011-use-module-owned-database-schemas.md)）。足し忘れると、SQL が `permission denied for schema` で失敗する。
+- `ArchitectureMetricsReportTest` の `MAX_GLOBAL_RELATIVE_VISIBILITY` を、公開の型が増えた分だけ見直す。公開の型が増えて上限を超えると、アーキテクチャテストが止まる。
+
 ## 検証コマンド
 
 アーキテクチャテストは次のコマンドで実行できる。

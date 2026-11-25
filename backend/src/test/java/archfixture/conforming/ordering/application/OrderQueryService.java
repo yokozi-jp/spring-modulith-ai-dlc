@@ -7,6 +7,7 @@ import archfixture.conforming.ordering.OrderSummary;
 import archfixture.conforming.ordering.domain.model.CustomerId;
 import archfixture.conforming.ordering.domain.model.OrderId;
 import archfixture.conforming.ordering.domain.model.OrderRepository;
+import archfixture.conforming.shared.idempotency.IdempotencyKey;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,9 +29,10 @@ class OrderQueryService implements OrderQueries {
   @Override
   @Transactional(readOnly = true)
   public Optional<OrderDetails> findDetails(final String orderId) {
+    final IdempotencyKey key = new IdempotencyKey(orderId);
     return orderRepository
         .findById(new OrderId(UUID.fromString(orderId)))
-        .map(order -> new OrderDetails(order.id().value().toString(), List.of()));
+        .map(order -> new OrderDetails(key.value(), List.of()));
   }
 
   @Override

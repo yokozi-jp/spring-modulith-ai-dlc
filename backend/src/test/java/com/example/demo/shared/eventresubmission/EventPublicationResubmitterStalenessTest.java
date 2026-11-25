@@ -98,9 +98,6 @@ class EventPublicationResubmitterStalenessTest {
   /** 再投入の設定値。 */
   @Autowired private EventPublicationResubmissionConfig.Properties properties;
 
-  /** 再投入の回数の上限。 */
-  @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
-
   @BeforeEach
   void reset() {
     clock.set(T0);
@@ -264,7 +261,6 @@ class EventPublicationResubmitterStalenessTest {
         properties,
         policies,
         new SimpleMeterRegistry(),
-        abandon,
         new DefaultEventPublicationRegistry(interleaved, clock));
   }
 }

@@ -1,10 +1,4 @@
 package archfixture.conforming.shared.idempotency;
 
-import java.util.UUID;
-
-/**
- * クライアントが利用者の操作ごとに採番するキー。
- *
- * @param value キーの UUID
- */
-public record IdempotencyKey(UUID value) {}
+/** 再送を見分けるキー。 */
+public record IdempotencyKey(String value) {}

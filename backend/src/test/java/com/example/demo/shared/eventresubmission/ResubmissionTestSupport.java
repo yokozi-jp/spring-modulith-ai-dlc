@@ -67,6 +67,9 @@ final class ResubmissionTestSupport {
         "spring.modulith.events.resubmission.abandon-after-attempts=2",
         "event-publication.resubmission.policies.probe.multiplier=2",
         "event-publication.resubmission.policies.probe.max-wait=PT20M",
+        "event-publication.resubmission.policies.probe-once.multiplier=2",
+        "event-publication.resubmission.policies.probe-once.max-wait=PT20M",
+        "event-publication.resubmission.policies.probe-once.abandon-after-attempts=1",
         // リスナーが進めない変異で、手での再投入が application.yaml の PT10M まで待たないようにする。
         "event-publication.resubmit-once.completion-timeout=PT15S"
       })
@@ -100,7 +103,6 @@ final class ResubmissionTestSupport {
       final EventPublicationResubmissionConfig.Properties properties,
       final ResubmissionPolicies policies,
       final MeterRegistry meterRegistry,
-      final EventPublicationResubmissionConfig.AbandonProperties abandon,
       final EventPublicationRegistry registry) {
     return new EventPublicationResubmitter(
         dsl,
@@ -108,8 +110,7 @@ final class ResubmissionTestSupport {
         policies,
         clock,
         meterRegistry,
-        properties,
-        abandon);
+        properties);
   }
 
   /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。期限は DB の時刻で決まり、固定の時計では進まないため。 */

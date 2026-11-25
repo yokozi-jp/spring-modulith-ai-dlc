@@ -90,6 +90,9 @@ final class InfrastructureContainers {
   /** PostgreSQL の待ち受けポート。 */
   private static final int POSTGRES_PORT = 5432;
 
+  /** postgres のイメージが VOLUME に宣言するパス。 */
+  private static final String POSTGRES_VOLUME = "/var/lib/postgresql";
+
   /** WireMock の待ち受けポート。 */
   private static final int WIREMOCK_PORT = 8080;
 
@@ -135,6 +138,8 @@ final class InfrastructureContainers {
             .withEnv("MIGRATION_DB_PASSWORD", PASSWORD)
             .withEnv("DB_USERNAME", APP_USER)
             .withEnv("DB_PASSWORD", PASSWORD)
+            // イメージの VOLUME が作る匿名ボリュームは Ryuk が消さず、実行のたびに溜まるため、tmpfs に置く。
+            .withTmpFs(Map.of(POSTGRES_VOLUME, "rw"))
             .withCopyFileToContainer(
                 MountableFile.forHostPath(INITDB_DIR), "/docker-entrypoint-initdb.d/");
     final GenericContainer<?> wireMock =
