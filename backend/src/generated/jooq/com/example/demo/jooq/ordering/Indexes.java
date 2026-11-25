@@ -4,6 +4,7 @@
 package com.example.demo.jooq.ordering;
 
 
+import com.example.demo.jooq.ordering.tables.TIdempotencyKey;
 import com.example.demo.jooq.ordering.tables.TOrder;
 import com.example.demo.jooq.ordering.tables.TOrderLine;
 
@@ -34,6 +35,7 @@ public class Indexes {
 
     public static final Index UK_2_T_ORDER = Internal.createIndex(DSL.name("uk_2_t_order"), TOrder.T_ORDER, new OrderField[] { TOrder.T_ORDER.TENANT_PUBLIC_ID, TOrder.T_ORDER.CUSTOMER_ORDER_CODE }, true);
     public static final Index UK_3_T_ORDER = Internal.createIndex(DSL.name("uk_3_t_order"), TOrder.T_ORDER, new OrderField[] { TOrder.T_ORDER.TENANT_PUBLIC_ID, TOrder.T_ORDER.ORDER_ID }, true);
+    public static final Index UK_T_IDEMPOTENCY_KEY = Internal.createIndex(DSL.name("uk_t_idempotency_key"), TIdempotencyKey.T_IDEMPOTENCY_KEY, new OrderField[] { TIdempotencyKey.T_IDEMPOTENCY_KEY.TENANT_PUBLIC_ID, TIdempotencyKey.T_IDEMPOTENCY_KEY.USER_PUBLIC_ID, TIdempotencyKey.T_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY }, true);
     public static final Index UK_T_ORDER = Internal.createIndex(DSL.name("uk_t_order"), TOrder.T_ORDER, new OrderField[] { TOrder.T_ORDER.TENANT_PUBLIC_ID, TOrder.T_ORDER.PUBLIC_ID }, true);
     public static final Index UK_T_ORDER_LINE = Internal.createIndex(DSL.name("uk_t_order_line"), TOrderLine.T_ORDER_LINE, new OrderField[] { TOrderLine.T_ORDER_LINE.TENANT_PUBLIC_ID, TOrderLine.T_ORDER_LINE.ORDER_ID, TOrderLine.T_ORDER_LINE.LINE_NO }, true);
 }

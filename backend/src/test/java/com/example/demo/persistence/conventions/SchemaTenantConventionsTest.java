@@ -160,7 +160,19 @@ class SchemaTenantConventionsTest {
     private IndexRow uniqueIndex(
         final String schema, final String name, final String firstColumn, final boolean primary) {
       return new IndexRow(
-          schema, TABLE, name, BTREE, primary, 2, 2, false, false, false, true, firstColumn);
+          schema,
+          TABLE,
+          name,
+          BTREE,
+          primary,
+          2,
+          2,
+          false,
+          false,
+          false,
+          true,
+          firstColumn,
+          List.of());
     }
   }
 

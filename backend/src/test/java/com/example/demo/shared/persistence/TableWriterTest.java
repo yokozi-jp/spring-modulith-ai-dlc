@@ -5,6 +5,7 @@ import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_D
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static com.example.demo.shared.persistence.FixtureAggregates.DETAILS;
 import static com.example.demo.shared.persistence.FixtureAggregates.ITEM;
+import static com.example.demo.shared.persistence.FixtureAggregates.ITEM_IDEMPOTENT_ON_CODE;
 import static com.example.demo.shared.persistence.FixtureAggregates.ITEM_ONLY;
 import static com.example.demo.shared.persistence.FixtureAggregates.detail;
 import static com.example.demo.shared.persistence.FixtureAggregates.detailRows;
@@ -29,11 +30,13 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jooq.Table;
 import org.jooq.impl.DSL;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -354,13 +357,15 @@ class TableWriterTest {
   @Test
   @DisplayName("insert は子を持つ集約のルートと子を書き、lock_no を 1 にして共通カラムを書く")
   void insertWritesRootAndChildren() {
-    runInUseCase(() ->
-        writer.insert(
-            ITEM,
-            itemRoot(1L, 1L),
-            set -> set.set(FIXTURE_ITEM.ITEM_NAME, "new"),
-            detailRows(List.of(detail(1, "one"), detail(2, "two")))));
+    final boolean inserted =
+        callInUseCase(() ->
+            writer.insert(
+                ITEM,
+                itemRoot(1L, 1L),
+                set -> set.set(FIXTURE_ITEM.ITEM_NAME, "new"),
+                detailRows(List.of(detail(1, "one"), detail(2, "two")))));
 
+    assertThat(inserted).isTrue();
     final Record row = item(1L);
     assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("new");
     assertThat(row.get(FIXTURE_ITEM.LOCK_NO)).isEqualTo(1L);
@@ -415,6 +420,88 @@ class TableWriterTest {
         .hasMessageContaining("unique key already exists")
         .hasMessageContaining("table=t_fixture_item")
         .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.UNIQUE));
+  }
+
+  @Test
+  @DisplayName("insert は重複を許す列を宣言した集約でも、衝突がなければルートと子を書いて true を返す")
+  void insertWithDuplicateKeyWritesRootAndChildren() {
+    final boolean inserted =
+        callInUseCase(() ->
+            writer.insert(
+                ITEM_IDEMPOTENT_ON_CODE,
+                itemRoot(1L, 1L),
+                set -> set.set(FIXTURE_ITEM.ITEM_NAME, "new").set(FIXTURE_ITEM.ITEM_CODE, "A"),
+                detailRows(List.of(detail(1, "one")))));
+
+    assertThat(inserted).isTrue();
+    final Record row = item(1L);
+    assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("new");
+    assertThat(row.get(FIXTURE_ITEM.LOCK_NO)).isEqualTo(1L);
+    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).isEqualTo(PGM_CD);
+    assertThat(details(1L)).isEqualTo(Map.of(1, "one"));
+  }
+
+  @Test
+  @DisplayName("insert は重複を許すと宣言した列に同じ値の行があれば、例外にせず false を返し、ルートも子も書かない")
+  void insertWithDuplicateKeySkipsConflictingRootAndChildren() {
+    insertItem(1L, "first", "A");
+
+    final boolean inserted =
+        callInUseCase(() ->
+            writer.insert(
+                ITEM_IDEMPOTENT_ON_CODE,
+                itemRoot(2L, 1L),
+                set -> set.set(FIXTURE_ITEM.ITEM_NAME, "second").set(FIXTURE_ITEM.ITEM_CODE, "A"),
+                detailRows(List.of(detail(1, "one")))));
+
+    assertThat(inserted).isFalse();
+    final Record row = item(1L);
+    assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("first");
+    assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).isEqualTo(SEED_PGM_CD);
+    assertThat(dsl.fetchExists(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(2L)))
+        .as("入れなかったルート")
+        .isFalse();
+    assertThat(details(2L)).as("入れなかったルートの子").isEmpty();
+  }
+
+  @Test
+  @DisplayName("insert は重複を許すと宣言した列以外の一意制約の違反を、UNIQUE の競合の例外にする")
+  void insertWithDuplicateKeyConflictsOnOtherUniqueKey() {
+    insertItem(1L, "first", "A");
+
+    // 23505 の後のトランザクションは中断状態になるため、この後に SQL を実行しない。
+    assertThatThrownBy(() ->
+            runInUseCase(() ->
+                writer.insert(
+                    ITEM_IDEMPOTENT_ON_CODE,
+                    itemRoot(1L, 1L),
+                    set ->
+                        set.set(FIXTURE_ITEM.ITEM_NAME, "second").set(FIXTURE_ITEM.ITEM_CODE, "B"),
+                    detailRows(List.of()))))
+        .isInstanceOf(ConflictException.class)
+        .hasMessageContaining("table=t_fixture_item")
+        .satisfies(thrown -> assertConflictWithoutSql(thrown, ConflictException.Kind.UNIQUE));
+  }
+
+  @Test
+  @DisplayName("重複を許す列は一つ以上で、集約ルートのテーブルの列だけを宣言できる")
+  void idempotentDeclarationRejectsInvalidColumns() {
+    assertThatThrownBy(() ->
+            AggregateTable.ofIdempotentOn(
+                FIXTURE_ITEM,
+                FIXTURE_ITEM.ITEM_ID,
+                Item::id,
+                FIXTURE_ITEM.ITEM_ID,
+                List.of(FIXTURE_ITEM_DETAIL.ITEM_ID)))
+        .as("別のテーブルの列")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("duplicate key column must belong to the aggregate root table");
+    assertThatThrownBy(() ->
+            AggregateTable.<Record, Long, Item>ofIdempotentOn(
+                FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID, Item::id, FIXTURE_ITEM.ITEM_ID, List.of()))
+        .as("列がない")
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("duplicate key must have one or more columns");
   }
 
   @Test
@@ -537,9 +624,14 @@ class TableWriterTest {
     save(itemId, expectedLockNo, set -> set.set(FIXTURE_ITEM.ITEM_NAME, name), List.of());
   }
 
-  /** {@code lock_no = 1} の行を作る。 */
+  /** {@code lock_no = 1} の、item_code のない行を作る。 */
   private void insertItem(final long itemId, final String name) {
     seeds.insertItem(itemId, name);
+  }
+
+  /** {@code lock_no = 1} の行を作る。 */
+  private void insertItem(final long itemId, final String name, final @Nullable String code) {
+    seeds.insertItem(itemId, name, code);
   }
 
   /** {@code lock_no = 1} の子の行を作る。 */
@@ -564,6 +656,11 @@ class TableWriterTest {
         .from(FIXTURE_ITEM_DETAIL)
         .where(FIXTURE_ITEM_DETAIL.ITEM_ID.eq(itemId))
         .fetchMap(FIXTURE_ITEM_DETAIL.DETAIL_NO, FIXTURE_ITEM_DETAIL.DETAIL_TEXT);
+  }
+
+  /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のある処理を実行する。 */
+  private static <T> T callInUseCase(final Supplier<T> call) {
+    return ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD).call(call::get);
   }
 
   /** ユースケースの呼び出しの中として、pgm_cd を束縛して戻り値のない処理を実行する。 */

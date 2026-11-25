@@ -55,10 +55,10 @@ DBを`schema-v9`以前へ切り戻すとセッションの表が消えるため�
 適用が途中で止まると無効な索引が残りますが、次の`task be-release-migrate`がそれを消してから作り直します。
 DBを`schema-v11`以前へ切り戻すと索引だけが消え、行は失われません。
 
-029のchangeset（`schema-v13`）は、子の履歴の表`tenancy.h_membership`、`tenancy.h_user_identity`、`ordering.h_order_line`を作ります（[ADR-129](../adr/ADR-129-archive-removed-child-rows-in-table-writer.md)）。
-新版は、子の行を削除するときにこの表へ書くため、029を適用してから新版をデプロイします。
+035のchangeset（`schema-v16`）は、子の履歴の表`tenancy.h_membership`、`tenancy.h_user_identity`、`ordering.h_order_line`を作ります（[ADR-131](../adr/ADR-131-archive-removed-child-rows-in-table-writer.md)）。
+新版は、子の行を削除するときにこの表へ書くため、035を適用してから新版をデプロイします。
 表がないまま新版を動かすと、子を削除する保存が`relation does not exist`で失敗し、トランザクションごと戻ります。
-DBを`schema-v12`以前へ切り戻すと表が消え、それまでに退避した行は失われます。
+DBを`schema-v15`以前へ切り戻すと表が消え、それまでに退避した行は失われます。
 切り戻すときは同時に旧版のアプリケーションへ戻します。
 
 ## DB切り戻し

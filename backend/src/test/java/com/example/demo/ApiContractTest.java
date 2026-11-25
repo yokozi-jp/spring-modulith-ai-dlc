@@ -82,6 +82,8 @@ class ApiContractTest {
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 401)
   @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 401)
   @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 401)
   @ContractCase(method = RequestMethod.GET, path = "/api/memberships", status = 401)
   @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant", status = 401)
   @ContractCase(method = RequestMethod.PUT, path = "/api/current-tenant", status = 401)
@@ -111,6 +113,7 @@ class ApiContractTest {
   @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 403)
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 403)
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 403)
   @ContractCase(method = RequestMethod.PUT, path = "/api/current-tenant", status = 403)
   @ContractCase(
       method = RequestMethod.PUT,
@@ -141,6 +144,8 @@ class ApiContractTest {
   @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
   @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 403)
   @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 403)
   @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant", status = 403)
   @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant/members", status = 403)
   @ContractCase(

@@ -8,6 +8,9 @@ error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.respo
 error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses.4XX.content
 error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses[404]
 error-response-problem-detail|paths./api/sample-orders/{sampleOrderId}.get.responses[404].content
+idempotency-key-required|paths./api/sample-notes.post.parameters
+idempotency-key-required|paths./api/sample-orders.post
+idempotency-key-required|paths./api/sample-orders/{code}.delete.parameters
 instant-property-date-time|components.schemas.SampleOrderResponse.properties.placedAt
 instant-property-date-time|components.schemas.SampleOrderResponse.properties.receivedAt.type
 instant-property-date-time|paths./api/sample-orders.get.parameters[0].schema

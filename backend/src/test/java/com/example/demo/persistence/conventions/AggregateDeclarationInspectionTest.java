@@ -11,10 +11,12 @@ import java.util.List;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
-/** 本番の集約の宣言を、マイグレーション済みのテストDBの外部キーと突き合わせる。 */
+/** 本番の集約の宣言を、マイグレーション済みのテストDBの外部キーと一意索引と突き合わせる。 */
 @DatabaseTest
 class AggregateDeclarationInspectionTest {
 
@@ -26,14 +28,16 @@ class AggregateDeclarationInspectionTest {
   private String migrationRole;
 
   private List<ConventionViolation> check(final List<DeclaredAggregate> aggregates) {
+    final CatalogSnapshot catalog = SchemaCatalog.read(dsl, migrationRole);
     return AggregateDeclarationConventions.check(
         aggregates,
-        SchemaCatalog.read(dsl, migrationRole).constraints(),
+        catalog.constraints(),
+        catalog.indexes(),
         AggregateDeclarationConventions.ALLOWLIST);
   }
 
   @Test
-  @DisplayName("本番の集約の宣言は、外部キーと一致する")
+  @DisplayName("本番の集約の宣言は、外部キーと一意索引と一致する")
   void declaredAggregatesMatchForeignKeys() {
     final List<ConventionViolation> violations = check(AggregateDeclarations.declared());
 
@@ -64,11 +68,13 @@ class AggregateDeclarationInspectionTest {
       mutated.add(
           new DeclaredAggregate(
               aggregate.root(),
+              aggregate.key(),
               aggregate.children().stream()
                   .filter(child -> !"ordering.t_order_line".equals(child.table()))
-                  .toList()));
+                  .toList(),
+              aggregate.duplicateKey()));
     }
-    mutated.add(new DeclaredAggregate("ordering.t_order_line", List.of()));
+    mutated.add(new DeclaredAggregate("ordering.t_order_line", "line_no", List.of(), List.of()));
 
     assertThat(check(mutated))
         .extracting(ConventionViolation::key)
@@ -83,16 +89,43 @@ class AggregateDeclarationInspectionTest {
             .map(aggregate ->
                 new DeclaredAggregate(
                     aggregate.root(),
+                    aggregate.key(),
                     aggregate.children().stream()
                         .map(child ->
                             "tenancy.m_membership".equals(child.table())
                                 ? new DeclaredChild(child.table(), "user_id", child.archive())
                                 : child)
-                        .toList()))
+                        .toList(),
+                    aggregate.duplicateKey()))
             .toList();
 
     assertThat(check(mutated))
         .extracting(ConventionViolation::key)
         .containsExactly("AG2 tenancy.m_membership.user_id");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "order_public_id | AG3 payment.t_payment(order_public_id)",
+        "tenant_public_id,public_id | AG4 payment.t_payment.public_id"
+      })
+  @DisplayName("t_payment の duplicateKey を一意索引とずらすと、拒否する")
+  void rejectsPaymentDuplicateKeyOutsideItsUniqueIndex(
+      final String columns, final String expected) {
+    final List<DeclaredAggregate> mutated =
+        AggregateDeclarations.declared().stream()
+            .map(aggregate ->
+                "payment.t_payment".equals(aggregate.root())
+                    ? new DeclaredAggregate(
+                        aggregate.root(),
+                        aggregate.key(),
+                        aggregate.children(),
+                        List.of(columns.split(",")))
+                    : aggregate)
+            .toList();
+
+    assertThat(check(mutated)).extracting(ConventionViolation::key).containsExactly(expected);
   }
 }

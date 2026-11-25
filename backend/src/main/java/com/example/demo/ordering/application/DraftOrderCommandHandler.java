@@ -4,6 +4,7 @@ import com.example.demo.ordering.domain.model.Order;
 import com.example.demo.ordering.domain.model.OrderRepository;
 import com.example.demo.ordering.domain.model.OrderedItem;
 import com.example.demo.product.ProductQueries;
+import com.example.demo.shared.idempotency.Idempotency;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -23,19 +24,28 @@ public class DraftOrderCommandHandler {
   /** 作成した時刻を取る時計。 */
   private final Clock clock;
 
+  /** 同じ冪等性キーの再送に、保存した Result を返す。 */
+  private final Idempotency idempotency;
+
   /** 依存を受け取る。 */
   public DraftOrderCommandHandler(
       final OrderRepository orderRepository,
       final ProductQueries productQueries,
-      final Clock clock) {
+      final Clock clock,
+      final Idempotency idempotency) {
     this.orderRepository = orderRepository;
     this.productQueries = productQueries;
     this.clock = clock;
+    this.idempotency = idempotency;
   }
 
-  /** 明細の商品を読んで下書きの注文を作り、保存する。 */
+  /** 明細の商品を読んで下書きの注文を作り、保存する。同じ冪等性キーの再送には、保存した Result を返す。 */
   @Transactional
   public DraftOrderResult handle(final DraftOrderCommand command) {
+    return idempotency.execute(command, DraftOrderResult.class, () -> draft(command));
+  }
+
+  private DraftOrderResult draft(final DraftOrderCommand command) {
     final List<OrderedItem> items =
         command.lines().stream()
             .map(line -> OrderedItems.item(line.productId(), line.quantity()))

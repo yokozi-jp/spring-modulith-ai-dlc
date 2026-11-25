@@ -23,7 +23,7 @@ compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプ�
 - **`task mutation-test`**：`be-mutation-test`の別名。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task e2e`**：compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付けする（[E2Eテストの方針と書き方](../e2e/testing-strategy.md)）。
-- **`task e2e-up`**：`task e2e`の起動の手順（slotの取得、build、依存の起動、migration、代表データ、backend）だけを実行し、片付けない。
+- **`task e2e-up`**：`task e2e`の起動の手順（slotの取得、build、依存の起動、migration、テナントと所属、backend）だけを実行し、片付けない。
   `task e2e`の外で起動して残すときにも使い、その呼び出し側が片付ける。
 - **`task e2e-collect-logs LOG=<パス>`**：compose-testのbackendのログを書き、秘密の値、セッションのCookieの値、JWTの形の文字列が入っていれば失敗する。
   `task e2e`が片付けの前に呼ぶ。`task e2e-up`で残したスタックを片付けるときも、その前に呼ぶ。
@@ -82,7 +82,12 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 ## フロントエンド
 
-- **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。続けて、`e2e/`の`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts`をNodeで直接importでき（相対のimportに拡張子`.ts`がある）、Playwrightの外から使えることを確かめる。
+- **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。続けて`lint-e2e-seed`を実行する。
+  最後に、`e2e/`の`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts`をNodeで直接importでき（相対のimportに拡張子`.ts`がある）、Playwrightの外から使えることを確かめる。
+- **`task lint-e2e-seed`**：`frontend/apps/web/e2e/`（`.auth/`を除く）に`SEED-`の文字列が大文字小文字を問わずにあれば失敗する。
+  ディレクトリが無いときも失敗する。
+  E2Eは開発用のシーダーの代表データを読まず、各テストがデータを作る（[ADR-130](../adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
+  検査の本体は`tooling/e2e-seed-lint/e2e-seed-lint.sh`で、検出の前に`tooling/e2e-seed-lint/test.sh`が、fixtureで終了コードと出力を確かめる。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
   `packages/ui`は`includeEntryExports: true`にし、`exports`で公開した部品の未使用exportも報告する。
 - **`task fe-coverage`**：React Compilerを有効にして、`vp run --recursive test`でルートのlint設定のテストと各packageのテストを実行する。
@@ -166,7 +171,7 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
 - **`task lint-md-fix`**：markdownlint-cli2で安全に修正できるMarkdownの問題を修正する。
 - **`task ruleset-diff`**：GitHub上のrulesetと`.github/rulesets/main.json`の差分を表示する。認証済みの`gh`が要るため、CIでは動かさず、管理者が手元で使う。
 - **`task ruleset-apply`**：`main.json`をGitHub上のrulesetへ反映する。`CONFIRM_RULESET=yes`が要る。手順は[mainブランチの保護設定](../repository/branch-protection.md)にある。
-- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、削除した識別子が残っていないこと（`removed-names-check`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、iweのMCPサーバーの全ツールが`disabledTools`か残す一覧に入っていること（`iwe-tools-check`）、Taskfile文書同期候補を検査する。
+- **`task okf-check`**：OKF適合、内部リンク、孤立文書、変更した文書の責務の見直し合図（250行超の警告）、steering境界、ADRの整合（`adr-lint`）、削除した識別子が残っていないこと（`removed-names-check`）、READMEの技術スタック表のBackendの版が`backend/build.gradle`と一致すること（`readme-versions-check`）、rulesetの必須チェックとdocsの一覧とworkflowの名前の一致（`ruleset-check`）、iweのMCPサーバーの起動コマンドが選ぶ`iwe-mcp.sh`（`iwe-mcp-check`）、iweのMCPサーバーの全ツールが`disabledTools`か残す一覧に入っていること（`iwe-tools-check`）、Taskfile文書同期候補を検査する。
   `removed-names-check`は内部タスクで、`tooling/removed-names/names.txt`に書いた削除した識別子が、`docs/`、`.agents/`、`backend/src/`（生成コードを除く）に残っていないことを確かめる。
   `be-lint`と`skills-check`からも動く。`backend-ci`のlintジョブは`be-lint`を呼ばないので、`check.sh`を直接実行する。
   `check.sh`の自己検査（`tooling/removed-names/test.sh`）は`okf-check`だけが実行する。
@@ -247,12 +252,12 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **commit-msg（すべて）**：commitlintを実行する。
 - **pre-commit（すべて）**：`scan-secrets`を実行する。
 - **pre-commit（OpenAPI契約、`.spectral.yaml`、Orvalの設定、`frontend/apps/web/package.json`、生成物の変更）**：`api-lint`（`docker info`が失敗すればスキップ）と`api-client-check`を実行する。
-- **pre-commit（フロントエンドの変更）**：`fe-check`を実行する。
+- **pre-commit（フロントエンドか`tooling/e2e-seed-lint/`の変更）**：`fe-check`を実行する。
   前項と同じgroupで順に実行し、Orvalの再生成と型検査を同時に走らせない。
 - **pre-commit（Dockerfileの変更）**：`lint-docker`相当と`lint-docker-check`相当を実行する。
 - **pre-commit（Composeファイルの変更）**：`lint-compose`相当を実行する。
 - **pre-commit（Markdownの変更）**：変更ファイルへ`lint-md`相当を実行する。
-- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`tooling/removed-names/`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`tooling/iwe-tools/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
+- **pre-commit（docs、steering、Taskfile、README、`tooling/adr-lint/`、`tooling/removed-names/`、`tooling/readme-versions/`、`backend/build.gradle`、`.kiro/settings/mcp.json`、`tooling/iwe-mcp/`、`tooling/iwe-tools/`、`.github/rulesets/`、`.github/workflows/`、`tooling/ruleset-check/`、`tooling/ruleset-sync/`の変更）**：`okf-check`を実行する。
 - **pre-commit（`.agents/skills/`、`.kiro/`、`skills-lock.json`、`tooling/skills-check/`の変更）**：`skills-check`を実行する。
 - **pre-commit（Taskfile、`lefthook.yml`、GitHub Actionsワークフロー、`tooling/taskfile-cleanup/`、`tooling/task-calls/`、`tooling/openapi-drift/`の変更）**：`lint-taskfile`を実行する。
 - **pre-commit（`tooling/agent-git/`の変更）**：`agent-git-test`を実行する。
@@ -263,6 +268,7 @@ betterleaksの誤検知の除外の書き方は[betterleaksの誤検知の除外
 - **pre-commit（`tooling/formal-verify/`の変更）**：`formal-verify-test`を実行する。
 - **pre-commit（`tooling/*/test.sh`、`.kiro/hooks/*.test.sh`、`tooling/scratch-git/`の変更）**：`lint-scratch-git`を実行する。
 - **pre-commit（`tooling/test-weakening/`の変更）**：`test-weakening-test`を実行する。
+- **pre-commit（`backend/src/main/java/`、`backend/src/main/resources/db/`、`tooling/session-sql-lint/`、`tooling/db-clock-lint/`の変更）**：`lint-session-sql`と`lint-db-clock`を実行する。
 - **pre-push（すべて）**：`adr-check`、`test-weakening`、`scan-secrets-all`を実行する。
 - **pre-push（バックエンドのJavaまたはGradle変更）**：`be-lint`相当を実行する。全体のテスト（`task test`）はpre-pushでは実行せず、Backend CIが流す（[ADR-128](../adr/ADR-128-run-backend-tests-in-ci-not-in-pre-push.md)）。
 - **pre-push（フロントエンドの変更）**：`fe-test-build`を、Vitestのdot reporterと、報告を出さない`none`のcoverage reporterで実行する。
@@ -299,6 +305,7 @@ pre-pushの「変更」は、`origin/main`とのmerge-baseからの差分で判�
 - **`codeql.yml`**：actions、java-kotlin（autobuild）、javascript-typescriptを解析する（[ADR-083](../adr/ADR-083-manage-codeql-as-advanced-setup-with-explicit-build-mode.md)）。
   java-kotlinはBackend CIのtestと同じGradle cacheをread-onlyで復元し、Plugin Portalからのプラグイン取得で落ちないようにする。
 - **`frontend-ci.yml`**：`fe-verify`、`fe-route-tree-check`、`api-client-check`を実行する。
+  `fe-verify`の`fe-check`が`lint-e2e-seed`を実行するため、`tooling/e2e-seed-lint/`の変更でも動く。
 - **`api-contract.yml`**：`api-lint`、`api-lint-rules-test`、`api-breaking`、`api-docs`を実行し、設計書をartifactにする。
   mainへのpushでは設計書をGitHub Pagesに公開する。
 - **`betterleaks.yml`**：`lint-betterleaks`と`scan-secrets-all`を実行する。PRでは`BETTERLEAKS_LOG_OPTS`にbaseからheadまでの範囲を渡す。

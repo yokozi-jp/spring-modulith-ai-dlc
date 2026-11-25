@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: Taskfile の書き方
-description: ルートの Taskfile のシェル設定、公開タスクと説明、変数上書き、環境ファイルの分離、実行順序、後片付け、破壊操作の確認、外部ツールの固定、CI とフックとの一致、文書同期を定める規約。Taskfile.yml を書く、または直すときに読む。
+description: ルートの Taskfile のシェル設定、公開タスクと説明、変数上書き、環境ファイルの分離、実行順序、後片付け、破壊操作の確認、外部ツールの固定、CI とフックとの一致、文書同期、検査を足すときに直す場所を定める規約。Taskfile.yml を書く、または直すとき、tooling に検査を足すときに読む。
 tags: [convention, tooling, taskfile, ci]
 ---
 
@@ -166,6 +166,21 @@ Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれてい
 
 変更後は`task --list`、対象タスク、`task lint-md`を実行する。
 順序、環境分離、確認ゲート、後片付けに触れた場合は、その失敗経路も検証する。
+
+## 検査を足すとき
+
+`tooling/<名前>/`に本体を置く検査を足すときに、直す場所の索引である。
+規則の正文は各リンク先にあり、ここへ写さない。
+
+1. **コマンド**：`Taskfile.yml`にtaskを足し、最初のコマンドで`tooling/<名前>/test.sh`を呼ぶ（[検査の本体を別ファイルに置く先例](#後片付けと終了コード)と同じ形）。
+2. **自己検査**：止める入力と通す入力を`tooling/<名前>/test.sh`のfixtureに置く。失敗にする状態は`test.sh`を正とする。`test.sh`が`git`を呼ぶなら`scratch-git.sh`を先にsourceする（`task lint-scratch-git`が止める）。
+3. **CI**：新しいworkflowは`ci.yml`から呼び、`CI gate`の`needs`に足す（[ブランチ保護](../repository/branch-protection.md)）。足し忘れと、道具の版のファイルの`paths`漏れは`task ci-gate-check`が止める。既存のworkflowへ足すときは、そのworkflowの`paths`と`changed.sh`に`tooling/<名前>/**`を入れる。これは機械が止めないので、手で確かめる。
+4. **Lefthook**：jobを足し、`glob`に検査の対象と`tooling/<名前>/`を入れ、`tooling/lefthook-glob/test.sh`に`expect`を足す。`task <名前>`の誤りは`task lint-taskfile`が止める。入れないときは、理由を[Lintとテストのリファレンス](lint-and-test.md)に書く。
+5. **docs**：[文書の同期](#文書の同期)に従う。加えて、`lint-and-test.md`のtaskの項、「Gitフック対応」、「CI対応」を直す。規則を列挙する文書（`lint-and-test.md`のtaskの項、READMEの該当の節）がある検査は、列挙も直す。
+6. **ADR**：判断を伴うときは起こす。`task adr-check`の警告は、`frontend/`、`db/changelog/`、`docker/`、`.github/workflows/`などの変更に限られ、`tooling/`の変更では出ない。
+7. **既存の違反**：同じ変更でリポジトリから探して直す（[継続的な補強](../principles/continuous-reinforcement.md)）。
+
+既存の`tooling/<名前>/`の検査へ規則を1つ足すだけなら、本体と`test.sh`のケースに加えて、上の5の列挙を直す。
 
 ## 出典
 

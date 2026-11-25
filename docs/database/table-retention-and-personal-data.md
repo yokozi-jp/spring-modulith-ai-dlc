@@ -28,6 +28,8 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 | `tenancy.h_membership`               | 履歴           | 未定（[#672]）                                                                             | 含まない                                         |
 | `tenancy.h_user_identity`            | 履歴           | 未定（[#672]）                                                                             | 含む（`issuer_url`、`subject_code`）             |
 | `product.m_product`                  | マスタ         | 無期限                                                                                     | 含まない                                         |
+| `product.t_idempotency_key`          | トラン         | `expires_at`（作成から 24 時間）まで（[ADR-126]）                                          | 含まない                                         |
+| `ordering.t_idempotency_key`         | トラン         | `expires_at`（作成から 24 時間）まで（[ADR-126]）                                          | 含まない                                         |
 | `ordering.t_order`                   | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
 | `ordering.t_order_line`              | トラン         | 未定（[#671]）                                                                             | 含まない                                         |
 | `ordering.h_order_line`              | 履歴           | 未定（[#671]）                                                                             | 含まない                                         |
@@ -47,12 +49,16 @@ changeset が作る全テーブルについて、保持期限と個人データ�
 
 | テーブル                             | 改廃方法             | 自動化                                            | 実行のタイミング                  | 改廃の条件                                                                                                                                                      | `ANALYZE` と `VACUUM`  |
 | ------------------------------------ | -------------------- | ------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| `product.t_idempotency_key`          | DELETE               | なし（[#540] で実装する）                         | 定期（ShedLock のジョブ）         | `expires_at` を過ぎた行。テナントごとに消す（[ADR-126]）                                                                                                        | 自動バキュームに任せる |
+| `ordering.t_idempotency_key`         | DELETE               | なし（[#540] で実装する）                         | 定期（ShedLock のジョブ）         | `expires_at` を過ぎた行。テナントごとに消す（[ADR-126]）                                                                                                        | 自動バキュームに任せる |
 | `modulith.event_publication_archive` | DELETE               | なし（[#542] で実装する）                         | 1 日 1 回                         | `COMPLETED` で完了から 7 日を過ぎた行。`ABANDONED` の行は消さない（[ADR-120]）                                                                                  | 自動バキュームに任せる |
 | `modulith.spring_session`            | DELETE               | あり（Spring Session JDBC の定期削除。[ADR-111]） | 各インスタンスで毎分              | `expiry_time` を過ぎた行                                                                                                                                        | 自動バキュームに任せる |
 | `modulith.spring_session_attributes` | 外部キーのカスケード | あり                                              | `spring_session` の行の削除と同時 | 親の行の削除                                                                                                                                                    | 自動バキュームに任せる |
 
+[#540]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540
 [#542]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/542
 [#671]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/671
 [#672]: https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/672
 [ADR-111]: ../adr/ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md
 [ADR-120]: ../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md
+[ADR-126]: ../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md

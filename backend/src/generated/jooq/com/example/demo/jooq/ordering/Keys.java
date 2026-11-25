@@ -5,9 +5,11 @@ package com.example.demo.jooq.ordering;
 
 
 import com.example.demo.jooq.ordering.tables.HOrderLine;
+import com.example.demo.jooq.ordering.tables.TIdempotencyKey;
 import com.example.demo.jooq.ordering.tables.TOrder;
 import com.example.demo.jooq.ordering.tables.TOrderLine;
 import com.example.demo.jooq.ordering.tables.records.HOrderLineRecord;
+import com.example.demo.jooq.ordering.tables.records.TIdempotencyKeyRecord;
 import com.example.demo.jooq.ordering.tables.records.TOrderLineRecord;
 import com.example.demo.jooq.ordering.tables.records.TOrderRecord;
 
@@ -38,6 +40,7 @@ public class Keys {
     // -------------------------------------------------------------------------
 
     public static final UniqueKey<HOrderLineRecord> PK_H_ORDER_LINE = Internal.createUniqueKey(HOrderLine.H_ORDER_LINE, DSL.name("pk_h_order_line"), new TableField[] { HOrderLine.H_ORDER_LINE.ORDER_LINE_HISTORY_ID }, true);
+    public static final UniqueKey<TIdempotencyKeyRecord> PK_T_IDEMPOTENCY_KEY = Internal.createUniqueKey(TIdempotencyKey.T_IDEMPOTENCY_KEY, DSL.name("pk_t_idempotency_key"), new TableField[] { TIdempotencyKey.T_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY_ID }, true);
     public static final UniqueKey<TOrderRecord> PK_T_ORDER = Internal.createUniqueKey(TOrder.T_ORDER, DSL.name("pk_t_order"), new TableField[] { TOrder.T_ORDER.ORDER_ID }, true);
     public static final UniqueKey<TOrderLineRecord> PK_T_ORDER_LINE = Internal.createUniqueKey(TOrderLine.T_ORDER_LINE, DSL.name("pk_t_order_line"), new TableField[] { TOrderLine.T_ORDER_LINE.ORDER_LINE_ID }, true);
 }

@@ -32,8 +32,10 @@ class ArchiveDeclarationConventionsTest {
       List.of(
           new DeclaredAggregate(
               "ordering.t_order",
+              "public_id",
               List.of(
-                  new DeclaredChild("ordering.t_order_line", "order_id", "ordering." + ARCHIVE))));
+                  new DeclaredChild("ordering.t_order_line", "order_id", "ordering." + ARCHIVE)),
+              List.of()));
 
   /** 型の名前。 */
   private static final String VARCHAR_10 = "character varying(10)";
@@ -109,7 +111,8 @@ class ArchiveDeclarationConventionsTest {
             false,
             false,
             true,
-            "order_id");
+            "order_id",
+            List.of("order_id"));
 
     assertThat(keys(check(noPrimaryKey, List.of(), List.of())))
         .as("主キーがない")

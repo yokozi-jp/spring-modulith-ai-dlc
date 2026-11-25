@@ -28,21 +28,35 @@ import org.springframework.dao.DataAccessException;
    */
   /* package */ static <T> T executeOrConflict(
       final Supplier<T> statement, final Supplier<String> target) {
+    return executeOrConflict(statement, target, ConflictException.Kind.LOCK);
+  }
+
+  /**
+   * {@link #executeOrConflict(Supplier, Supplier)} と同じく文を実行し、{@code 55P03} を種類 {@code lockKind} の
+   * {@link ConflictException} に変える。
+   *
+   * <p>{@code Idempotency-Key} の行のロック待ちを、業務の行のロック待ちと別の種類にするために使う（ADR-126）。
+   */
+  /* package */ static <T> T executeOrConflict(
+      final Supplier<T> statement,
+      final Supplier<String> target,
+      final ConflictException.Kind lockKind) {
     try {
       return statement.get();
     } catch (final DataAccessException e) {
-      throw translate(e, target);
+      throw translate(e, target, lockKind);
     }
   }
 
   /** 変換できない例外は、そのまま返す。 */
   // 原因の例外のメッセージに SQL と重複したキーの値が入るため、原因を付けない（ADR-062、docs/observability/conventions.md）。
   private static RuntimeException translate(
-      final DataAccessException error, final Supplier<String> target) {
+      final DataAccessException error,
+      final Supplier<String> target,
+      final ConflictException.Kind lockKind) {
     final String sqlState = sqlStateOf(error);
     if (LOCK_NOT_AVAILABLE.equals(sqlState)) {
-      return new ConflictException(
-          ConflictException.Kind.LOCK, "row is locked by another request: " + target.get());
+      return new ConflictException(lockKind, "row is locked by another request: " + target.get());
     }
     if (UNIQUE_VIOLATION.equals(sqlState)) {
       return new ConflictException(

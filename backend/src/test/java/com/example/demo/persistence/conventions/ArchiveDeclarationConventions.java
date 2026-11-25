@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * 子の履歴の表の宣言を、DBのカタログと突き合わせる（ADR-129）。
+ * 子の履歴の表の宣言を、DBのカタログと突き合わせる（ADR-131）。
  *
  * <p>{@code
  * ChildTable.of}は、履歴の表の列の名前とJavaの型だけを宣言のときに確かめる。長さとNULLの可否の食い違いは、最初の削除のINSERTが失敗して初めて分かるため、ここでカタログの型とNOT
@@ -35,7 +35,7 @@ final class ArchiveDeclarationConventions {
 
   /** 履歴の表の規約の文書。 */
   private static final String DOC =
-      "docs/adr/ADR-129-archive-removed-child-rows-in-table-writer.md";
+      "docs/adr/ADR-131-archive-removed-child-rows-in-table-writer.md";
 
   private ArchiveDeclarationConventions() {
     // 静的メソッドだけを持つ。

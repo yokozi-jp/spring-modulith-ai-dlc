@@ -1,6 +1,7 @@
 package com.example.demo;
 
 import static com.example.demo.jooq.ordering.Tables.H_ORDER_LINE;
+import static com.example.demo.jooq.ordering.Tables.T_IDEMPOTENCY_KEY;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static com.example.demo.jooq.payment.Tables.T_PAYMENT;
@@ -39,9 +40,9 @@ import org.jooq.impl.DSL;
 
 /**
  * 開発用の代表データ（#114）を、業務データが空のローカルかテストの DB の、{@link TenancySeeds#TENANTS} の各テナントに入れる。テナントと所属（{@link
- * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。
+ * TenancySeeds}）は、業務データの有無によらず、足りない行だけを毎回入れる。{@link Mode#TENANCY} のモードは、テナントと所属だけを入れ、業務データを入れない。
  *
- * <p>業務の表は RLS でテナントごとに分かれるため（ADR-107）、「空」の判定と reset の削除は {@code tenancy.m_tenant} のテナントごとに行う。
+ * <p>業務テーブルは RLS でテナントごとに分かれるため（ADR-107）、「空」の判定と reset の削除は {@code tenancy.m_tenant} のテナントごとに行う。
  *
  * <p>Gradle の {@code seedLocalData}（JavaExec、テストの runtime classpath）が {@link #main} を呼ぶ。Spring
  * を起動せず、Bean にもしないので、ほかのテストのコンテキストでは動かない。環境の確認、「空」の判定、reset の削除を 1 つのトランザクションで行う。
@@ -58,25 +59,39 @@ public final class LocalDataSeeder {
     /** 明示の投入。「空」のときだけ入れる。 */
     SEED,
     /** 業務データを消してから入れ直す。 */
-    RESET
+    RESET,
+    /** テナントと所属だけを入れ、業務データを入れない。 */
+    TENANCY
   }
 
   /** {@link #seed} の結果。 */
   /* package */ enum Outcome {
     /** 代表データを入れた。 */
     SEEDED,
+    /** テナントと所属だけを入れた。 */
+    TENANCY_SEEDED,
     /** 業務データがあるので何もしなかった。 */
     SKIPPED_NOT_EMPTY,
     /** マイグレーションが未適用なので何もしなかった。 */
     SKIPPED_NOT_MIGRATED
   }
 
-  /** 業務データの表。子から順に並べ、reset はこの順に DELETE する。modulith と tenancy と Liquibase の表は含めない。 */
+  /** 代表データを入れる業務テーブル。子から順に並べる。modulith と tenancy と Liquibase の表は含めない。 */
   /* package */ static final List<Table<?>> BUSINESS_TABLES =
       List.of(T_PAYMENT, H_ORDER_LINE, T_ORDER_LINE, T_ORDER, M_PRODUCT);
 
   /** {@link #BUSINESS_TABLES} のうち、削除した行を写す履歴の表。代表データは行を削除しないため、入れた後も空である。 */
   /* package */ static final List<Table<?>> HISTORY_TABLES = List.of(H_ORDER_LINE);
+
+  /**
+   * reset が消す業務テーブル。代表データを入れない {@code ordering.t_idempotency_key} と {@code
+   * product.t_idempotency_key} と、代表データを入れる業務テーブルを、この順に DELETE する（キーの表を消す理由は ADR-126）。
+   */
+  /* package */ static final List<Table<?>> RESET_TABLES =
+      Stream.concat(
+              Stream.of(T_IDEMPOTENCY_KEY, com.example.demo.jooq.product.Tables.T_IDEMPOTENCY_KEY),
+              BUSINESS_TABLES.stream())
+          .toList();
 
   /** テナントと所属の表。業務データの有無によらず、毎回 {@link TenancySeeds} が足りない行だけを入れる。reset でも消さない。 */
   private static final List<Table<?>> TENANCY_TABLES = List.of(M_TENANT, M_MEMBERSHIP);
@@ -121,7 +136,7 @@ public final class LocalDataSeeder {
   /** 呼ぶ側のトランザクションの中で、モードに従って代表データを入れる。 */
   /* package */ Outcome seed(final DSLContext dsl, final Mode mode) {
     final boolean migrated =
-        Stream.concat(BUSINESS_TABLES.stream(), TENANCY_TABLES.stream())
+        Stream.concat(RESET_TABLES.stream(), TENANCY_TABLES.stream())
             .allMatch(table ->
                 AsModule.callWithoutTenant(
                     dsl,
@@ -147,9 +162,12 @@ public final class LocalDataSeeder {
                   .orderBy(M_TENANT.TENANT_ID)
                   .fetch(row -> new TenantId(row.value1()));
             });
+    if (mode == Mode.TENANCY) {
+      return Outcome.TENANCY_SEEDED;
+    }
     if (mode == Mode.RESET) {
       tenants.forEach(tenant ->
-          BUSINESS_TABLES.forEach(
+          RESET_TABLES.forEach(
               table -> inModuleOf(dsl, tenant, table, tx -> tx.deleteFrom(table).execute())));
     }
     final List<String> nonEmpty =
@@ -204,7 +222,7 @@ public final class LocalDataSeeder {
     }
   }
 
-  /** 引数のモード（auto、seed、reset）で代表データを入れる。異常のときは例外を投げ、終了コードを 1 にする。 */
+  /** 引数のモード（auto、seed、reset、tenancy）で代表データを入れる。異常のときは例外を投げ、終了コードを 1 にする。 */
   public static void main(final String[] args) throws SQLException {
     run(args, System.getenv());
   }
@@ -213,7 +231,7 @@ public final class LocalDataSeeder {
   /* package */ static void run(final String[] args, final Map<String, String> env)
       throws SQLException {
     if (args.length == 0) {
-      throw new IllegalArgumentException("引数にモード（auto、seed、reset）を渡してください");
+      throw new IllegalArgumentException("引数にモード（auto、seed、reset、tenancy）を渡してください");
     }
     final Mode mode = Mode.valueOf(args[0].toUpperCase(Locale.ROOT));
     if (mode == Mode.AUTO && !isLocalEnvironment(env)) {

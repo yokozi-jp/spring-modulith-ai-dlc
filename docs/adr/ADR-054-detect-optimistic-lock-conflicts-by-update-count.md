@@ -27,6 +27,7 @@ Proposed
 その後、[ADR-062](ADR-062-map-business-exceptions-to-404-409-422.md) の改訂（[issue #145](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/145)）に合わせ、`55P03` の変換で原因を付けないよう、この版で決定を書き直す。
 また、ADR-062 が集約ルートの INSERT の入口 `TableWriter.insert` を足したため、INSERT は `TableWriter` を通さないとしていた決定を、この版で書き直す。
 その後、ArchUnit がラムダの本体の呼び出しを外側のメソッドの呼び出しとして数えると分かったため、R4 の記述を、この版で書き直す。
+[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md) の `Idempotency-Key` の行の書き込みを `TableWriter` から `IdempotencyKeyWriter` に分けたため、H1 の除外にそれを足し、CommandHandler が本体を private メソッドに置けるよう R4 の記述を、この版で書き直す。
 さらに、Repository が 5 つの手順（ルートの更新、内部の主キーの読み直し、保存済みの子の読み取り、子の削除、子ごとの更新か追加）を並べ、子の書き込みが任意の `Condition` を受け取り、INSERT が別の弱い入口になっていたため、入口を集約の宣言と `insert`、`update` の二つにまとめる決定を、この版で書き直す。
 
 利用者は、共通基盤に次の順で重みを置く。
@@ -42,26 +43,29 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
 最初の版の時点では業務テーブルと production の Repository がなく、移行の費用は共通処理、テスト、規約に限られていた。
 その後、`t_order` と `t_payment` の業務テーブルと、`JooqOrderRepository`、`JooqPaymentRepository`、`JooqProductRepository` が加わった。
 書き込む `JooqOrderRepository` と `JooqPaymentRepository` は、この決定の入口を使っている。
+[ADR-129](ADR-129-check-all-listeners-for-idempotency-without-a-uniform-processed-message-table.md) で、同じイベントの 2 回目の決済記録を処理済みとして正常に終えるため、集約の宣言に重複を許す一意索引の列を足し、`insert` が入れたかを返すように書き直した。
 
 ## Decision
 
 - 業務テーブルの INSERT と UPDATE は、`shared.persistence` の `TableWriter` だけが組み立てて実行する。
   Repository は集約の形を、クラスの定数として一度だけ宣言する。
-  `AggregateTable<R, K, A>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、集約ルートからその列の値を取る関数、内部の主キー、子のテーブルを持つ。
+  `AggregateTable<R, K, A>` は、ルートのテーブル、ルートを一つに決める一意の列（`public_id` など）、集約ルートからその列の値を取る関数、内部の主キー、子のテーブルを持ち、`ofIdempotentOn` で宣言したときだけ重複を許す一意索引の列を持つ。
   `A` は集約ルートのクラス（`Versioned` を実装する）で、`insert` と `update` が受け取る集約ルートの型になる。
   一意の列の値は関数で集約ルートから取るため、呼び出し側が別の集約ルートの値と組にして渡す誤りは書けない。
   `ChildTable<C>` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列（一つ以上）を持つ。
   `ChildTable` はどの集約の子かを型に持たない。`TableWriter` は、渡された子の行が宣言した子と過不足なく合うことを、SQL の前に実行時に確かめる（`IllegalArgumentException`）。
   同じ子のテーブルを二つの集約の子として宣言する誤りと、子のテーブルを別の集約のルートとして宣言する誤りは、この確かめで見つからないため、`AggregateDeclarationsTest` が本番の全 Repository の宣言を調べる。
   子を親の子として宣言し忘れる誤りと、`parentKey` の列の誤りは、`AggregateDeclarationInspectionTest` が宣言を DB の外部キーと突き合わせて止める（同じモジュールの外部キーは、参照する表が参照される表をルートとする集約の子であることと、`parentKey` が外部キーの列に含まれることを求める）。
+  重複を許す列は、同じテストが、列の集合が一致する述語と式のない一意索引があり、ルートを一つに決める一意の列を含まないことを確かめる。
   子の自然キーの列は、保存済みの値と `equals` で比べるため、`Integer`、`Long`、`Short`、`String`、`UUID` に限る。
-  宣言は構造と、ルートを一つに決める値の取り方（`keyOf`）だけを持ち、業務の値から列への変換は、保存のたびに渡すラムダが持つ。
+  宣言は構造（重複を許す一意索引の列を含む）と、ルートを一つに決める値の取り方（`keyOf`）だけを持ち、業務の値から列への変換は、保存のたびに渡すラムダが持つ。
   Repository は、保存のたびにルートの列の値と、保存後にあるべき子の全行（`ChildRows`）を渡す。
   `Condition`、`Insert`、`Update` は渡さない。ルートの条件、版の条件、子の外部キーの条件は、`TableWriter` が宣言から作る。
 - `TableWriter.insert` は、新しい集約ルートを受け取り、ルートを `INSERT ... RETURNING 内部の主キー` で書き、続けて子を 1 文の複数行の INSERT で書く。
   `lock_no = 1` と共通カラムは `TableWriter` が書く。
   内部の主キーは `RETURNING` で受けるため、Repository は読み直さない。
   子を宣言していない集約は、子の行を渡さない。
+  入れたら `true` を返す。`ofIdempotentOn` で宣言した集約は `INSERT ... ON CONFLICT (その列) DO NOTHING` で書き、その列の衝突では子を書かずに `false` を返す。ほかの一意制約の違反は `ConflictException`（種類は `UNIQUE`）になる。
 - `TableWriter.update` は、以前に読んだ集約ルート（`AggregateTable` の `A`、`shared.concurrency` の `Versioned`、`long lockNo()`）を受け取り、その `lockNo()` を期待する版にする。
   版の数値を渡す入口はなく、`A` に集約ルートのクラスを指定すれば、版を返すラムダも渡せないため、テーブルから読み直した版を期待する版に渡す誤りは書けない。
   `A` に `Versioned` そのものを指定すると、ラムダを渡せる。集約ルートのクラスを指定することはレビューで見る。
@@ -89,7 +93,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   競合の例外は `shared.concurrency` の `ConflictException` で、`TableWriter` が自分で投げる。
 - 書き込みは、開いていて読み取り専用ではないトランザクションの中でだけ行う。そうでなければ、SQL を実行する前に `IllegalStateException` にする。
   ルートの行ロックが子の書き込みを守るのは、同じトランザクションの中だけだからである。
-- 子の削除の前に行を履歴の表へ写す宣言（`ChildTable.of` の履歴の表の引数）は、[ADR-129](ADR-129-archive-removed-child-rows-in-table-writer.md)で決める。
+- 子の削除の前に行を履歴の表へ写す宣言（`ChildTable.of` の履歴の表の引数）は、[ADR-131](ADR-131-archive-removed-child-rows-in-table-writer.md)で決める。
 - 版を比べない UPDATE と DELETE の入口と、集約ルートの物理削除の入口は、今は持たない。
   本番の呼び出しがなく、`Condition` を受け取る入口は、版の比べ忘れと子の絞り込み忘れの抜け道になるためである。
   在庫の引き当てのように版を比べない更新が必要になったとき、この ADR を更新して、集約と一意の列で行を指し、件数の意味を結果の型で返す入口を足す。
@@ -97,7 +101,7 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
   UPDATE の `lock_no` を書くのは `TableWriter` だけになる。
   `CommonColumns.forInsert` は、テストのデータ作成のために public のままにするが、本番の Repository は `insertInto` を呼べないため使えない（H1）。
 - ArchUnit の `TableWriterArchTest` で次を検査する。
-  - `TableWriter` と、その子の行の書き込み（`ChildWriter`）の外の本番のコードは、jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`TableRecord`、`UpdatableRecord`、`DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
+  - `TableWriter` と、その子の行の書き込み（`ChildWriter`）、`Idempotency-Key` の行の書き込み（`IdempotencyKeyWriter`、ADR-126）の外の本番のコードは、jOOQ の INSERT、UPDATE、DELETE、UPSERT、MERGE の入口、`Update` と `Delete` に代入できる型の実行、`org.jooq` の型の、名前が `$` で始まるメソッド（問い合わせのモデルの API）、`TableRecord`、`UpdatableRecord`、`DAO` の書き込み、Spring JDBC と JDBC の直接の利用を呼ばない。
     判定は、呼び出し先の型が禁じる型に代入できるかで行う。
     `DataSource`、`Connection`、`ConnectionProvider` を引数に取るメソッドとコンストラクタも呼ばない。
     接続の元を受け取るライブラリ（Spring Boot の `DataSourceScriptDatabaseInitializer` など）は、パッケージを選ばずに任意の SQL を流せるため、パッケージの一覧ではなく引数の型で禁じる。
@@ -121,8 +125,8 @@ PostgreSQL の READ COMMITTED では、後の UPDATE は先の UPDATE のコミ�
     Repository の実装から別の Repository の書き込みを呼ぶ経路も、CommandHandler の `ensureLockNo` を通らないため止める。
   - `expectedLockNoIsCreatedOnlyByRequests`（R3）：`ExpectedLockNo` のコンストラクタ（`ExpectedLockNo::new` を含む）は、`presentation.web` の `*Request` だけが呼ぶ。
     Repository、`TableWriter`、CommandHandler、Controller が読んだ版から作って、比較を常に成り立たせることを止める。
-  - `commandHandlersEnsureScreenLockNo`（R4）：CommandHandler の、引数が `VersionedCommand` である `handle` は、その中で直接 `domain.model` の型の `ensureLockNo(ExpectedLockNo)` を呼ぶ。
-    別のメソッドの中の呼び出しと、`ensureLockNo(long)` のオーバーロードでは満たせない。ラムダの本体の呼び出しは `handle` の呼び出しとして数えるため、満たす。
+  - `commandHandlersEnsureScreenLockNo`（R4）：CommandHandler の、引数が `VersionedCommand` である `handle` は、その中か、そこから呼ぶ同じクラスの private メソッドの中で直接 `domain.model` の型の `ensureLockNo(ExpectedLockNo)` を呼ぶ。
+    `handle` から呼ばないメソッドの中の呼び出しと、`ensureLockNo(long)` のオーバーロードでは満たせない。ラムダの本体の呼び出しは `handle` の呼び出しとして数えるため、満たす。
 - jOOQ の実行時の版をテストで固定する。
   版が変わったら、[jOOQ の SQL の書き方](../database/jooq-usage.md)の「jOOQの版を上げるとき」に従って禁止の一覧を見直す。
 - 期待する版は `shared.concurrency` の `ExpectedLockNo`（`long value`、1 未満は `IllegalArgumentException`）で運ぶ。

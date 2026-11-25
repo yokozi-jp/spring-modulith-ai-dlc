@@ -27,7 +27,7 @@ class JooqUserRepository implements UserRepository {
   /**
    * 利用者の IdP の識別。親の中の行は、発行者と識別子の組で同定する。
    *
-   * <p>外す前の行を h_user_identity に残す（ADR-129）。
+   * <p>外す前の行を h_user_identity に残す（ADR-131）。
    */
   private static final ChildTable<MUserIdentityRecord> IDENTITIES =
       ChildTable.of(

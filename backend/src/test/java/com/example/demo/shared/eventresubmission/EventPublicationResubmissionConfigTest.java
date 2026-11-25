@@ -257,6 +257,36 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
+  @DisplayName("方針の abandon-after-attempts が 1 未満だと起動に失敗し、1 なら起動する")
+  void policyAbandonAfterAttemptsBelowOneFailsStartup() {
+    assertBindFailure("event-publication.resubmission.policies.default.abandon-after-attempts=0");
+    runner
+        .withPropertyValues(
+            DISABLED, "event-publication.resubmission.policies.default.abandon-after-attempts=1")
+        .run(context -> assertThat(context).hasNotFailed());
+  }
+
+  @Test
+  @DisplayName("方針の abandon-after-attempts が全体の値以上だと、方針の名前を示して起動に失敗し、1 小さければ起動する")
+  void policyAbandonAfterAttemptsNotBelowGlobalFailsStartup() {
+    runner
+        .withUserConfiguration(ResubmissionPolicies.class)
+        .withPropertyValues(
+            DISABLED, "event-publication.resubmission.policies.default.abandon-after-attempts=5")
+        .run(context ->
+            assertThat(context)
+                .getFailure()
+                .rootCause()
+                .hasMessageContaining("policies.default.abandon-after-attempts (5)")
+                .hasMessageContaining("must be less than"));
+    runner
+        .withUserConfiguration(ResubmissionPolicies.class)
+        .withPropertyValues(
+            DISABLED, "event-publication.resubmission.policies.default.abandon-after-attempts=4")
+        .run(context -> assertThat(context).hasNotFailed());
+  }
+
+  @Test
   @DisplayName("default の方針がないと起動に失敗する")
   void missingDefaultPolicyFailsStartup() {
     bareRunner()
@@ -317,7 +347,7 @@ class EventPublicationResubmissionConfigTest {
   @DisplayName("n 回目の再投入の前の待ち時間は min(wait-age × multiplier^(n-1), max-wait) である")
   void waitBeforeGrowsExponentiallyUpToMaxWait() {
     final EventPublicationResubmissionConfig.Policy policy =
-        new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1));
+        new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1), null);
     final Duration waitAge = Duration.ofMinutes(5);
 
     assertThat(policy.waitBefore(waitAge, 1)).isEqualTo(Duration.ofMinutes(5));
@@ -326,7 +356,7 @@ class EventPublicationResubmissionConfigTest {
     assertThat(policy.waitBefore(waitAge, 5)).isEqualTo(Duration.ofHours(1));
     assertThat(policy.waitBefore(waitAge, 1_000)).isEqualTo(Duration.ofHours(1));
     assertThat(
-            new EventPublicationResubmissionConfig.Policy(1, Duration.ofHours(1))
+            new EventPublicationResubmissionConfig.Policy(1, Duration.ofHours(1), null)
                 .waitBefore(waitAge, 5))
         .as("倍率 1")
         .isEqualTo(Duration.ofMinutes(5));

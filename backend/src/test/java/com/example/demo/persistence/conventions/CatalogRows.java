@@ -60,7 +60,8 @@ final class CatalogRows {
         false,
         false,
         false,
-        null);
+        null,
+        List.of());
   }
 
   /** RLSのENABLEとFORCEを付けた、論理名が「品目」のテーブル。 */

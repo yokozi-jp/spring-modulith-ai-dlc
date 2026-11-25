@@ -45,4 +45,17 @@ class ProductQueryServiceTest {
             tuple(pen.toString(), "ON_SALE", true),
             tuple(eraser.toString(), "DISCONTINUED", false));
   }
+
+  @Test
+  @DisplayName("findById は、商品があればその商品を、なければ空を返す")
+  void findByIdReturnsProductOrEmpty() {
+    final String code = UniqueCodes.next("P");
+    final UUID pen = TestProducts.onSale(dsl, code, "120.00");
+
+    assertThat(productQueries.findById(pen.toString()))
+        .as("productId=%s", pen)
+        .map(ProductSummary::productCode)
+        .contains(code);
+    assertThat(productQueries.findById(UUID.randomUUID().toString())).isEmpty();
+  }
 }

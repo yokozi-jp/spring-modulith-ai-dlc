@@ -5,6 +5,7 @@ package com.example.demo.jooq.ordering;
 
 
 import com.example.demo.jooq.ordering.tables.HOrderLine;
+import com.example.demo.jooq.ordering.tables.TIdempotencyKey;
 import com.example.demo.jooq.ordering.tables.TOrder;
 import com.example.demo.jooq.ordering.tables.TOrderLine;
 
@@ -28,6 +29,11 @@ public class Tables {
      * 注文明細履歴
      */
     public static final HOrderLine H_ORDER_LINE = HOrderLine.H_ORDER_LINE;
+
+    /**
+     * 冪等性キー
+     */
+    public static final TIdempotencyKey T_IDEMPOTENCY_KEY = TIdempotencyKey.T_IDEMPOTENCY_KEY;
 
     /**
      * 注文

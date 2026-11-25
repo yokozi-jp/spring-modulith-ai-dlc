@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-129: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す'
+title: 'ADR-131: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す'
 description: 集約の子の行を TableWriter.update で物理削除すると内容が残らない問題に対し、すべての子に ChildTable で履歴の表を宣言させ、ChildWriter が削除と同じトランザクションで行を写す決定。履歴の表の形、カタログでの検査、親の物理削除の入口を足すときの前提を記録する。
 tags: [adr, backend, database, jooq, audit]
 ---
 
-# ADR-129: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す
+# ADR-131: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す
 
 ## Status
 

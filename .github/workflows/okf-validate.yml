@@ -14,6 +14,8 @@ on:
       - "README.md"
       - "tooling/adr-lint/**"
       - "tooling/removed-names/**"
+      - "tooling/readme-versions/**"
+      - "backend/build.gradle"
       - ".kiro/settings/mcp.json"
       - "tooling/iwe-mcp/**"
       - "tooling/iwe-tools/**"
@@ -63,6 +65,8 @@ jobs:
             'README.md' \
             'tooling/adr-lint/**' \
             'tooling/removed-names/**' \
+            'tooling/readme-versions/**' \
+            'backend/build.gradle' \
             '.kiro/settings/mcp.json' \
             'tooling/iwe-mcp/**' \
             'tooling/iwe-tools/**' \

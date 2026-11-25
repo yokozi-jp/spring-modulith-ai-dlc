@@ -5,6 +5,7 @@ package com.example.demo.jooq.product;
 
 
 import com.example.demo.jooq.product.tables.MProduct;
+import com.example.demo.jooq.product.tables.TIdempotencyKey;
 
 import javax.annotation.processing.Generated;
 
@@ -33,4 +34,5 @@ public class Indexes {
 
     public static final Index UK_2_M_PRODUCT = Internal.createIndex(DSL.name("uk_2_m_product"), MProduct.M_PRODUCT, new OrderField[] { MProduct.M_PRODUCT.TENANT_PUBLIC_ID, MProduct.M_PRODUCT.PRODUCT_CODE }, true);
     public static final Index UK_M_PRODUCT = Internal.createIndex(DSL.name("uk_m_product"), MProduct.M_PRODUCT, new OrderField[] { MProduct.M_PRODUCT.TENANT_PUBLIC_ID, MProduct.M_PRODUCT.PUBLIC_ID }, true);
+    public static final Index UK_T_IDEMPOTENCY_KEY = Internal.createIndex(DSL.name("uk_t_idempotency_key"), TIdempotencyKey.T_IDEMPOTENCY_KEY, new OrderField[] { TIdempotencyKey.T_IDEMPOTENCY_KEY.TENANT_PUBLIC_ID, TIdempotencyKey.T_IDEMPOTENCY_KEY.USER_PUBLIC_ID, TIdempotencyKey.T_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY }, true);
 }

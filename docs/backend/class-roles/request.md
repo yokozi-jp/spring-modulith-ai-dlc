@@ -41,7 +41,7 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
   HTTP の Request と OpenAPI は数値のままにする。
 - `toCommand` で `new ExpectedLockNo(lockNo)` を作って Command に渡す。
   `ExpectedLockNo` を作ってよいのは `presentation.web` の Request だけであり、CommandHandler、Repository、Controller は作らない。
-- 変換はインスタンスメソッド `public <UseCase>Command toCommand(...)` 一つにし、パス変数の値（`orderId`）は引数で受け取る。
+- 変換はインスタンスメソッド `public <UseCase>Command toCommand(...)` 一つにし、パス変数の値（`orderId`）と、Controller が受け取った `IdempotencyKey` は引数で受け取る。
   パス変数のない操作では引数を持たない（`toCommand()`）。
 - `List` の component は、コンパクトコンストラクタで `List.copyOf` に置き換える。
 - record、ネストした record、`toCommand` に Javadoc を書く。

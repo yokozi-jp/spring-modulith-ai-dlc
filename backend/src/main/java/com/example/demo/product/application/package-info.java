@@ -1,4 +1,4 @@
-/** 商品の参照のユースケース。 */
+/** 商品の登録と参照のユースケース。 */
 @NullMarked
 package com.example.demo.product.application;
 

@@ -25,6 +25,7 @@ CONSTANTS
   Multiplier,        \* policies.<name>.multiplier (an integer here)
   MaxWait,           \* policies.<name>.max-wait
   MaxResubmissions,  \* spring.modulith.events.resubmission.abandon-after-attempts
+  PolicyAbandon,     \* policies.<name>.abandon-after-attempts, or MaxResubmissions when unset
   InFlightStaleness, \* event-publication.resubmission.in-flight-staleness
   \* Timing of the environment. These are not settings: they are what the
   \* comments in application.yaml and EventPublicationResubmissionConfig
@@ -48,6 +49,11 @@ Max(a, b) == IF a > b THEN a ELSE b
 RECURSIVE Pow(_, _)
 Pow(b, e) == IF e = 0 THEN 1 ELSE b * Pow(b, e - 1)
 
+\* ResubmissionPolicies.maxResubmissions: Spring Modulith hands 1 to both the
+\* first delivery and the first resubmission, so 1 abandons on the first
+\* delivery and the job never resubmits; N >= 2 allows N resubmissions.
+MaxDue == IF PolicyAbandon = 1 THEN 0 ELSE PolicyAbandon
+
 \* EventPublicationResubmissionConfig.Policy.waitBefore(waitAge, attempts)
 WaitBefore(attempts) == Min(WaitAge * Pow(Multiplier, attempts - 1), MaxWait)
 
@@ -61,6 +67,9 @@ ASSUME /\ LockAtMostFor > Interval            \* isLockAtMostForLongerThanInterv
        /\ QueueMax <= LockAtMostFor /\ ListenerMax <= LockAtMostFor
        /\ WaitAge >= 1 /\ Interval >= 1
        /\ MaxResubmissions >= 2                \* AbandonProperties @Min(2)
+       \* Policy @Min(1), and ResubmissionPolicies rejects a policy value at or
+       \* above the global one (a policy without the value takes the global one).
+       /\ PolicyAbandon \in 1..MaxResubmissions
 
 \* Delivery slots: slot 1 is the first delivery; slot a is the delivery
 \* started when completion_attempts became a. Extra slots show an overrun.
@@ -207,7 +216,7 @@ RunFinish(i) ==
   /\ inst[i].up /\ inst[i].phase = "read"
   /\ LET due == /\ inst[i].snap
                 /\ now - inst[i].runStart <= Budget
-                /\ inst[i].snapAttempts <= MaxResubmissions
+                /\ inst[i].snapAttempts <= MaxDue
                 /\ inst[i].snapLast + WaitBefore(inst[i].snapAttempts)
                      < inst[i].runStart
           a == row.attempts + 1
@@ -256,7 +265,7 @@ ExecFail(k) ==
   /\ exec[k].st = "running"
   /\ exec' = [exec EXCEPT ![k] = [st |-> "done", on |-> None, t |-> 0, seen |-> 0]]
   /\ row' = IF ~RowExists THEN row
-            ELSE IF exec[k].seen >= MaxResubmissions THEN SetStatus("ABANDONED")
+            ELSE IF exec[k].seen >= PolicyAbandon THEN SetStatus("ABANDONED")
             ELSE IF row.status # "FAILED" THEN SetStatus("FAILED")
             ELSE row
   /\ UNCHANGED <<now, lock, inst, crashes, staleHitInFlight>>
@@ -323,7 +332,11 @@ OneDeliveryAtATime ==
 InFlightNeverMarkedStale == ~staleHitInFlight
 
 \* The job resubmits a publication at most abandon-after-attempts times.
-ResubmissionsCapped == row.attempts <= MaxResubmissions + 1
+ResubmissionsCapped == row.attempts <= MaxDue + 1
+
+\* A listener whose policy abandons on the first delivery is never
+\* resubmitted by the job, even after a crash left its row in flight.
+NoResubmissionWhenAbandonOnFirst == PolicyAbandon = 1 => row.attempts = 1
 
 \* At most one instance is inside the locked part of a run.
 OneLockedRun ==

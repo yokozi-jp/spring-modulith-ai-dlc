@@ -4,6 +4,7 @@ import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_D
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 
 import org.jooq.DSLContext;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@link TableWriter} のテストが、テスト専用のテーブルに {@code lock_no = 1} の行を作る。共通カラムは {@code seedColumns}
@@ -25,14 +26,20 @@ import org.jooq.DSLContext;
     this.seedColumns = seedColumns;
   }
 
-  /** {@code lock_no = 1} のルートの行を作る。 */
+  /** {@code lock_no = 1} の、item_code のないルートの行を作る。 */
   /* package */ void insertItem(final long itemId, final String name) {
+    insertItem(itemId, name, null);
+  }
+
+  /** {@code lock_no = 1} のルートの行を作る。 */
+  /* package */ void insertItem(final long itemId, final String name, final @Nullable String code) {
     ScopedValue.where(PgmCdAspect.PGM_CD, SEED_PGM_CD)
         .run(() ->
             dsl.insertInto(FIXTURE_ITEM)
                 .set(seedColumns.forInsert(FIXTURE_ITEM))
                 .set(FIXTURE_ITEM.ITEM_ID, itemId)
                 .set(FIXTURE_ITEM.ITEM_NAME, name)
+                .set(FIXTURE_ITEM.ITEM_CODE, code)
                 .execute());
   }
 

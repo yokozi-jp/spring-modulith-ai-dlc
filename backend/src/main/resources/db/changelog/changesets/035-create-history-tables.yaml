@@ -1,9 +1,9 @@
 databaseChangeLog:
   - changeSet:
-      id: 029-create-history-tables
+      id: 035-create-history-tables
       author: system
       comment: >-
-        子の行を削除する前の内容を残す履歴の表を作る（#609、ADR-129）。
+        子の行を削除する前の内容を残す履歴の表を作る（#609、ADR-131）。
         所属（tenancy.m_membership）、IdP 識別（tenancy.m_user_identity）、注文明細（ordering.t_order_line）の履歴である。
         アプリケーションが、ChildWriter の削除と同じトランザクションで書く（トリガーは使わない）。
         元の表の列（共通カラムを含む）は削除前の値のまま写し、退避の日時、者、プログラム、トレースを archived_* に持つ。

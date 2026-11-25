@@ -32,7 +32,7 @@ class JooqTenantRepository implements TenantRepository {
   /**
    * テナントの所属。親の中の行は、利用者の内部の主キーで同定する（所属は利用者とテナントの組が一意）。
    *
-   * <p>所属を外すと、誰がどの役割でいつまで所属していたかが消えるため、外す前の行を h_membership に残す（ADR-129）。
+   * <p>所属を外すと、誰がどの役割でいつまで所属していたかが消えるため、外す前の行を h_membership に残す（ADR-131）。
    */
   private static final ChildTable<MMembershipRecord> MEMBERSHIPS =
       ChildTable.of(M_MEMBERSHIP, M_MEMBERSHIP.TENANT_ID, H_MEMBERSHIP, M_MEMBERSHIP.USER_ID);

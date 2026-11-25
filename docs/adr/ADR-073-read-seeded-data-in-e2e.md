@@ -9,7 +9,7 @@ tags: [adr, e2e, testing, seed]
 
 ## Status
 
-Accepted
+Superseded by [ADR-130](ADR-130-create-e2e-data-per-test-with-product-registration-api.md)
 
 Amended by [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)：代表データ（商品 5 件、注文 6 件、決済 2 件）を `TenancySeeds` の 2 つのテナントの両方に入れ、業務データが空かの判定と reset の削除を `m_tenant` のテナントごとに、そのテナントを設定して行うこと。
 

@@ -113,7 +113,8 @@ class OpenApiAnnotationConventionTest {
   }
 
   @Test
-  @DisplayName("全 operation に 401、403、500 が付き、400 は入力のある operation にだけ付く")
+  @DisplayName(
+      "全 operation に 401、403、500 が付き、400 は入力のある operation に、409 は Idempotency-Key を求める operation に付く")
   void commonProblemResponsesAreAttachedByCustomizer() throws Exception {
     final ResultActions apiDocs = apiDocs();
     for (final String operation : OPERATIONS) {
@@ -125,7 +126,10 @@ class OpenApiAnnotationConventionTest {
     for (final String operation : OPERATIONS_WITH_INPUT) {
       apiDocs.andExpect(problemRef(operation, "400", "BadRequestProblem"));
     }
-    apiDocs.andExpect(jsonPath(LIST + ".responses['400']").doesNotExist());
+    apiDocs
+        .andExpect(jsonPath(LIST + ".responses['400']").doesNotExist())
+        .andExpect(problemRef(PLACE, "409", "ConflictProblem"))
+        .andExpect(jsonPath(FIND + ".responses['409']").doesNotExist());
   }
 
   @Test

@@ -5,6 +5,7 @@ import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_D
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 import static com.example.demo.shared.persistence.FixtureAggregates.DETAILS;
 import static com.example.demo.shared.persistence.FixtureAggregates.ITEM;
+import static com.example.demo.shared.persistence.FixtureAggregates.ITEM_IDEMPOTENT_ON_CODE;
 import static com.example.demo.shared.persistence.FixtureAggregates.itemRoot;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -141,6 +142,48 @@ class TableWriterConcurrencyTest {
               .fetchSingle();
       assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).as("B の値").isEqualTo("B");
       assertThat(row.get(FIXTURE_ITEM.LOCK_NO)).as("B の版").isEqualTo(2L);
+    }
+  }
+
+  @Test
+  @DisplayName("重複を許す列に B が未コミットの同じ値を入れていると、A の insert は B のコミットを待ち、何も書かずに false を返す")
+  // A が B のトランザクションの終わりを待つ間に B をコミットするため、見張りを別のスレッドで動かす。
+  @SuppressWarnings("PMD.DoNotUseThreads")
+  void idempotentInsertWaitsForCommitAndSkips() throws Exception {
+    dsl.setLocal(DSL.name("lock_timeout"), DSL.inline("4s")).execute();
+    try (ExecutorService watcher = Executors.newSingleThreadExecutor();
+        Connection sessionB = dataSource.getConnection()) {
+      sessionB.setAutoCommit(false);
+      ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD)
+          .run(() ->
+              DSL.using(sessionB, SQLDialect.POSTGRES)
+                  .insertInto(FIXTURE_ITEM)
+                  .set(commonColumns.forInsert(FIXTURE_ITEM))
+                  .set(FIXTURE_ITEM.ITEM_ID, ITEM_ID)
+                  .set(FIXTURE_ITEM.ITEM_NAME, "B")
+                  .set(FIXTURE_ITEM.ITEM_CODE, "A")
+                  .execute());
+      final Future<Void> committed =
+          watcher.submit(() -> {
+            commitWhenAnotherSessionWaits(sessionB);
+            return null;
+          });
+
+      final boolean inserted =
+          ScopedValue.where(PgmCdAspect.PGM_CD, PGM_CD)
+              .call(() ->
+                  writer.insert(
+                      ITEM_IDEMPOTENT_ON_CODE,
+                      itemRoot(ITEM_ID + 1, 1L),
+                      set -> set.set(FIXTURE_ITEM.ITEM_NAME, "A").set(FIXTURE_ITEM.ITEM_CODE, "A"),
+                      DETAILS.rows(List.<String>of(), (text, set) -> {})));
+
+      // A が B の終わりを待ってから B がコミットしたことは、見張りが例外なく戻ることで確かめる。
+      committed.get(WAIT_LIMIT.toMillis(), TimeUnit.MILLISECONDS);
+      assertThat(inserted).isFalse();
+      assertThat(dsl.fetchExists(FIXTURE_ITEM, FIXTURE_ITEM.ITEM_ID.eq(ITEM_ID + 1)))
+          .as("A のルート")
+          .isFalse();
     }
   }
 

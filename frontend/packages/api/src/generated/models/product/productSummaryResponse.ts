@@ -4,7 +4,7 @@
  */
 
 /**
- * 商品の一覧の1行を返す API の本文。
+ * 商品の一覧の1行と、商品1件を返す API の本文。
  */
 export interface ProductSummaryResponse {
   /** 商品コード */

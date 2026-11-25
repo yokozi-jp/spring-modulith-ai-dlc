@@ -8,6 +8,7 @@ on:
       - "frontend/**"
       - "openapi/**"
       - "Taskfile.yml"
+      - "tooling/e2e-seed-lint/**"
       - "mise.toml"
       - "mise.lock"
       - ".github/actions/setup-mise/**"
@@ -46,6 +47,7 @@ jobs:
             'frontend/**' \
             'openapi/**' \
             'Taskfile.yml' \
+            'tooling/e2e-seed-lint/**' \
             'mise.toml' \
             'mise.lock' \
             '.github/actions/setup-mise/**' \

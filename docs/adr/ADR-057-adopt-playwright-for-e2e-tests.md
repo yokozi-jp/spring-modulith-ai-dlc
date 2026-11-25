@@ -48,7 +48,7 @@ backend は PostgreSQL、Keycloak へ service 名で接続し、compose が公�
 ブラウザは公開用の `127.0.0.1:8081`、backend は `keycloak:8080` で Keycloak へ到達するため、issuer を次のようにそろえる。
 
 - Keycloak は hostname v2 の `KC_HOSTNAME=http://127.0.0.1:8081` で、issuer とブラウザ向けの endpoint を公開用の URL に固定する。
-  `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true` で、backend が直接呼ぶ token、jwks、userinfo の endpoint だけを要求の Host から決める。
+  `KC_HOSTNAME_BACKCHANNEL_DYNAMIC=true` で、backend が直接呼ぶ token、jwks の endpoint だけを要求の Host から決める。
 - backend は `OIDC_DISCOVERY_URI` を設定したときだけ、discovery を `keycloak:8080` から読む `OidcDiscoveryLocationConfig` を有効にする。
   discovery の `issuer` が `OIDC_ISSUER_URI` と一致しなければ起動を止め、`ClientRegistrations.fromOidcConfiguration` で issuer と discovery の全体を registration に残す。
   これにより、ID トークンの `iss` の検査と、`end_session_endpoint` を使う OIDC のログアウトが、discovery を issuer から読む場合と同じに動く。
@@ -142,7 +142,8 @@ E2E の CI は path filter 付きの非必須の check とする。
 - [Issue #116](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/116)
 - [ADR-005](ADR-005-decouple-liquibase-from-app-startup.md)、[ADR-014](ADR-014-use-same-origin-spa-security-boundary.md)、[ADR-027](ADR-027-adopt-frontend-testing-stack.md)、[ADR-033](ADR-033-pin-vite-dev-origin-and-source-proxy-port.md)
 - [E2E テストの方針と書き方](../e2e/testing-strategy.md)
-- [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（テストデータの「シーダーと共有しない」を、読むだけの共有に改める）
+- [ADR-073: E2E はシーダーの代表データを読むだけにし、変更するデータは各テストが作る](ADR-073-read-seeded-data-in-e2e.md)（テストデータの「シーダーと共有しない」を、読むだけの共有に改めた。ADR-130 が置き換えた）
+- [ADR-130: E2E のデータを各テストが作り、商品は本番の商品を登録する API で作る](ADR-130-create-e2e-data-per-test-with-product-registration-api.md)（商品も本番の商品を登録する API で作り、テストデータを公開 API で作る決定に戻す）
 - [ADR-104: compose-test を使う実行ごとに slot を割り当て、worktree をまたいで同時に流す](ADR-104-allocate-test-stack-slots-per-run.md)（preview の port を slot ごとの固定の port に改める）
 - [Playwright, Authentication](https://playwright.dev/docs/auth)
 - [Playwright, Test configuration](https://playwright.dev/docs/test-configuration)

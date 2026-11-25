@@ -8,7 +8,7 @@ tags: [convention, web-api, openapi, springdoc, javadoc]
 # OpenAPIのアノテーションとJavadoc
 
 OpenAPI契約の説明はJavadocに書き、springdocがtherapi-runtime-javadoc経由で読む。
-アノテーションは`@Tag(name, description)`、`@Operation(operationId)`、個別の`@ApiResponse`、`@Schema(example)`と、認証なしのoperationだけに付ける空の`@SecurityRequirements`に限る。
+アノテーションは`@Tag(name, description)`、`@Operation(operationId)`、個別の`@ApiResponse`、`@Schema(example)`と、認証なしのoperationだけに付ける空の`@SecurityRequirements`、`Idempotency-Key`を求めないoperationだけに付ける`@Operation(extensions)`に限る。
 401、403、500と入力のあるoperationの400は`OpenApiConfig`のcustomizerが付けるため、Controllerに書かない。
 欠落は`task api-lint`のSpectralが失敗にし、springdocの出力の形は`OpenApiAnnotationConventionTest`が固定する。
 
@@ -67,6 +67,7 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
 
 - 400、401、403、500は`OpenApiConfig`のcustomizerが付ける。
   401、403、500は全operationに、400はparameterかrequestBodyがあるoperationにだけ付く。
+  `Idempotency-Key`を求めるoperationには、処理中の409も付く。
 - 400の`BadRequestProblem`は`ValidationProblem`（`ProblemDetail`と、typeが`/problems/validation-error`のときの`errors`）を参照する。
 - 404、409、422は、起きるoperationにだけ`@ApiResponse(responseCode, ref = "#/components/responses/<Name>Problem")`で書く。
   `<Name>`は`NotFound`、`Conflict`、`UnprocessableContent`のいずれかである。
@@ -220,5 +221,6 @@ springdocやtherapiの版を上げてこのテストが失敗したら、この�
 - [ ] 201は`Location`ヘッダー、204は本文なしにし、200を残さない。［Spectralで検査：created-location-header（204の本文と200の残りは自分で点検）］
 - [ ] `@Operation(summary, description)`、`@Schema(description)`、`///`を使わない。［自分で点検］
 - [ ] クエリパラメータを`@ParameterObject`や`@ModelAttribute`でまとめて受けない。POST、PUT、PATCH、`lockNo`以外のDELETEは`in: query`を使わない（GETとHEADだけで使う）。［Spectralで検査：query-parameter-get-only（まとめて受けないことは自分で点検）］
+- [ ] POST、PUT、PATCH、DELETEのoperationには、`OpenApiConfig`のcustomizerが必須の`Idempotency-Key`ヘッダーを付ける。Controllerの`IdempotencyKey`の引数は契約に出ないので、ヘッダーのパラメータの注釈を書かない（引数の受け方は[Controller](../backend/class-roles/controller.md)）。テナントを選ぶ前の操作は`@Operation(extensions = @Extension(properties = @ExtensionProperty(name = "x-idempotency-key", value = "none")))`で除き、今は`selectTenant`だけである（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。［Spectralで検査：idempotency-key-required（参照の有無だけ）。除くoperationの一覧は`OpenApiContractTest`で検査］
 - [ ] `/api/**`のoperationは`OpenApiConfig`の既定のCookieセッションの`security`を要する。認証なしにするoperationには空の`@SecurityRequirements`を付け、`SecurityConfig`の`permitAll`と合わせる。［Spectralで検査：operation-security（`security`の有無だけ。`permitAll`との一致は自分で点検）］
 - [ ] パスをkebab-caseにし、2xxの応答の配列をトップレベルにしない。［Spectralで検査：path-kebab-case、path-kebab-case-resource、no-top-level-array-response］

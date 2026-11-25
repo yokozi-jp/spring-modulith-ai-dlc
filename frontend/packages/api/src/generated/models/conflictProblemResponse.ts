@@ -5,6 +5,6 @@
 import type { ProblemDetail } from './problemDetail.ts';
 
 /**
- * ほかの要求と競合した。type は競合の種類ごとに異なり、ProblemDetail.type の x-extensible-enum に載る
+ * ほかの要求と競合した。type は競合の種類ごとに異なり、ProblemDetail.type の x-extensible-enum に載る。同じ Idempotency-Key の要求を処理しているときの type は /problems/idempotency-key-in-progress で、Retry-After を付ける
  */
 export type ConflictProblemResponse = ProblemDetail;

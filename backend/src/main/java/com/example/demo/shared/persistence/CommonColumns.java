@@ -12,6 +12,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -31,10 +32,10 @@ import org.springframework.stereotype.Component;
  * <p>戻り値の Map は jOOQ の {@code set(Map)} にそのまま渡す。{@code patched_*} はデータパッチだけが更新するため扱わない。
  *
  * <p>{@link #forArchive} は、削除する子の行を履歴の表へ写す {@link ChildWriter} だけが使い、{@code archived_*}
- * の値を返す（ADR-129）。
+ * の値を返す（ADR-131）。
  *
  * <p>{@link #forInsert} は {@link TableWriter} とテストのデータ作成が INSERT で使う。{@link #forUpdate} は {@link
- * TableWriter} だけが使い、UPDATE の {@code lock_no} は {@link TableWriter} だけが書く（ADR-054）。
+ * TableWriter} と {@link IdempotencyKeyWriter} だけが使い、UPDATE の {@code lock_no} もこの 2 つだけが書く（ADR-054）。
  *
  * <ul>
  *   <li>{@code *_at}：注入した {@link Clock} の現在時刻。
@@ -71,6 +72,12 @@ public class CommonColumns {
           "patched_by",
           "patched_id");
 
+  /** 作成のカラムの接頭辞。 */
+  private static final String CREATED = "created_";
+
+  /** 更新のカラムの接頭辞。 */
+  private static final String UPDATED = "updated_";
+
   /** 更新のカラムを省いてよい、追記だけのワークテーブルの接頭辞。 */
   private static final String WORK_TABLE_PREFIX = "w_";
 
@@ -102,9 +109,9 @@ public class CommonColumns {
     // INSERT では、更新のカラムにも作成のカラムと同じ値を登録する。
     return toMap(
         Stream.of(
-                audit.entries(table, "created_"),
+                audit.entries(table, CREATED),
                 hasUpdated
-                    ? audit.entries(table, "updated_")
+                    ? audit.entries(table, UPDATED)
                     : Stream.<Entry<Field<?>, Object>>empty(),
                 Stream.of(
                     Map.<Field<?>, Object>entry(
@@ -128,7 +135,7 @@ public class CommonColumns {
    */
   /* package */ static void requireAuditColumns(final Table<?> table) {
     requiredField(table, LOCK_NO, Long.class);
-    for (final String prefix : List.of("created_", "updated_")) {
+    for (final String prefix : List.of(CREATED, UPDATED)) {
       AuditValues.fields(table, prefix);
     }
   }
@@ -143,12 +150,45 @@ public class CommonColumns {
   }
 
   /**
-   * UPDATE で登録する更新のカラムだけを返す。{@code lock_no} は {@link TableWriter} が書く。
+   * UPDATE で登録する更新のカラムだけを返す。{@code lock_no} は呼び出し側が書く。
    *
    * @param table 更新先のテーブル
    */
   /* package */ Map<Field<?>, Object> forUpdate(final Table<?> table) {
-    return toMap(audit().entries(table, "updated_"));
+    return toMap(audit().entries(table, UPDATED));
+  }
+
+  /**
+   * 既存の行を新しい行として取り直す UPDATE で登録する、作成と更新のカラムを返す。{@code lock_no} は呼び出し側が書く。
+   *
+   * <p>期限切れの {@code Idempotency-Key} の行を新しいキーとして取り直すときに使い、作成のカラムも新しいキーを表すようにする（ADR-126）。
+   *
+   * @param table 更新先のテーブル
+   */
+  /* package */ Map<Field<?>, Object> forRecreate(final Table<?> table) {
+    final AuditValues audit = audit();
+    return toMap(Stream.concat(audit.entries(table, CREATED), audit.entries(table, UPDATED)));
+  }
+
+  /**
+   * 認証した利用者の、アプリの利用者の ID を返す（ADR-096）。認証がないか匿名なら空を返す。
+   *
+   * @throws IllegalStateException principal が {@link AppUserPrincipal} でない認証の場合
+   */
+  /* package */ static Optional<String> currentAppUserId() {
+    final @Nullable Authentication authentication =
+        SecurityContextHolder.getContext().getAuthentication();
+    if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
+      return Optional.empty();
+    }
+    if (authentication.getPrincipal() instanceof AppUserPrincipal user) {
+      return Optional.of(user.userId());
+    }
+    throw new IllegalStateException(
+        "authenticated principal is not an app user: authentication="
+            + authentication.getClass().getName()
+            + ". The principal must implement AppUserPrincipal (SignInOidcUserService returns one;"
+            + " clear sessions saved before ADR-096; tests use testkit AppUsers)");
   }
 
   /**
@@ -176,7 +216,7 @@ public class CommonColumns {
   /** 1 回の呼び出しで、現在時刻と trace ID を 1 回だけ取る。 */
   private AuditValues audit() {
     final String pgmCd = PgmCdAspect.current();
-    final String operator = PgmCdAspect.inListener() ? pgmCd : operator(pgmCd);
+    final String operator = PgmCdAspect.inListener() ? pgmCd : currentAppUserId().orElse(pgmCd);
     return new AuditValues(Instant.now(clock), operator, pgmCd, traceId());
   }
 
@@ -191,22 +231,6 @@ public class CommonColumns {
                   throw new IllegalStateException("duplicate common column");
                 },
                 LinkedHashMap::new)));
-  }
-
-  private static String operator(final String pgmCd) {
-    final @Nullable Authentication authentication =
-        SecurityContextHolder.getContext().getAuthentication();
-    if (authentication == null || authentication instanceof AnonymousAuthenticationToken) {
-      return pgmCd;
-    }
-    if (authentication.getPrincipal() instanceof AppUserPrincipal user) {
-      return user.userId();
-    }
-    throw new IllegalStateException(
-        "authenticated principal is not an app user: authentication="
-            + authentication.getClass().getName()
-            + ". The principal must implement AppUserPrincipal (SignInOidcUserService returns one;"
-            + " clear sessions saved before ADR-096; tests use testkit AppUsers)");
   }
 
   private String traceId() {

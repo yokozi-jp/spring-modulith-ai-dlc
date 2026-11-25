@@ -47,7 +47,7 @@ tasks.named('bootRun') {
 // 開発用の代表データ（#114）。シーダーは src/test にあり、本番の jar と runtimeClasspath に入れない。
 tasks.register('seedLocalData', JavaExec) {
     group = 'application'
-    description = 'ローカルの業務データが空なら代表データを入れる（-PseedMode=auto|seed|reset）'
+    description = 'ローカルの業務データが空なら代表データを入れる（-PseedMode=auto|seed|reset|tenancy）'
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'com.example.demo.LocalDataSeeder'
     args(providers.gradleProperty('seedMode').getOrElse('auto'))

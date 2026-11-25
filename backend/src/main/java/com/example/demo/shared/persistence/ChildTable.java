@@ -52,7 +52,7 @@ public final class ChildTable<C extends Record> {
   }
 
   /**
-   * 子のテーブルを宣言する。子の行は、削除する前に履歴の表へ写す（ADR-129）。
+   * 子のテーブルを宣言する。子の行は、削除する前に履歴の表へ写す（ADR-131）。
    *
    * <p>履歴の表は、子のテーブルのすべての列（共通カラムを含む）を同じ名前と Java の型で持ち、退避のカラム（{@code archived_at}、{@code
    * archived_by}、{@code archived_pgm_cd}、{@code

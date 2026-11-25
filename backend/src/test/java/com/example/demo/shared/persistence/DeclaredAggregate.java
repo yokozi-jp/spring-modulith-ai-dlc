@@ -3,18 +3,22 @@ package com.example.demo.shared.persistence;
 import java.util.List;
 
 /**
- * 集約の宣言のうち、DB の外部キーと突き合わせる部分だけを、{@code スキーマ.テーブル}の名前で表す。
+ * 集約の宣言のうち、DB の外部キーと一意索引と突き合わせる部分だけを、{@code スキーマ.テーブル}と列の名前で表す。
  *
  * <p>{@link AggregateTable} と {@link ChildTable} の読み出しは package-private
  * なので、別のパッケージの検査が宣言を読めるよう、この型に写す。
  *
  * @param root ルートのテーブル。{@code スキーマ.テーブル}
+ * @param key ルートを一つに決める一意の列
  * @param children 子のテーブル
+ * @param duplicateKey 重複を許す一意索引の列。{@link AggregateTable#of} で宣言した集約は空
  */
-public record DeclaredAggregate(String root, List<DeclaredChild> children) {
+public record DeclaredAggregate(
+    String root, String key, List<DeclaredChild> children, List<String> duplicateKey) {
 
   public DeclaredAggregate {
     children = List.copyOf(children);
+    duplicateKey = List.copyOf(duplicateKey);
   }
 
   /**

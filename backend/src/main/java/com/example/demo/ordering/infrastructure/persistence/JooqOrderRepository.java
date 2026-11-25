@@ -37,7 +37,7 @@ class JooqOrderRepository implements OrderRepository {
   /**
    * 注文の明細。親の中の行は、明細番号で同定する。
    *
-   * <p>外す前の行を h_order_line に残す（ADR-129）。
+   * <p>外す前の行を h_order_line に残す（ADR-131）。
    */
   private static final ChildTable<TOrderLineRecord> LINES =
       ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, Tables.H_ORDER_LINE, T_ORDER_LINE.LINE_NO);

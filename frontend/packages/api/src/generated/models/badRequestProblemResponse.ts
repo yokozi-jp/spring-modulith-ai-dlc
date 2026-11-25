@@ -5,6 +5,6 @@
 import type { ValidationProblem } from './validationProblem.ts';
 
 /**
- * 要求の形式または入力値が正しくない
+ * 要求の形式または入力値が正しくない。Idempotency-Key がないときの type は /problems/idempotency-key-missing、形式が正しくないときは /problems/idempotency-key-invalid、同じキーで内容の違う要求を送ったときは /problems/idempotency-key-payload-mismatch
  */
 export type BadRequestProblemResponse = ValidationProblem;
