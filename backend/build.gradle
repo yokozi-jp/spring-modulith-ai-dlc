@@ -61,12 +61,16 @@ tasks.register('seedLocalData', JavaExec) {
 
 tasks.register('writeE2eFixtureArgs') {
     group = 'application'
-    description = 'E2E の fixture サーバーを java で起動する引数ファイルを build/e2e-fixture/java-args.txt に書く'
+    description = 'E2E の fixture サーバーを起動する、テストと同じ toolchain の java のパスと引数ファイルを build/e2e-fixture/ に書く'
     def classpath = sourceSets.test.runtimeClasspath
+    def launcher = javaToolchains.launcherFor(java.toolchain)
     def argsFile = layout.buildDirectory.file('e2e-fixture/java-args.txt')
+    def javaFile = layout.buildDirectory.file('e2e-fixture/java-path.txt')
     inputs.files(classpath)
-    outputs.file(argsFile)
+    inputs.property('java', launcher.map { it.executablePath.asFile.absolutePath })
+    outputs.files(argsFile, javaFile)
     doLast {
+        javaFile.get().asFile.text = launcher.get().executablePath.asFile.absolutePath + '\n'
         // 引数ファイルは空白を区切りに読むので、パスを二重引用符で囲み、\ を重ねる。
         def quote = { String value -> '"' + value.replace('\\', '\\\\') + '"' }
         argsFile.get().asFile.text = [

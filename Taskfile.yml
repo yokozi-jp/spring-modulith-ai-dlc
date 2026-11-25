@@ -156,7 +156,7 @@ tasks:
     deps: [_ensure-test-env]
     cmds:
       - |
-        # migration と fixture サーバーはホストの JVM で動く。JAVA_HOME があればそれを、なければ PATH の java を使う。
+        # migration はホストの Gradle で、fixture サーバーは Gradle の toolchain（Java 25）の java で動く。Gradle は JAVA_HOME があればそれを、なければ PATH の java を使う。
         if ! command -v "${JAVA_HOME:+$JAVA_HOME/bin/}java" >/dev/null 2>&1; then
           echo "Java が見つかりません（JAVA_HOME か PATH）。docs/local-env-setup/setup.md の手順で Corretto 25 を入れてください。" >&2
           exit 1
