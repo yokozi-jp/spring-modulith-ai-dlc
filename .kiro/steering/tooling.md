@@ -13,6 +13,7 @@ description: Taskfile.yml、lefthook.yml、GitHub Actions のワークフロー�
 
 - Taskfile、Lefthook、CI を変更する前に、該当する文書を読む。
 - CI と Lefthook は処理を複製せず、Taskfile の同じタスクを呼ぶ。
+- 検査を足す前に、`docs/tooling/taskfile.md` の「検査を足すとき」を読む。
 - 公開タスクを追加、削除、改名、または挙動を変えたら、README と `docs/tooling/index.md` 配下の関連文書を同じ変更で更新する。
 - 変更後は `task --list`、対象タスク、`task lint-md` を実行する。
 

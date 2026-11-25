@@ -167,6 +167,21 @@ Taskfileを変更したら、CIのpaths条件に`Taskfile.yml`が含まれてい
 変更後は`task --list`、対象タスク、`task lint-md`を実行する。
 順序、環境分離、確認ゲート、後片付けに触れた場合は、その失敗経路も検証する。
 
+## 検査を足すとき
+
+`tooling/<名前>/`に本体を置く検査を足すときに直す場所を、上から順に並べる。
+規則の正文がある文書へはリンクし、ここへ写さない。機械が止める項目は、止める検査を添える。
+
+1. **コマンド**：`Taskfile.yml`にtaskを足す。最初のコマンドで`tooling/<名前>/test.sh`を呼び、そのあとで本体を呼ぶ（先例は`lint-session-sql`）。
+2. **止める入力と通す入力のテスト**：`tooling/<名前>/test.sh`のfixtureに置く。失敗にする状態は`test.sh`を正とし、docsへ写さない。
+3. **CI**：workflowを`ci.yml`から呼び、`CI gate`の`needs`に足す（[ブランチ保護](../repository/branch-protection.md)）。`task ci-gate-check`が足し忘れを止める。`paths`と`changed.sh`には、道具の版のファイルも入れる（同じく`task ci-gate-check`が止める）。
+4. **Lefthook**：jobを足し、`glob`に検査の対象と`tooling/<名前>/`を入れる。`task <名前>`の誤りは`task lint-taskfile`が止める。`glob`の選び方は`tooling/lefthook-glob/test.sh`に`expect`を足して確かめる。Lefthookに入れないときは、理由を[Lintとテストのリファレンス](lint-and-test.md)に書く。
+5. **docs**：[Lintとテストのリファレンス](lint-and-test.md)のtaskの項、「Gitフック対応」、「CI対応」を直す。READMEは`lint-and-test.md`に任せる。`task okf-check`が同期の候補を警告する。
+6. **ADR**：判断を伴うときは起こす（`task adr-check`がpre-pushで警告する）。
+7. **既存の違反**：同じ変更でリポジトリから探して直す（[継続的な補強](../principles/continuous-reinforcement.md)）。
+
+既存の`tooling/<名前>/`の検査へ規則を1つ足すだけなら、本体と`test.sh`のケースの2か所で足りる。
+
 ## 出典
 
 - Task Guide：<https://taskfile.dev/docs/guide>
