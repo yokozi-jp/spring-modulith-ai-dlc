@@ -15,7 +15,6 @@ on:
       - "docker/keycloak/**"
       - ".env.test.example"
       - "Taskfile.yml"
-      - "tooling/test-slot/**"
       - "mise.toml"
       - "mise.lock"
       - ".github/actions/setup-mise/**"
