@@ -143,7 +143,12 @@ class ProductApiTest {
             .getResponse()
             .getHeader(HttpHeaders.LOCATION);
 
-    register(otherTenant, productCode, "80.00", "ON_SALE").andExpect(status().isCreated());
+    final String otherLocation =
+        register(otherTenant, productCode, "80.00", "ON_SALE")
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getHeader(HttpHeaders.LOCATION);
 
     mockMvc
         .perform(get("/api/products").with(oidcLogin()))
@@ -156,6 +161,10 @@ class ProductApiTest {
     mockMvc
         .perform(get(Objects.requireNonNull(location)).with(otherTenant))
         .andExpect(status().isNotFound());
+    mockMvc
+        .perform(get(Objects.requireNonNull(otherLocation)).with(otherTenant))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.unitPrice").value(80.00));
   }
 
   @Test
