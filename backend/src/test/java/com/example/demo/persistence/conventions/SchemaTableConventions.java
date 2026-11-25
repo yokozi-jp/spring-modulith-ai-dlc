@@ -245,38 +245,32 @@ final class SchemaTableConventions {
     return violations;
   }
 
-  /**
-   * T13：uuidのDEFAULT。業務テーブルのテナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。
-   *
-   * <p>RLSの外のスキーマのテナントの列は、既定値を付けず、文が値を書く。
-   */
+  /** T13：uuidのDEFAULT。RLSのスキーマの表のテナントの列の、トランザクションのテナントを入れる既定値はIDの採番ではないため除く。 */
   private static void uuidDefault(
       final ColumnRow row, final String target, final List<ConventionViolation> violations) {
     final String defaultExpression = row.defaultExpression();
-    if (!"uuid".equals(row.typeName()) || defaultExpression == null) {
-      return;
-    }
     final boolean tenantColumn = TenantIsolation.TENANT_COLUMN.equals(row.column());
-    if (tenantColumn && !TenantIsolation.isTenantScoped(row.schema())) {
+    final boolean rlsSchema = TenantIsolation.isTenantScoped(row.schema());
+    final boolean tenantDefault =
+        tenantColumn
+            && rlsSchema
+            && TenantIsolation.CATALOG_TENANT_DEFAULT.equals(defaultExpression);
+    if ("uuid".equals(row.typeName()) && defaultExpression != null && !tenantDefault) {
       violations.add(
           new ConventionViolation(
               "T13",
               target,
-              "RLSの外のスキーマでは、tenant_public_idのDEFAULT（"
-                  + defaultExpression
-                  + "）を外し、文で値を書く（"
-                  + MULTITENANCY_DOC
-                  + "）。"));
-    } else if (!tenantColumn || !TenantIsolation.CATALOG_TENANT_DEFAULT.equals(defaultExpression)) {
-      violations.add(
-          new ConventionViolation(
-              "T13",
-              target,
-              "uuidはアプリケーションでRepositoryのnextId()から採番し、DEFAULT（"
-                  + defaultExpression
-                  + "）を外す（"
-                  + PRIMARY_KEYS_DOC
-                  + "）。"));
+              tenantColumn && !rlsSchema
+                  ? "RLSの外のスキーマでは、tenant_public_idのDEFAULT（"
+                      + defaultExpression
+                      + "）を外し、文で値を書く（"
+                      + MULTITENANCY_DOC
+                      + "）。"
+                  : "uuidはアプリケーションでRepositoryのnextId()から採番し、DEFAULT（"
+                      + defaultExpression
+                      + "）を外す（"
+                      + PRIMARY_KEYS_DOC
+                      + "）。"));
     }
   }
 }

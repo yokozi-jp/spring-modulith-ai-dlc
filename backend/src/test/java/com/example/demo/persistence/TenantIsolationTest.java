@@ -397,12 +397,6 @@ class TenantIsolationTest {
   }
 
   private static Field<UUID> tenantOf(final Table<?> table) {
-    final Field<UUID> tenant = table.field(TENANT_COLUMN, UUID.class);
-    assertThat(tenant)
-        .as(
-            "RLS のスキーマの業務テーブル %s は %s を持つ（docs/database/postgresql-multitenancy.md）",
-            table, TENANT_COLUMN)
-        .isNotNull();
-    return tenant;
+    return Objects.requireNonNull(table.field(TENANT_COLUMN, UUID.class), TENANT_COLUMN);
   }
 }
