@@ -80,11 +80,14 @@ public final class LocalDataSeeder {
       List.of(T_PAYMENT, T_ORDER_LINE, T_ORDER, M_PRODUCT);
 
   /**
-   * reset が消す業務テーブル。代表データを入れない {@code ordering.t_idempotency_key} と、代表データを入れる業務テーブルを、この順に DELETE
-   * する（キーの表を消す理由は ADR-126）。
+   * reset が消す業務テーブル。代表データを入れない {@code ordering.t_idempotency_key} と {@code
+   * product.t_idempotency_key} と、代表データを入れる業務テーブルを、この順に DELETE する（キーの表を消す理由は ADR-126）。
    */
   /* package */ static final List<Table<?>> RESET_TABLES =
-      Stream.concat(Stream.of(T_IDEMPOTENCY_KEY), BUSINESS_TABLES.stream()).toList();
+      Stream.concat(
+              Stream.of(T_IDEMPOTENCY_KEY, com.example.demo.jooq.product.Tables.T_IDEMPOTENCY_KEY),
+              BUSINESS_TABLES.stream())
+          .toList();
 
   /** テナントと所属の表。業務データの有無によらず、毎回 {@link TenancySeeds} が足りない行だけを入れる。reset でも消さない。 */
   private static final List<Table<?>> TENANCY_TABLES = List.of(M_TENANT, M_MEMBERSHIP);

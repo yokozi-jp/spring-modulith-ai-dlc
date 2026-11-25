@@ -5,7 +5,9 @@ package com.example.demo.jooq.product;
 
 
 import com.example.demo.jooq.product.tables.MProduct;
+import com.example.demo.jooq.product.tables.TIdempotencyKey;
 import com.example.demo.jooq.product.tables.records.MProductRecord;
+import com.example.demo.jooq.product.tables.records.TIdempotencyKeyRecord;
 
 import javax.annotation.processing.Generated;
 
@@ -34,4 +36,5 @@ public class Keys {
     // -------------------------------------------------------------------------
 
     public static final UniqueKey<MProductRecord> PK_M_PRODUCT = Internal.createUniqueKey(MProduct.M_PRODUCT, DSL.name("pk_m_product"), new TableField[] { MProduct.M_PRODUCT.PRODUCT_ID }, true);
+    public static final UniqueKey<TIdempotencyKeyRecord> PK_T_IDEMPOTENCY_KEY = Internal.createUniqueKey(TIdempotencyKey.T_IDEMPOTENCY_KEY, DSL.name("pk_t_idempotency_key"), new TableField[] { TIdempotencyKey.T_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY_ID }, true);
 }
