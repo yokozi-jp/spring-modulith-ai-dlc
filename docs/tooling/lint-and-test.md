@@ -84,7 +84,7 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 
 - **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。続けて`lint-e2e-seed`を実行する。
   最後に、`e2e/`の`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts`をNodeで直接importでき（相対のimportに拡張子`.ts`がある）、Playwrightの外から使えることを確かめる。
-- **`task lint-e2e-seed`**：`frontend/apps/web/e2e/`（`.auth/`を除く）に`SEED-`の文字列があれば失敗する。
+- **`task lint-e2e-seed`**：`frontend/apps/web/e2e/`（`.auth/`を除く）に`SEED-`の文字列が大文字小文字を問わずにあれば失敗する。
   ディレクトリが無いときも失敗する。
   E2Eは開発用のシーダーの代表データを読まず、各テストがデータを作る（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-product-registration-api.md)）。
   検査の本体は`tooling/e2e-seed-lint/e2e-seed-lint.sh`で、検出の前に`tooling/e2e-seed-lint/test.sh`が、fixtureで終了コードと出力を確かめる。
