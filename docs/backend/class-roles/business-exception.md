@@ -65,11 +65,14 @@ rollback させたい失敗は、例外にする。
   enum はモジュールごとに、理由を投げる層のパッケージに置く。
   集約と Domain Service が投げる理由は `<module>.domain.model` に置く。
   Presentation だけが投げる理由は `<module>.presentation.web` に置く（Presentation は Domain に依存できない）。
-- enum の名前は `<Aggregate>Failure`（`OrderFailure`、`TenantFailure`）にし、定数は理由を表す名前にする（`NOT_DRAFT`、`PRODUCT_NOT_FOUND`）。
+- enum の名前は `<対象>Failure`（`OrderFailure`、`TenantFailure`、`TenantSelectionFailure`）にし、定数は理由を表す名前にする（`NOT_DRAFT`、`PRODUCT_NOT_FOUND`）。
 - enum は `com.example.demo.<module>` の下に置き、type と `title` のキーを書かない。
-  `FailureReason` が、type `/problems/<module>/<定数の kebab-case>` と `title` のキー `problem.title.<module>.<定数の kebab-case>` を作る。
-- 定数を足したら、`messages.properties` と `messages_ja.properties` にその `title` を足す。
+  `error` モジュールの `ProblemTypes` が、type `/problems/<module>/<定数の kebab-case>` と `title` のキー `problem.title.<module>/<定数の kebab-case>` を作る。
+  `<module>` は enum のパッケージから決まる。
+- 定数を足したら、`messages.properties` と `messages_ja.properties` にその `title` を足し、`ProblemTypesTest` の type の一覧に 1 行を足す。
 - 定数の名前を変えるか、enum を別のモジュールへ移すと type が変わり、API の契約を壊す。
+- テストが業務規則の違反を起こすときは、プロダクションコードの理由を借りず、`com.example.demo` の外の `errorfixture.presentation.web.ErrorFixtureFailure` を渡す。
+  `com.example.demo` の下のテストの enum は、type の一覧と、テストが書き出す OpenAPI に入る。
 - 409 の `ConflictException` には理由の enum を渡さない。
   type は `ConflictException.Kind` から決まり、モジュールによらず共通である。
 
@@ -93,12 +96,12 @@ rollback させたい失敗は、例外にする。
 
 ## 例外、HTTP、ログ、Listener の対応
 
-| 例外                                                                                            | HTTP | 本文                                                                                                      | API のログ                                                  | 非同期の Listener            |
-| ----------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------- |
-| `NotFoundException`                                                                             | 404  | `about:blank`、`title` は `problem.title.404`、`detail` なし                                              | INFO、例外付き（原因なし）、`API business failure`          | 回復不能として再試行しない   |
-| `BusinessRuleViolationException`                                                                | 422  | 理由の `/problems/<module>/<kebab-case>`、`title` は `problem.title.<module>.<kebab-case>`、`detail` なし | INFO、例外付き（原因なし）、`API business failure`          | 回復不能として再試行しない   |
-| `ConflictException`                                                                             | 409  | 種類の `/problems/<kebab-case>`、`title` は `problem.title.<kebab-case>`、`detail` なし                   | INFO、例外付き（原因なし）、`conflict.kind`、`API conflict` | 回復不能として再試行しない   |
-| JDK の例外ほか（`IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException`） | 500  | `about:blank`、`title` は `problem.title.500`、`detail` なし                                              | ERROR、例外と原因の連鎖付き、`Unhandled API exception`      | 予期しない例外として送出する |
+| 例外                                                                                            | HTTP | 本文                                                                                                      | API のログ                                                                  | 非同期の Listener            |
+| ----------------------------------------------------------------------------------------------- | ---- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------- |
+| `NotFoundException`                                                                             | 404  | `about:blank`、`title` は `problem.title.404`、`detail` なし                                              | INFO、例外付き（原因なし）、`problem.type`、`API business failure`          | 回復不能として再試行しない   |
+| `BusinessRuleViolationException`                                                                | 422  | 理由の `/problems/<module>/<kebab-case>`、`title` は `problem.title.<module>/<kebab-case>`、`detail` なし | INFO、例外付き（原因なし）、`problem.type`、`API business failure`          | 回復不能として再試行しない   |
+| `ConflictException`                                                                             | 409  | 種類の `/problems/<kebab-case>`、`title` は `problem.title.<kebab-case>`、`detail` なし                   | INFO、例外付き（原因なし）、`problem.type`、`conflict.kind`、`API conflict` | 回復不能として再試行しない   |
+| JDK の例外ほか（`IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException`） | 500  | `about:blank`、`title` は `problem.title.500`、`detail` なし                                              | ERROR、例外と原因の連鎖付き、`Unhandled API exception`                      | 予期しない例外として送出する |
 
 `title` は `Accept-Language` から解決した言語で返り、404 の本文は対象がない場合と存在を隠す場合で同じになる。
 409 の type は、`Kind.VERSION` が `/problems/version-conflict`、`Kind.LOCK` が `/problems/lock-timeout`、`Kind.UNIQUE` が `/problems/unique-violation` である。
@@ -110,6 +113,7 @@ Listener の扱いは[非同期処理の失敗時の再試行と回復](../../in
 `23505` と `55P03` の Spring の例外のメッセージには SQL が入り、`23505` では重複したキーの値も入る。
 三つの型は原因を持たないため、これらの SQL と値は INFO のログに出ない（[可観測性の規約](../../observability/conventions.md)の「発生源で渡さない値」）。
 409 の `conflict.kind` は `version`、`lock`、`unique` のどれかで、どの競合かをログで区別する。
+404、409、422 のログの `problem.type` は、応答の type と同じ値である。
 
 ## 最小の例と典型的な例
 
@@ -162,8 +166,8 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 
 集約と Domain Service の単体テストで、投げる例外の型、理由、メッセージの識別子を確かめる（`isInstanceOfSatisfying(BusinessRuleViolationException.class, exception -> assertThat(exception.reason()).isEqualTo(OrderFailure.NOT_DRAFT))`）。
 値オブジェクトの単体テストは、`IllegalArgumentException` を確かめる。
-例外から HTTP のステータス、本文、ログへの対応づけは `ApiErrorContractTest`、`ApiExceptionHandlerTest`、`ApiExceptionHandlerProblemTypeTest` が確かめるため、機能ごとのテストでは確かめない。
-すべての理由の定数と `Kind` に日本語と英語の `title` があることは `ProblemTitleMessagesTest` が、OpenAPI の `ProblemDetail.type` にすべての type が載ることは `OpenApiContractTest` が確かめる。
+例外から HTTP のステータス、本文、ログへの対応づけは `ApiErrorContractTest` と `ApiExceptionHandlerTest` が確かめるため、機能ごとのテストでは確かめない。
+type の一覧と、すべての type に日本語と英語の `title` があることは `ProblemTypesTest` が、OpenAPI の `ProblemDetail.type` に type が載ることは `OpenApiContractTest` が確かめる。
 
 ## アンチパターン
 
@@ -193,10 +197,12 @@ Controller は参照の結果がなければ `NotFoundException` を投げ、ス
 - [ ] `NoSuchElementException` を生成せず、引数なしの `Optional.orElseThrow()` を呼ばない。［ArchUnit で検査：GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown］
 - [ ] `Throwable`、`Exception`、`RuntimeException`、`Error` を投げない。［ArchUnit で検査：GeneralCodingRulesArchTest.noClassesShouldThrowGenericExceptions］
 - [ ] `shared` と各モジュールの `domain`、`application`、`infrastructure.persistence` の型は、Spring Web、Spring の HTTP、Servlet の型に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayers］
-- [ ] `error.presentation.web` の外で、`ProblemDetail`、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus` を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWeb］
-- [ ] 422 の理由は、モジュールの `FailureReason` の enum の定数で渡す。［型で検査：`BusinessRuleViolationException` は理由を受け取るコンストラクタしか持たない］
-- [ ] `FailureReason` を enum で実装し、理由の定数ごとに日本語と英語の `title` を足す。［テストで検査：ProblemTitleMessagesTest］
-- [ ] 理由の定数の名前を変えず、enum を別のモジュールへ移さない。［自分で点検］
+- [ ] `error.presentation.web` の外で、`ProblemDetail`、`ErrorResponse`、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus`、`HttpStatus.CONFLICT`、`HttpStatus.UNPROCESSABLE_CONTENT` を使わない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWeb］
+- [ ] 409 と 422 の status を整数（`sendError(422)`、`ResponseEntity.status(409)`）で書かない。［自分で点検］
+- [ ] 422 の理由は、モジュールの `FailureReason` の enum の定数で渡す。［型で検査：`BusinessRuleViolationException` は理由の enum の定数を受け取るコンストラクタしか持たない］
+- [ ] `FailureReason` は `com.example.demo.<module>` の下の enum で実装する。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.failureReasonsAreModuleEnums］
+- [ ] 理由の定数ごとに日本語と英語の `title` を足す。［テストで検査：ProblemTypesTest］
+- [ ] 理由の定数の名前を変えず、enum を別のモジュールへ移さない。［テストで検査：ProblemTypesTest の type の一覧］
 - [ ] 集約ごとの例外の型を作らない。［自分で点検］
 - [ ] メッセージは英語にし、対象の識別子を含める。［自分で点検］
 - [ ] Controller に try と catch を書かない。［自分で点検］

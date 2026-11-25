@@ -63,24 +63,23 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
   `ConflictException` は `shared.concurrency` から移さず、意味を一意制約の違反へ広げて Javadoc を直す。
 - `BusinessRuleViolationException` は、理由（`shared.failure` の interface `FailureReason`）とログ用のメッセージを受け取り、メッセージだけのコンストラクタを持たない。
   理由は、モジュールごとの enum が `FailureReason` を実装して表す（例：`ordering` の `OrderFailure` の `NOT_DRAFT`、`PRODUCT_NOT_FOUND`、`PRODUCT_DISCONTINUED`、`NO_LINES`）。
-  `FailureReason` は sealed にしない。
-  名前のないモジュールでは、sealed の型の permits が同じパッケージに限られ、`javac` が止めるためである（#317 で確かめた）。
+  理由の型の形は [ADR-125](ADR-125-derive-problem-types-from-failure-reasons.md) が決める。
 - `ApiExceptionHandler` は、3 つの型を次の Problem Details にする。
   `title` は `Accept-Language` の言語で返し、`detail` は付けない。
   例外のメッセージは応答に入れず、ログにだけ出す。
 
-  | 型                               | HTTP | `type`                                        | `title` のキー                        |
-  | -------------------------------- | ---- | --------------------------------------------- | ------------------------------------- |
-  | `NotFoundException`              | 404  | `about:blank`                                 | `problem.title.404`                   |
-  | `BusinessRuleViolationException` | 422  | 理由ごと（`/problems/<module>/<kebab-case>`） | `problem.title.<module>.<kebab-case>` |
-  | `ConflictException`              | 409  | 種類ごと（`/problems/<kebab-case>`）          | `problem.title.<kebab-case>`          |
+  | 型                               | HTTP | `type`                                     |
+  | -------------------------------- | ---- | ------------------------------------------ |
+  | `NotFoundException`              | 404  | `about:blank`                              |
+  | `BusinessRuleViolationException` | 422  | 理由（`FailureReason` の定数）ごと         |
+  | `ConflictException`              | 409  | 競合の種類（`ConflictException.Kind`）ごと |
 
   404 は、対象がない場合と存在を隠す場合で本文を同じにするため、理由を分けず `about:blank` のままにする。
-  409 の種類ごとの `type` は、`Kind.VERSION` が `/problems/version-conflict`、`Kind.LOCK` が `/problems/lock-timeout`、`Kind.UNIQUE` が `/problems/unique-violation` である。
-  アプリのコードは `about:blank` の 422 と 409 を返さない。
-  `ApiExceptionHandler` が理由を知らない Spring の 422 と 409 の例外と、`/error` に転送された 422 と 409 だけは、`about:blank` のまま返る。
-  どちらもアプリのコードからは作れない（次の ArchUnit の規則）。
-- ログは、404 と 422 を INFO の `API business failure`、409 を INFO の `API conflict` で、`http.response.status_code` と例外を付けて記録する。
+  422 と 409 の `type` と `title` のキーの形は ADR-125 が決める。
+  `about:blank` のまま返る 422 と 409 は、`ApiExceptionHandler` が理由を知らない Spring の例外と、`/error` に転送された応答である。
+  後の ArchUnit の規則 `httpErrorsAreMappedOnlyInErrorPresentationWeb` が止めるのは、`error.presentation.web` の外で、Spring の Problem Details と HTTP の例外の型と注釈に依存する書き方と、`HttpStatus.CONFLICT` と `HttpStatus.UNPROCESSABLE_CONTENT` を読む書き方である。
+  整数で書いた status（`sendError(422)`、`ResponseEntity.status(409)`）は止めない。
+- ログは、404 と 422 を INFO の `API business failure`、409 を INFO の `API conflict` で、`http.response.status_code`、応答の type の `problem.type`（ADR-125）、例外を付けて記録する。
   409 には、競合の種類（`version`、`lock`、`unique`）を属性 `conflict.kind` で足す。
   3 つの型は原因（cause）を持たない。
   コンストラクタは原因を `null` に決め、原因を受け取るコンストラクタを置かないため、後から `initCause` を呼ぶと `IllegalStateException` になる。
@@ -102,7 +101,8 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - ArchUnit に 3 つの規則を足す。
   `noSuchElementExceptionIsNotThrown` は、`NoSuchElementException` の生成と引数なしの `Optional.orElseThrow()` を禁じる。
   `httpTypesAreNotUsedByInnerLayers` は、`shared` と各モジュールの `domain`、`application`、`infrastructure.persistence` から Spring Web、Spring の HTTP、Servlet の型への依存を禁じる。
-  `httpErrorsAreMappedOnlyInErrorPresentationWeb` は、`error.presentation.web` の外で `ProblemDetail`、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus` に依存することを禁じる。
+  `httpErrorsAreMappedOnlyInErrorPresentationWeb` は、`error.presentation.web` の外で `ProblemDetail`、`ErrorResponse`（入れ子の型を含む）、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus` に依存することと、`HttpStatus.CONFLICT` と `HttpStatus.UNPROCESSABLE_CONTENT` を読むことを禁じる。
+  成功の応答の `@ResponseStatus` も禁じ、成功の status は `ResponseEntity` で返す。
 - 例外と値を、失敗の前に書いた行とイベントの出版を commit してよいかで使い分ける。
   要求を断り、トランザクションで書いたものを取り消す失敗は、3 つの型の例外で投げる。
   業務の状態に記録して正常に終える結果（決済の拒否、契約の不備、請求しない、処理済み）は、Result の値で返す。
@@ -120,8 +120,8 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 
 - 機能モジュールは型を投げるだけで、404、409、422 のステータス、本文、ログが決まる。
 - 画面は 422 と 409 の理由を `type` で区別でき、理由を示す `title` を見出しに出せる。
-- 理由のない 422 は、コンストラクタがないためコンパイルが通らない。
-  Problem Details を機能モジュールで作る書き方は、ArchUnit が止める。
+- 理由を渡さない `BusinessRuleViolationException` は、コンストラクタがないためコンパイルが通らない。
+- `error.presentation.web` の外で Problem Details と HTTP の例外を作る書き方と、409 と 422 の `HttpStatus` の定数を読む書き方は、ArchUnit が止める。
 - Controller に try と catch が要らない。
 - `shared.persistence` から Spring Web への依存が消え、`shared` が HTTP に依存しないことを ArchUnit で検査する。
 - 一意制約の違反が、500 ではなく 409 になる。
@@ -145,7 +145,8 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - `Optional.get()`、`Iterator.next()`、`Optional::orElseThrow` のメソッド参照などが中で投げる `NoSuchElementException` は検出しない。
 - 404 は `about:blank` のままなので、画面は 404 の理由を本文から区別できない。
 - 理由の定数を足すたびに、日本語と英語の `title` を足す。
-  足し忘れは `ProblemTitleMessagesTest` が落とす。
+  足し忘れは `ProblemTypesTest` が落とす。
+- 整数で書いた 409 と 422 の status（`sendError(422)` など）は ArchUnit が検出しないため、レビューで見る。
 
 ### Neutral
 
@@ -237,7 +238,7 @@ ADR は Proposed のままであるため、新しい ADR を起こさず、こ�
 - **Pros**：理由ごとの `type` を例外の型から決められる。
 - **Cons**：`ErrorResponse` は `problemDetail.type.<クラスの完全名>` と `problemDetail.title.<クラスの完全名>` でクラスごとに `type` と `title` を解決する。
   理由の数だけクラスを作ることになり、集約ごとの型を作らない決定とぶつかる。
-  `shared.failure` が Spring Web に依存し、選択肢5と同じ理由で `sharedModuleDoesNotDependOnHttp` に反する。
+  `shared.failure` が Spring Web に依存し、選択肢5と同じ理由で `httpTypesAreNotUsedByInnerLayers` に反する。
   `type` と `title` は `ApiProblemDetails` が同じ `MessageSource` で作る。
 
 ### 選択肢12: 422 と 409 も about:blank のままにする

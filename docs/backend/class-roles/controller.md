@@ -246,7 +246,7 @@ class OrderControllerTest {
 - [ ] `presentation.web` に置き、名前を `Controller` で終える。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.controllersResideInPresentationWeb］
 - [ ] Domain の型と Repository に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain］
 - [ ] Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
-- [ ] `ResponseStatusException`、`ProblemDetail`、`@ExceptionHandler`、`@ResponseStatus` を使わず、エラー応答のステータスと本文を Controller で決めない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWeb］
+- [ ] `ResponseStatusException`、`ProblemDetail`、`ErrorResponse`、`@ExceptionHandler`、`@ResponseStatus`（成功の応答も含む）、`HttpStatus.CONFLICT`、`HttpStatus.UNPROCESSABLE_CONTENT` を使わず、エラー応答のステータスと本文を Controller で決めない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWeb］
 - [ ] `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods］
 - [ ] ハンドラメソッドに `@Operation(operationId = "...")` を付け、名前を api-style.md の「operationId」の形にする。［Spectral で検査：operation-id-naming（形だけ。語彙は自分で点検）］
 - [ ] クラスに `@Tag(name, description)` を付け、tag を業務機能の kebab-case にし、`-controller` で終えない。［Spectral で検査：tag-name-format、tag-description、operation-singular-tag］

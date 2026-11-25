@@ -13,11 +13,8 @@ tags: [convention, frontend, optimistic-locking, problem-details, accessibility]
 
 ## バックエンドが返す 409
 
-409 の `type` は原因ごとに分かれ、`title` が原因を示す（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
-
-- **楽観的ロックの競合**：`/problems/version-conflict`、`title` は「ほかの操作が先に更新しました」。
-- **悲観的ロックの取得失敗（`lock_timeout`）**：`/problems/lock-timeout`、`title` は「ほかの操作が更新しています」。
-- **一意制約の違反**：`/problems/unique-violation`、`title` は「同じ値がすでに使われています」。
+409 の `type` は、楽観的ロックの競合、悲観的ロックの取得失敗（`lock_timeout`）、一意制約の違反の原因ごとに分かれ、`title` が原因を示す（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
+原因と `type` の対応は[業務上の失敗の例外](../backend/class-roles/business-exception.md#例外httpログlistener-の対応)にある。
 
 本文の版の項目名は `lockNo` で、版の送り方（本文か query parameter か）は[楽観的ロック](../web-api/optimistic-locking.md)に従う。
 

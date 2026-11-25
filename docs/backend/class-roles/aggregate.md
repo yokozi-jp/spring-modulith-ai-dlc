@@ -79,6 +79,7 @@ tags: [convention, backend, class-role]
 ## 最小の例と典型的な例
 
 最小の例は、注文を受け付けて確定するまでの `Order` である。
+`OrderFailure` は、この例の状態遷移の失敗ごとに `NOT_PLACED`、`NOT_CONFIRMED`、`NOT_PAID` の定数を持つ、同じ `domain.model` の enum である（[業務上の失敗の例外](business-exception.md#422-の理由の-enum)）。
 
 ```java
 package com.example.demo.ordering.domain.model;
@@ -141,7 +142,7 @@ public final class Order {
 
   /** 受付の注文を確定する。 */
   public void confirm() {
-    ensureStatus(OrderStatus.PLACED);
+    ensureStatus(OrderStatus.PLACED, OrderFailure.NOT_PLACED);
     status = OrderStatus.CONFIRMED;
   }
 
@@ -152,11 +153,10 @@ public final class Order {
 
   // customerId()、status()、discount()、placedAt()、lockNo() も同じ形で返し、lines() は List.copyOf(lines) を返す。
 
-  private void ensureStatus(final OrderStatus expected) {
+  private void ensureStatus(final OrderStatus expected, final OrderFailure reason) {
     if (status != expected) {
       throw new BusinessRuleViolationException(
-          OrderFailure.UNEXPECTED_STATUS,
-          "order is not " + expected + ": orderId=" + id.value() + ", status=" + status);
+          reason, "order is not " + expected + ": orderId=" + id.value() + ", status=" + status);
     }
   }
 }
@@ -189,7 +189,7 @@ public void ensureLockNo(final ExpectedLockNo expectedLockNo) {
 
 /** 確定の注文を支払い済みにする。 */
 public void markPaid() {
-  ensureStatus(OrderStatus.CONFIRMED);
+  ensureStatus(OrderStatus.CONFIRMED, OrderFailure.NOT_CONFIRMED);
   status = OrderStatus.PAID;
 }
 
@@ -200,19 +200,19 @@ public boolean isPaid() {
 
 /** 支払い済みの注文を出荷する。 */
 public void ship() {
-  ensureStatus(OrderStatus.PAID);
+  ensureStatus(OrderStatus.PAID, OrderFailure.NOT_PAID);
   status = OrderStatus.SHIPPED;
 }
 
 /** 受付の注文を取り消す。 */
 public void cancel() {
-  ensureStatus(OrderStatus.PLACED);
+  ensureStatus(OrderStatus.PLACED, OrderFailure.NOT_PLACED);
   status = OrderStatus.CANCELLED;
 }
 
 /** 受付の注文に、小計を超えない割引を適用する。 */
 public void applyDiscount(final Money discount) {
-  ensureStatus(OrderStatus.PLACED);
+  ensureStatus(OrderStatus.PLACED, OrderFailure.NOT_PLACED);
   if (discount.amount().compareTo(subtotal().amount()) > 0) {
     throw new IllegalArgumentException("discount exceeds subtotal: orderId=" + id.value());
   }

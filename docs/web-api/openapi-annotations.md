@@ -86,7 +86,8 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
 - **201**：`ResponseEntity<Void>`を返し、`Location`ヘッダーを持つ`@ApiResponse(responseCode = "201", headers = @Header(...))`を書く。
 - **204**：`ResponseEntity<Void>`を返し、`@ApiResponse(responseCode = "204")`を書く。
 
-この形では`200`が残らず、`@ResponseStatus`は要らない。
+この形では`200`が残らない。
+成功の応答にも`@ResponseStatus`を付けない（ArchUnitの`httpErrorsAreMappedOnlyInErrorPresentationWeb`が拒否する）。
 `@ApiResponse`を書かないハンドラには、springdocが200を付ける。
 
 ## 例

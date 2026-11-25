@@ -134,6 +134,7 @@ public class CancelOrderCommandHandler {
 
 典型的な例は、注文を受け付ける `PlaceOrderCommandHandler` の `handle` である（抜粋）。
 依存は `orderRepository`、`orderLimitPolicy`、`discountPolicy`、`customerQueries`、`productQueries`、`events`、`clock` の七つである。
+違反の理由は、この例の `domain.model` の enum `OrderFailure` の定数 `CUSTOMER_NOT_FOUND` と `PRODUCT_NOT_FOUND` で渡す（[業務上の失敗の例外](business-exception.md#422-の理由の-enum)）。
 
 ```java
 /** 上限を確かめて注文を受け付け、会員ランクの割引を適用して保存し、受付のイベントを発行する。 */
