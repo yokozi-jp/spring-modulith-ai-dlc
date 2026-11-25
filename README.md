@@ -209,9 +209,11 @@ task <タスク名>
 
 初めて起動するときと、`frontend/`の下の`package.json`か`frontend/pnpm-lock.yaml`が変わったときは、`task fe-dev`の前に`task fe-install`でフロントエンドの依存をインストールします。
 
-開発用の代表データは次の二つで入れます。
+開発用の代表データとテナントは次の三つで入れます。
 
 - **`task be-seed`**：ローカルの業務データが空のときだけ代表データを入れる。
+- **`task be-seed-tenancy`**：業務データの有無によらず、テナントと所属の足りない行だけを入れ、業務データを入れない。
+  `task e2e-up`が呼ぶ。
 - **`task be-seed-reset CONFIRM_RESET=yes`**：ローカルの業務データを消して代表データを入れ直す。
 
 エージェントは commit と push を `task agent-commit`、`task agent-push` でバックグラウンドで始め、`task agent-wait` で終わりを待ちます（[開発ワークフロー](docs/tooling/dev-workflow.md) の「エージェントがcommitとpushをするとき」）。
