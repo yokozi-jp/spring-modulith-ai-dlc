@@ -137,12 +137,11 @@ processors:
   # 検証済みの報告から固定本文と最終属性を作る。文書の URL は残さず、blockedURL は origin か scheme かキーワードまで縮約する。
   # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
   transform/frontend_csp:
-    # blockedURL や sourceFile のない報告では、nil に対する Len、ExtractPatterns、ConvertCase が失敗するのが通常の経路で、報告ごとに warn が出る。
+    # blockedURL のない報告では、nil に対する Len、ExtractPatterns、ConvertCase が失敗するのが通常の経路で、報告ごとに warn が出る。
     # 失敗した文は属性を付けない側に倒れるので silent にする。
     error_mode: silent
     log_statements:
       - set(log.cache["blocked"], log.body["body"]["blockedURL"]) where IsString(log.body["body"]["blockedURL"]) and Len(log.body["body"]["blockedURL"]) <= 8192
-      - set(log.cache["source"], log.body["body"]["sourceFile"]) where IsString(log.body["body"]["sourceFile"]) and Len(log.body["body"]["sourceFile"]) <= 8192
       # inline、eval、data などのキーワードはそのまま残す。
       - set(log.attributes["csp.blocked"], log.cache["blocked"]) where IsMatch(log.cache["blocked"], "^[a-z-]{1,32}$$")
       # 階層を持つ URL は scheme と host と port だけにし、userinfo、path、path parameter、query、fragment を落とす。
@@ -155,13 +154,6 @@ processors:
       - set(log.attributes["csp.blocked"], ConvertCase(log.attributes["csp.blocked"], "lower")) where log.attributes["csp.blocked"] != nil
       # 長すぎる origin は送り手が任意の値を詰められるので残さない。
       - delete_key(log.attributes, "csp.blocked") where Len(log.attributes["csp.blocked"]) > 300
-      # 違反した文書と同一オリジンの /assets/<名前>.js だけを、origin を落とした path で残す。query か fragment を持つ URL は残さない。
-      # 別オリジンの同名の path を自分の asset と取り違えないためである。documentURL は比べるだけで属性に残さない。
-      - set(log.cache["document_origin"], ConvertCase(ExtractPatterns(log.body["body"]["documentURL"], "^(?P<origin>[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?)(?:[/?#;]|$$)")["origin"], "lower")) where IsString(log.body["body"]["documentURL"]) and Len(log.body["body"]["documentURL"]) <= 8192
-      - set(log.cache["source_match"], ExtractPatterns(log.cache["source"], "^(?P<origin>[Hh][Tt][Tt][Pp][Ss]?://[A-Za-z0-9.-]+(?::[0-9]{1,5})?)(?P<path>/assets/[\\w.-]+\\.js)$$"))
-      - set(log.attributes["code.file.path"], log.cache["source_match"]["path"]) where log.cache["document_origin"] != nil and ConvertCase(log.cache["source_match"]["origin"], "lower") == log.cache["document_origin"]
-      - set(log.attributes["code.line.number"], Int(log.body["body"]["lineNumber"])) where IsDouble(log.body["body"]["lineNumber"]) and log.body["body"]["lineNumber"] >= 0 and log.body["body"]["lineNumber"] <= 2147483647
-      - set(log.attributes["code.column.number"], Int(log.body["body"]["columnNumber"])) where IsDouble(log.body["body"]["columnNumber"]) and log.body["body"]["columnNumber"] >= 0 and log.body["body"]["columnNumber"] <= 2147483647
       - set(log.attributes["csp.directive"], log.body["body"]["effectiveDirective"])
       - set(log.attributes["csp.disposition"], log.body["body"]["disposition"])
       - set(log.attributes["telemetry.signal"], "csp-violation")
@@ -177,7 +169,7 @@ processors:
       - keep_keys(resource.attributes, ["service.name", "service.namespace", "service.version", "deployment.environment.name"])
       # receiver が付ける scope の属性（source、receiver）は消す。
       - keep_keys(scope.attributes, [])
-      - keep_keys(log.attributes, ["telemetry.signal", "csp.directive", "csp.disposition", "csp.blocked", "code.file.path", "code.line.number", "code.column.number"])
+      - keep_keys(log.attributes, ["telemetry.signal", "csp.directive", "csp.disposition", "csp.blocked"])
 
 exporters:
   # ローカルの Grafana OpenTelemetry LGTM。

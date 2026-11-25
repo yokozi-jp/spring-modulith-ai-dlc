@@ -1544,7 +1544,7 @@ tasks:
         sleep 2
         if [ ! -s "$out/frontend-csp.json" ]; then fail "CSP の報告が出口に届きませんでした。"; fi
         # good は、userinfo の区切りを \ でごまかした URL の誤った host（指摘 2）が残らないことを見る。
-        if grep -qE 'secret-|FixtureAgent|orders/42|localhost:5173|jsessionid|pass@|ref\.example|good' "$out/frontend-csp.json"; then
+        if grep -qE 'secret-|FixtureAgent|orders/42|localhost:5173|index-abc|jsessionid|pass@|ref\.example|good' "$out/frontend-csp.json"; then
           fail "CSP の報告に、許可していない値か URL の path、query、fragment が残りました。"
         fi
         if ! jq -s -e '
@@ -1562,26 +1562,21 @@ tasks:
                 and string_attr("deployment.environment.name") == "local"
                 and ([.attributes[]?.key] | sort) == ["deployment.environment.name", "service.name", "service.namespace", "service.version"])
             and all($scopes[]; ((.scope.attributes // []) | length) == 0)
-            and ($records | length) == 11
+            and ($records | length) == 10
             and all($records[];
               .body.stringValue == "Browser CSP violation"
                 and string_attr("telemetry.signal") == "csp-violation"
-                and ([.attributes[]?.key] - ["telemetry.signal", "csp.directive", "csp.disposition", "csp.blocked", "code.file.path", "code.line.number", "code.column.number"]) == [])
-            and any($records[]; string_attr("csp.blocked") == "https://blocked.example" and string_attr("csp.directive") == "img-src" and int_attr("code.line.number") == "16")
-            and any($records[]; string_attr("csp.blocked") == "inline" and string_attr("csp.directive") == "style-src-attr" and string_attr("code.file.path") == null)
-            and any($records[]; string_attr("csp.blocked") == "https://blocked.example:8443"
-              and string_attr("code.file.path") == "/assets/index-abc.js"
-              and int_attr("code.column.number") == "7"
-              and string_attr("csp.disposition") == "report")
+                and ([.attributes[]?.key] - ["telemetry.signal", "csp.directive", "csp.disposition", "csp.blocked"]) == [])
+            and any($records[]; string_attr("csp.blocked") == "https://blocked.example" and string_attr("csp.directive") == "img-src")
+            and any($records[]; string_attr("csp.blocked") == "inline" and string_attr("csp.directive") == "style-src-attr")
+            and any($records[]; string_attr("csp.blocked") == "https://blocked.example:8443" and string_attr("csp.disposition") == "report")
             and any($records[]; string_attr("csp.blocked") == "data")
-            and any($records[]; string_attr("csp.blocked") == "eval" and int_attr("code.line.number") == null)
-            and any($records[]; int_attr("code.line.number") == "10" and string_attr("csp.blocked") == null)
+            and any($records[]; string_attr("csp.blocked") == "eval")
             and any($records[]; string_attr("csp.blocked") == "https://evil.example" and string_attr("csp.directive") == "connect-src")
-            and any($records[]; string_attr("csp.directive") == "script-src-elem" and string_attr("code.file.path") == null)
-            and any($records[]; int_attr("code.line.number") == "20" and string_attr("csp.blocked") == null)
-            and any($records[]; int_attr("code.line.number") == "21" and string_attr("csp.blocked") == null)
+            and any($records[]; string_attr("csp.directive") == "script-src-elem" and string_attr("csp.blocked") == "inline")
+            # 長すぎる origin、数値でない port、@ を重ねた userinfo の 3 件は、csp.blocked を残さず報告だけを残す。
+            and ([$records[] | select(string_attr("csp.blocked") == null)] | length) == 3
             and all($records[]; string_attr("csp.blocked") != "https")
-            and any($records[]; string_attr("csp.directive") == "script-src-attr" and int_attr("code.line.number") == null)
         ' "$out/frontend-csp.json" >/dev/null; then
           fail "CSP の報告の属性、resource 属性、scope の属性、件数のいずれかが期待値と一致しません。"
         fi

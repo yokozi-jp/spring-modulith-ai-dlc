@@ -170,14 +170,15 @@ resource 属性は `service.name`、`service.namespace`、`service.version`、`d
 
 CSP 違反の報告は、`webhook_event` receiver から別の pipeline（`logs/frontend_csp`）で絞る。
 `unroll` で報告ごとの record に分け、型が `csp-violation` で directive と disposition が形式に合う record だけを通す。
-本文は `Browser CSP violation` に固定し、残す属性は次の 7 つである。
+本文は `Browser CSP violation` に固定し、残す属性は次の 4 つである。
 
 - `telemetry.signal`：`csp-violation` に固定する。
 - `csp.directive`、`csp.disposition`：検証済みの `effectiveDirective` と `disposition`。
 - `csp.blocked`：`blockedURL` のキーワード（`inline` など）、階層を持つ URL の `scheme://host[:port]`、それ以外の URL の scheme のいずれかを小文字で残す。300 文字を超える値は残さない。
   authority の全体が hostname（英数字、`.`、`-`）か角括弧の IPv6 と数値の port に一致しない階層 URL（数値でない port、`@` を重ねた userinfo など）は残さない。
-- `code.file.path`：`sourceFile` が `documentURL` と同一オリジンの `/assets/<名前>.js` のときだけ、origin を落とした path を残す。別オリジンの URL と、query か fragment を持つ URL は残さない。
-- `code.line.number`、`code.column.number`：0 以上 2147483647 以下の整数だけを残す。
+
+違反した自分のファイルと行と列（`sourceFile`、`lineNumber`、`columnNumber`）と、`documentURL`、`referrer`、`originalPolicy`、`sample` は残さない。
+本番の報告から違反した画面とコードの位置は分からないので、directive と止めた先を手がかりに開発環境で再現する（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
 
 resource 属性はフロントエンドのログと同じ 4 つを Collector の値で付け、receiver が付ける scope の属性は消す。
 `service.version` は Compose が `version.txt` から渡す `FRONTEND_SERVICE_VERSION` である。

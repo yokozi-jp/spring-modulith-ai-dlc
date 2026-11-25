@@ -159,8 +159,8 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
   Faroのfixtureもフロントエンドのpipelineに流し、例外、View、LCP、INP、CLSが同じ匿名session IDを持つことを確かめる。
   許可していない属性、URL token、UUIDのsession IDが出口に残らないことも検査する。
   同一オリジンの`/assets/<名前>.js`のstack frameだけが、pathと行と列で残ることも検査する。
-  CSP違反の報告のfixtureを`logs/frontend_csp`に流し、許可した7つの属性だけが残り、CSP以外の報告の型、`disposition`のない報告、64 KiBを超える本文が捨てられることも検査する。
-  数値でないportと`@`を重ねたuserinfoの`blockedURL`が`csp.blocked`に残らず、別オリジンの`sourceFile`が`code.file.path`に残らないことも検査する。
+  CSP違反の報告のfixtureを`logs/frontend_csp`に流し、許可した4つの属性だけが残り、CSP以外の報告の型、`disposition`のない報告、64 KiBを超える本文が捨てられることも検査する。
+  数値でないportと`@`を重ねたuserinfoの`blockedURL`が`csp.blocked`に残らず、`documentURL`と`sourceFile`の値が出口に残らないことも検査する。
   受け口が`application/reports+json`以外の`Content-Type`に401を返し、`text/plain`で送った有効な本文が出口に届かないことも検査する。
   このタスクは`webhook_event`のportを直接叩き、Viteのproxyを通らない。
   Viteのproxyのhop（`/csp-report`と`/collect`の転送と資格情報のheaderの削除）は、`frontend/apps/web/vite-config.test.ts`が偽の受け口で検査する。
