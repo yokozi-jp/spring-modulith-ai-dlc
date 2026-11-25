@@ -29,7 +29,7 @@ new = ''
 name = "lock-ignores-expiry"
 change = "the lock provider takes the lock without lock_until <= now (or a second LockProvider bean)"
 config = "documented"
-invariants = ["OneLockedRun", "InFlightNeverMarkedStale"]
+invariants = ["OneLockedRun"]
 
 [[mutant.edits]]
 old = '''  /\ IF lock.until <= now'''
@@ -68,3 +68,36 @@ invariants = ["NoResubmissionWhenAbandonOnFirst"]
 [[mutant.edits]]
 old = '''MaxDue == IF PolicyAbandon = 1 THEN 0 ELSE PolicyAbandon'''
 new = '''MaxDue == PolicyAbandon'''
+
+# The old code: Spring Modulith's markStalePublicationsFailed lists the stale rows, then marks each with markFailed(id),
+# which does not check the status or the date again. The two steps are the find and the mark that the real model joins.
+[[mutant]]
+name = "stale-mark-without-recheck"
+change = "the stale check lists the rows, then marks them with an UPDATE that does not check the status or the date again (markStalePublicationsFailed)"
+config = "run-overruns-lock"
+invariants = ["InFlightNeverMarkedStale"]
+
+[[mutant.edits]]
+old = '''inst[i].phase \in {"idle", "locked", "checked", "read"}'''
+new = '''inst[i].phase \in {"idle", "locked", "found", "checked", "read"}'''
+
+[[mutant.edits]]
+old = '''StaleMark(i) ==
+  /\ inst[i].up /\ inst[i].phase = "locked"
+  /\ inst' = [inst EXCEPT ![i].phase = "checked"]
+  /\ IF StaleNow
+'''
+new = '''StaleFind(i) ==
+  /\ inst[i].up /\ inst[i].phase = "locked"
+  /\ inst' = [inst EXCEPT ![i].phase = IF StaleNow THEN "found" ELSE "checked"]
+  /\ UNCHANGED <<now, row, lock, exec, crashes, staleHitInFlight>>
+
+StaleMark(i) ==
+  /\ inst[i].up /\ inst[i].phase = "found"
+  /\ inst' = [inst EXCEPT ![i].phase = "checked"]
+  /\ IF RowExists /\ row.status # "FAILED"
+'''
+
+[[mutant.edits]]
+old = '''       \/ StaleMark(i)'''
+new = '''       \/ StaleFind(i) \/ StaleMark(i)'''
