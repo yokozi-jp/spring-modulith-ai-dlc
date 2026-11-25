@@ -6,7 +6,7 @@ import java.io.Serializable;
  * 422 になる業務規則の違反の理由。モジュールごとの enum が実装し、{@link BusinessRuleViolationException} に渡す。
  *
  * <p>理由は、enum を置いたモジュールの名前と定数の名前で識別する。problem type と title のキーは {@code error} モジュールがこの 2
- * つから作る（ADR-125）。
+ * つから作る（ADR-127）。
  *
  * <p>例外とともに直列化されるため {@link Serializable} を継承する。enum は直列化できる。
  */

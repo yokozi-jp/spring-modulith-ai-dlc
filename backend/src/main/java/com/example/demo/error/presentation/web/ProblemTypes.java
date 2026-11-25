@@ -15,7 +15,7 @@ import org.springframework.core.type.filter.AssignableTypeFilter;
 import org.springframework.util.ClassUtils;
 
 /**
- * problem type と title のキーを、{@link CommonProblem} とモジュールの {@link FailureReason} から作る（ADR-125）。
+ * problem type と title のキーを、{@link CommonProblem} とモジュールの {@link FailureReason} から作る（ADR-127）。
  *
  * <p>type は {@code /problems/<パス>}、title のキーは {@code problem.title.<パス>} で、同じパスを使う。 パスは、{@code
  * CommonProblem} では定数の名前の kebab-case、{@code FailureReason} では {@code <module>/<定数の名前の kebab-case>}

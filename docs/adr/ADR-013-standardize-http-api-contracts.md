@@ -12,6 +12,7 @@ tags: [adr, backend, api, openapi]
 Accepted
 
 Amended by [ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)：span があるすべての Problem Details に `traceId` を付け、`instance` を設定しないこと。
+Amended by [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)：冪等性に関する記述（「冪等性」の節、Alternative 3、保持期間を操作ごとに決める記述、冪等性ストアを今は持たない記述）を改め、GET と HEAD 以外のすべての業務の API に `Idempotency-Key` を必須にすること。
 
 ## Date
 
@@ -160,7 +161,7 @@ JSON API は `/api` 配下へ置き、次の契約を適用する。
 - [OpenAPI Specification](https://spec.openapis.org/oas/latest)
 - [Spectral CLI](https://github.com/stoplightio/spectral/blob/develop/docs/guides/2-cli.md)
 - [Zalando RESTful API Guidelines: Pagination](https://github.com/zalando/restful-api-guidelines/blob/main/chapters/pagination.adoc)
-- [Expired Internet-Draft: The Idempotency-Key HTTP Header Field](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/)
+- [Internet-Draft: The Idempotency-Key HTTP Header Field（draft-08）](https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/)
 - [ADR-006](ADR-006-utc-instant-absolute-time-policy.md)
 - [ADR-058](ADR-058-use-path-absolute-relative-uri-for-problem-types.md)
 - `backend/build.gradle`

@@ -2,7 +2,12 @@ package com.example.demo.shared.eventresubmission;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
+import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ProbeConfiguration;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ProbeListener;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ResubmissionProbe;
+import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.CommittedDatabaseTest;
@@ -14,22 +19,36 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
+import net.javacrumbs.shedlock.core.LockConfiguration;
+import net.javacrumbs.shedlock.core.LockProvider;
 import net.javacrumbs.shedlock.core.LockingTaskExecutor;
+import net.javacrumbs.shedlock.core.SimpleLock;
+import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.mockito.Mockito;
 import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
+import org.springframework.modulith.events.core.EventPublicationRegistry;
+import org.springframework.modulith.test.Scenario;
 import org.springframework.test.context.TestPropertySource;
 
-/** 再投入のテストで使う、Spring の文脈の設定、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
+/** 再投入のテストで使う、Spring の文脈の設定、ジョブの組み立て、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
+// 再投入のテストが共有する組み立て、ロック、行の操作を一か所に集めるため、メソッドと型の数が多い。
+@SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 final class ResubmissionTestSupport {
+
+  /** 他のインスタンスの代わりにロックを持つ時間。lock-at-most-for（3 秒）の待ちと、ロックを持つ間の 3 秒の待ちより長くする。 */
+  private static final Duration HELD_LOCK = Duration.ofSeconds(10);
 
   private ResubmissionTestSupport() {}
 
@@ -37,7 +56,7 @@ final class ResubmissionTestSupport {
   /* package */ @Target(ElementType.TYPE)
   @Retention(RetentionPolicy.RUNTIME)
   @CommittedDatabaseTest
-  @Import(EventPublicationResubmitterTest.ProbeConfiguration.class)
+  @Import(ProbeConfiguration.class)
   @TestPropertySource(
       properties = {
         "event-publication.resubmission.wait-age=PT5M",
@@ -60,7 +79,19 @@ final class ResubmissionTestSupport {
     return CompletableFuture.supplyAsync(task, runnable -> Thread.ofVirtual().start(runnable));
   }
 
-  /** 同じ {@code dsl}、{@code clock}、{@code properties} から Sweep と定期のジョブを組み立てる。 */
+  /**
+   * 古い出版を FAILED に戻す処理を何もしないモックにする。{@code clock} と Spring Modulith の時計が別でも、行の状態を変えないためである。
+   *
+   * <p>本物の処理を試すテストは、{@code resubmitter} に本物の {@link EventPublicationRegistry} を渡す。
+   */
+  /* package */ static EventPublicationRegistry noStaleCheck() {
+    return Mockito.mock(EventPublicationRegistry.class);
+  }
+
+  /**
+   * 同じ {@code dsl}、{@code clock}、{@code properties} から、古い出版を FAILED に戻す処理を {@code registry}
+   * にして、Sweep と定期のジョブを組み立てる。
+   */
   /* package */ static EventPublicationResubmitter resubmitter(
       final DSLContext dsl,
       final FailedEventPublications failed,
@@ -69,10 +100,11 @@ final class ResubmissionTestSupport {
       final EventPublicationResubmissionConfig.Properties properties,
       final ResubmissionPolicies policies,
       final MeterRegistry meterRegistry,
-      final EventPublicationResubmissionConfig.AbandonProperties abandon) {
+      final EventPublicationResubmissionConfig.AbandonProperties abandon,
+      final EventPublicationRegistry registry) {
     return new EventPublicationResubmitter(
         dsl,
-        new FailedPublicationSweep(dsl, failed, lockingTaskExecutor, clock, properties),
+        new FailedPublicationSweep(dsl, failed, lockingTaskExecutor, clock, properties, registry),
         policies,
         clock,
         meterRegistry,
@@ -80,9 +112,89 @@ final class ResubmissionTestSupport {
         abandon);
   }
 
+  /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。期限は DB の時刻で決まり、固定の時計では進まないため。 */
+  /* package */ static void runJob(final DSLContext dsl, final EventPublicationResubmitter job) {
+    expireLock(dsl);
+    job.resubmitOnce();
+  }
+
+  /** 再投入したリスナーが門に着く（最初の配信と合わせて 2 回呼ばれる）まで待つ。 */
+  /* package */ static void awaitListenerAtGate(final ProbeListener listener, final String label) {
+    Awaitility.await(label + " の再投入したリスナーが門に着く")
+        .atMost(Duration.ofSeconds(ResubmissionProbes.JOIN_TIMEOUT_SECONDS))
+        .untilAsserted(() -> assertThat(listener.calls()).as(label).isEqualTo(2));
+  }
+
+  /** 他のインスタンスがロックを持っていて飛ばした回の数。 */
+  /* package */ static double skippedRuns(final MeterRegistry meterRegistry) {
+    return meterRegistry
+        .get("event.publication.resubmission.runs")
+        .tag("outcome", "skipped")
+        .counter()
+        .count();
+  }
+
   /** ロックの期限を過去にする。 */
   /* package */ static void expireLock(final DSLContext dsl) {
     CleanGeneratedTablesExtension.expireLocks(dsl);
+  }
+
+  /**
+   * 他のインスタンスの代わりに、定期の再投入と手での 1 回の再投入のロックを {@link #HELD_LOCK} だけ持つ。
+   *
+   * <p>放すときは {@link SimpleLock#unlock()} ではなく、ロックの期限を過去にする（{@link #expireLock}）。lock-at-least-for が
+   * 0 の解放は期限を {@code max(locked_at, DB の今)} にするため、取った後に DB の壁時計が戻ると、{@code locked_at} まで放されないためである。
+   */
+  /* package */ static void holdLock(final LockProvider lockProvider, final Clock clock) {
+    if (lockProvider
+        .lock(
+            new LockConfiguration(
+                Instant.now(clock), FailedPublicationSweep.LOCK_NAME, HELD_LOCK, Duration.ZERO))
+        .isEmpty()) {
+      throw new AssertionError("テストのロック " + FailedPublicationSweep.LOCK_NAME + " を取れない");
+    }
+  }
+
+  /** ロックの期限を過去にしてから、他のインスタンスの代わりにロックを持って {@code task} を呼び、終わったら期限を過去にする。 */
+  /* package */ static void whileLockHeld(
+      final DSLContext dsl,
+      final LockProvider lockProvider,
+      final Clock clock,
+      final Runnable task) {
+    expireLock(dsl);
+    holdLock(lockProvider, clock);
+    try {
+      task.run();
+    } finally {
+      expireLock(dsl);
+    }
+  }
+
+  /**
+   * テストのリスナーを 1 回失敗させ、今の時計の時刻に FAILED の出版を作り、その ID を返す。
+   *
+   * <p>今の時刻の出版は再投入の対象にならないため（{@code ResubmissionOptionsLearningTest} の {@code
+   * defaultsResubmitOnlyPublicationsOlderThanNow}）、再投入する前に時計を進める。
+   */
+  /* package */ static UUID failedProbe(
+      final Scenario scenario, final ProbeListener listener, final DSLContext dsl) {
+    listener.failTimes(1);
+    final String id = UUID.randomUUID().toString();
+    final AtomicReference<@Nullable UUID> publication = new AtomicReference<>();
+    scenario
+        .publish(new ResubmissionProbe(id, AsTenant.TENANT))
+        .andWaitForStateChange(() ->
+            dsl.select(EVENT_PUBLICATION.ID)
+                .from(EVENT_PUBLICATION)
+                .where(
+                    EVENT_PUBLICATION
+                        .SERIALIZED_EVENT
+                        .contains(id)
+                        .and(EVENT_PUBLICATION.STATUS.eq(EventPublication.Status.FAILED.name())))
+                .fetchOptional(EVENT_PUBLICATION.ID)
+                .orElse(null))
+        .andVerify(publication::set);
+    return Objects.requireNonNull(publication.get(), "FAILED の出版の ID");
   }
 
   /** {@code test.event} の出版の行を作り、その ID を返す。 */
@@ -93,11 +205,29 @@ final class ResubmissionTestSupport {
       final Instant publicationDate,
       final String status,
       final int completionAttempts) {
+    return insertPublication(
+        dsl, id, listenerId, "test.event", publicationDate, status, completionAttempts);
+  }
+
+  /**
+   * {@code eventType} の出版の行を、本文を {@code {"id":"<ID>"}} にして作り、その ID を返す。
+   *
+   * <p>Spring Modulith は、古い出版を FAILED に戻す処理と再投入で行のイベントを読み戻し、読めない型の行を落とす。
+   * 読み戻させる行には、テストのイベントの型（{@link ResubmissionProbe}）を渡す。
+   */
+  /* package */ static UUID insertPublication(
+      final DSLContext dsl,
+      final UUID id,
+      final String listenerId,
+      final String eventType,
+      final Instant publicationDate,
+      final String status,
+      final int completionAttempts) {
     dsl.insertInto(EVENT_PUBLICATION)
         .set(EVENT_PUBLICATION.ID, id)
         .set(EVENT_PUBLICATION.LISTENER_ID, listenerId)
-        .set(EVENT_PUBLICATION.EVENT_TYPE, "test.event")
-        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{}")
+        .set(EVENT_PUBLICATION.EVENT_TYPE, eventType)
+        .set(EVENT_PUBLICATION.SERIALIZED_EVENT, "{\"id\":\"" + id + "\"}")
         .set(EVENT_PUBLICATION.PUBLICATION_DATE, publicationDate)
         .set(EVENT_PUBLICATION.STATUS, status)
         .set(EVENT_PUBLICATION.COMPLETION_ATTEMPTS, completionAttempts)

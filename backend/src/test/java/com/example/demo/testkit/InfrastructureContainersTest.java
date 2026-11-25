@@ -2,6 +2,7 @@ package com.example.demo.testkit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URI;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Map;
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.env.Environment;
+import software.amazon.awssdk.services.sesv2.SesV2Client;
 
 /**
  * Spring の設定の接続先が、{@link InfrastructureContainers} の起動したコンテナを指すことを確かめる（ADR-085）。
@@ -29,8 +31,11 @@ class InfrastructureContainersTest {
   /** アプリケーションの接続の pool。 */
   @Autowired private DataSource dataSource;
 
+  /** メールを送る SDK の Client。 */
+  @Autowired private SesV2Client sesV2Client;
+
   @Test
-  @DisplayName("DB、決済代行の接続先は、この JVM が起動したコンテナを指す")
+  @DisplayName("DB、決済代行、SES の接続先は、この JVM が起動したコンテナを指す")
   void connectionsPointToStartedContainers() throws SQLException {
     final Map<String, Object> started = InfrastructureContainers.properties();
     final String jdbcUrl =
@@ -45,5 +50,9 @@ class InfrastructureContainersTest {
     assertThat(environment.getProperty("payment-gateway.base-url"))
         .as("payment-gateway.base-url")
         .isEqualTo(started.get("PAYMENT_GATEWAY_BASE_URL"));
+    // SesV2ClientConfig が AWS_ENDPOINT_URL_SESV2 を読み、Client の設定の endpointOverride に入れる（ADR-125）。
+    assertThat(sesV2Client.serviceClientConfiguration().endpointOverride())
+        .as("SES v2 の Client の接続先")
+        .hasValue(URI.create((String) started.get("AWS_ENDPOINT_URL_SESV2")));
   }
 }

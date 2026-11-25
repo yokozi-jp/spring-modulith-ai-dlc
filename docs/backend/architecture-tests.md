@@ -58,7 +58,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `httpErrorsAreMappedOnlyInErrorPresentationWeb`：`error.presentation.web`の外のクラスは、`ProblemDetail`、`ErrorResponse`（入れ子の`Builder`と`Interceptor`を含む）、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus`に依存せず、`HttpStatus.CONFLICT`と`HttpStatus.UNPROCESSABLE_CONTENT`を読まない（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   注釈を付けることも依存に数え、成功の応答の`@ResponseStatus(HttpStatus.CREATED)`も拒否する。
   整数で書いたstatus（`sendError(422)`、`ResponseEntity.status(409)`、`HttpStatusCode.valueOf(422)`）は検出しない。
-- `failureReasonsAreModuleEnums`：`shared.failure.FailureReason`を実装する型は、enumにし、ベースパッケージの下のモジュールのパッケージに置く（[ADR-125](../adr/ADR-125-derive-problem-types-from-failure-reasons.md)）。
+- `failureReasonsAreModuleEnums`：`shared.failure.FailureReason`を実装する型は、enumにし、ベースパッケージの下のモジュールのパッケージに置く（[ADR-127](../adr/ADR-127-derive-problem-types-from-failure-reasons.md)）。
   フィクスチャは自分の`shared.failure`に同じ名前のinterfaceを持つため、規則は型を名前で指す。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenancy.TenantId`と`shared.tenancy.TenantScoped`だけに依存する。
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。

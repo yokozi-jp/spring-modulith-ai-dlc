@@ -76,6 +76,7 @@ check "slot 1 の issuer" "http://127.0.0.1:21081/realms/spring-modulith" "$(val
 env_file="$work/build/test-slot/slot-1.env"
 check "env ファイルの DB_PORT" "DB_PORT=21433" "$(grep '^DB_PORT=' "$env_file")"
 check "env ファイルの決済代行" "PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:21082" "$(grep '^PAYMENT_GATEWAY_BASE_URL=' "$env_file")"
+check "env ファイルの SES の接続先" "AWS_ENDPOINT_URL_SESV2=http://127.0.0.1:21082" "$(grep '^AWS_ENDPOINT_URL_SESV2=' "$env_file")"
 check "web 用の SERVER_PORT は slot の backend のポート" "21080" "$(value_of "$out" SERVER_PORT)"
 check "ポート以外の変数は基の値のまま" "$(grep '^OIDC_CLIENT_ID=' "$work/.env.test")" "$(grep '^OIDC_CLIENT_ID=' "$env_file")"
 check "基のファイルは書き換えない" "$(grep '^DB_PORT=' "$repo_root/.env.test.example")" "$(grep '^DB_PORT=' "$work/.env.test")"

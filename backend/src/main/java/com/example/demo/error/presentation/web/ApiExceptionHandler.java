@@ -46,7 +46,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /** 409 の種類のログの属性名（version、lock、unique）。 */
   private static final String CONFLICT_KIND = "conflict.kind";
 
-  /** 404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-125）。 */
+  /** 404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-127）。 */
   private static final String PROBLEM_TYPE = "problem.type";
 
   /** Problem Details の共通フィールドを生成する。 */

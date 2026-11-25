@@ -33,7 +33,7 @@ import org.testcontainers.utility.MountableFile;
 import org.yaml.snakeyaml.Yaml;
 
 /**
- * テストの JVM ごとに 1 つずつ起動する PostgreSQL、決済代行の WireMock のコンテナ（ADR-085）。
+ * テストの JVM ごとに 1 つずつ起動する PostgreSQL、決済代行と SES v2 の API の WireMock のコンテナ（ADR-085）。
  *
  * <p>Gradle は fork ごとに別の JVM を起動するため、fork どうしは DB を共有しない。 最初の Spring のテストのコンテキストを作るときに起動し、JVM の終了で
  * Testcontainers の Ryuk が片付ける。 イメージと WireMock のコマンドは {@code docker/compose-test.yml} から読み、E2E
@@ -96,6 +96,15 @@ final class InfrastructureContainers {
   /** 決済代行のスタブが請求に返す status。 */
   private static final int CHARGED = 201;
 
+  /** テストの SDK が使うリージョン。WireMock はリージョンを見ない。 */
+  private static final String AWS_REGION = "ap-northeast-1";
+
+  /** テストの SDK のダミーのアクセスキー。WireMock は署名を見ない。 */
+  private static final String AWS_ACCESS_KEY_ID = "test-dummy-access-key";
+
+  /** テストの SDK のダミーのシークレットキー。WireMock は署名を見ない。 */
+  private static final String AWS_SECRET_ACCESS_KEY = "test-dummy-secret-key";
+
   private InfrastructureContainers() {}
 
   /** 起動した依存の接続先を、{@code application.yaml} のプレースホルダの名前で返す。初回の呼び出しで起動する。 */
@@ -139,9 +148,8 @@ final class InfrastructureContainers {
     bindToLoopback(wireMock, WIREMOCK_PORT);
     Startables.deepStart(postgres, wireMock).join();
 
-    final String paymentGateway =
-        "http://" + LOOPBACK + ":" + wireMock.getMappedPort(WIREMOCK_PORT);
-    warmUp(paymentGateway);
+    final String wireMockUrl = "http://" + LOOPBACK + ":" + wireMock.getMappedPort(WIREMOCK_PORT);
+    warmUp(wireMockUrl);
     final String dbPort = String.valueOf(postgres.getMappedPort(POSTGRES_PORT));
     migrate("jdbc:postgresql://" + LOOPBACK + ":" + dbPort + "/" + DB_NAME);
     return Map.ofEntries(
@@ -152,7 +160,11 @@ final class InfrastructureContainers {
         Map.entry("DB_PASSWORD", PASSWORD),
         Map.entry("MIGRATION_DB_USERNAME", MIGRATION_USER),
         Map.entry("MIGRATION_DB_PASSWORD", PASSWORD),
-        Map.entry("PAYMENT_GATEWAY_BASE_URL", paymentGateway));
+        Map.entry("PAYMENT_GATEWAY_BASE_URL", wireMockUrl),
+        Map.entry("AWS_ENDPOINT_URL_SESV2", wireMockUrl),
+        Map.entry("AWS_REGION", AWS_REGION),
+        Map.entry("AWS_ACCESS_KEY_ID", AWS_ACCESS_KEY_ID),
+        Map.entry("AWS_SECRET_ACCESS_KEY", AWS_SECRET_ACCESS_KEY));
   }
 
   /** コンテナのポートを、空いているホストのポートへ、{@code 127.0.0.1} だけで公開する。 */
@@ -171,7 +183,7 @@ final class InfrastructureContainers {
    * <p>ponytail: WireMock の最初の請求は JsonPath とテンプレートのクラスの読み込みで遅く、負荷の下では {@code
    * payment-gateway.read-timeout} を超えるため、テストより先に 1 回呼ぶ。温めるのは {@code /v1/charges} だけで、要求の形は {@code
    * payment-gateway-charge.json} の照合の写しなので、スタブの照合を変えたらここも変える。 スタブが増えたら、各スタブを温めるか、テストの read-timeout
-   * を延ばす。
+   * を延ばす。SES の SendEmail のスタブは、呼ぶ唯一の Spring のテストの {@code MailSenderClientIntegrationTest} が温める。
    */
   // 割り込まれたら、割り込みの状態を戻して失敗させる。
   @SuppressWarnings("PMD.DoNotUseThreads")

@@ -1,4 +1,4 @@
-# テスト専用の依存スタック（PostgreSQL + 決済代行の WireMock、バックエンドスモーク時のみ Keycloak）。
+# テスト専用の依存スタック（PostgreSQL + 決済代行と SES の WireMock、バックエンドスモーク時のみ Keycloak）。
 # 目的: 開発用スタック（docker/compose.yml）と隔離し、開発を止めずにテストを回す。
 #   - プロジェクト名を分け（name: spring-modulith-test。task は slot ごとに COMPOSE_PROJECT_NAME=spring-modulith-test-<n> で上書きする）、ネットワーク/コンテナを別空間にする。
 #   - ホストポートを開発用とずらす（slot 0 は PostgreSQL 5433 / Keycloak 8081 / WireMock 8082 / backend 8080）。開発の 5432/8090 と衝突しない。
@@ -74,7 +74,7 @@ services:
       retries: 24
       start_period: 20s
 
-  # 決済代行の偽物。開発用と同じ docker/wiremock/mappings の成功のスタブを返す。
+  # 決済代行と SES v2 の API の偽物。開発用と同じ docker/wiremock/mappings の成功のスタブを返す。
   # 失敗は、E2E が管理 API（/__admin/mappings）で注文ごとに実行中に足す。
   # profile を付けない。task e2e とバックエンドのスモークが使う（ADR-072）。Gradle のテストは同じイメージとコマンドをコンテナで起動する（ADR-085）。
   wiremock:
@@ -113,6 +113,7 @@ services:
       OIDC_ISSUER_URI: http://127.0.0.1:${TEST_KEYCLOAK_PORT:-8081}/realms/spring-modulith
       OIDC_DISCOVERY_URI: http://keycloak:8080/realms/spring-modulith/.well-known/openid-configuration
       PAYMENT_GATEWAY_BASE_URL: http://wiremock:8080
+      AWS_ENDPOINT_URL_SESV2: http://wiremock:8080
     ports:
       - "127.0.0.1:${TEST_BACKEND_PORT:-8080}:8080"
     depends_on:

@@ -72,7 +72,7 @@ slot 1: web http://localhost:21173、backend http://localhost:21080、Keycloak h
   `vp preview` と Playwright は、ルートの `.env.test` よりこれらの環境変数を優先して読む。
 
 slot の env ファイルは、基にする env ファイル（Task の `TEST_ENV_FILE`、既定は `.env.test`）の写しである。
-ホストから見たポートを持つ次の 3 つの変数だけを、slot の値に置き換える。
+ホストから見たポートを持つ次の 4 つの変数だけを、slot の値に置き換える。
 基にする env ファイルは書き換えない。
 
 | 変数                       | slot の値                                                      |
@@ -80,9 +80,11 @@ slot の env ファイルは、基にする env ファイル（Task の `TEST_EN
 | `DB_PORT`                  | `TEST_PG_PORT`                                                 |
 | `OIDC_ISSUER_URI`          | `http://127.0.0.1:<TEST_KEYCLOAK_PORT>/realms/spring-modulith` |
 | `PAYMENT_GATEWAY_BASE_URL` | `http://127.0.0.1:<TEST_WIREMOCK_PORT>`                        |
+| `AWS_ENDPOINT_URL_SESV2`   | `http://127.0.0.1:<TEST_WIREMOCK_PORT>`                        |
 
 `task be-migrate` と `task be-seed` は `COMPOSE_ENV_FILE` で、`task be-verify-migrations` と `task be-test` は `TEST_ENV_FILE` で、slot の env ファイルを受け取る。
 compose-test の backend（`e2e` profile）は `.env.test` を `env_file` で読み、`SERVER_PORT` をコンテナの待ち受けのポート 8080 に、`OIDC_ISSUER_URI` を slot の Keycloak の URL に上書きする。
+`PAYMENT_GATEWAY_BASE_URL` と `AWS_ENDPOINT_URL_SESV2` は、compose の中の WireMock（`http://wiremock:8080`）に上書きする。
 そのため、`.env.test` の `SERVER_PORT` は、`vp preview` の proxy が向ける、ホストから見た backend のポートだけを表す（slot の値は `acquire` が環境変数で渡す）。
 
 ## 空きがないとき

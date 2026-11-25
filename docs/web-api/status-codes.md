@@ -23,7 +23,7 @@ tags: [convention, web-api, http, future-arch-guidelines]
 ステータス以上の意味がないproblemの`type`は`about:blank`にする。
 業務固有のproblem typeは、パスを全部書いた相対URIにし、`title`をMessageSourceで日本語と英語に解決する（[ADR-058](../adr/ADR-058-use-path-absolute-relative-uri-for-problem-types.md)）。
 422と409は`about:blank`にせず、失敗ごとのtypeを付け、404は`about:blank`のままにする。
-422と409のtypeと`title`のキーの形と値は、[業務上の失敗の例外](../backend/class-roles/business-exception.md#例外httpログlistener-の対応)に従う（[ADR-125](../adr/ADR-125-derive-problem-types-from-failure-reasons.md)）。
+422と409のtypeと`title`のキーの形と値は、[業務上の失敗の例外](../backend/class-roles/business-exception.md#例外httpログlistener-の対応)に従う（[ADR-127](../adr/ADR-127-derive-problem-types-from-failure-reasons.md)）。
 OpenAPIの`ProblemDetail.type`の`x-extensible-enum`に、今あるtypeをすべて載せる。
 CSRFトークンの検証に失敗した403は`/problems/csrf-token-invalid`にする。
 対象は`/api/**`の更新系と`/logout`で、理由は[CSRFのCookie](authentication-and-session.md#csrfのcookie)にある。

@@ -18,7 +18,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 /**
  * どの Problem Details にも、要求の trace ID を traceId で付け、instance を設定しない（ADR-117）。
  *
- * <p>OpenAPI の {@code ProblemDetail.type} に、応答が返す problem type を載せる（ADR-125）。
+ * <p>OpenAPI の {@code ProblemDetail.type} に、応答が返す problem type を載せる（ADR-127）。
  */
 @Configuration(proxyBeanMethods = false)
 class ProblemDetailsConfig implements WebMvcConfigurer {

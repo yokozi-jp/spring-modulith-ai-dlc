@@ -11,7 +11,7 @@ tags: [convention, backend, class-role]
 422 は理由をモジュールの `FailureReason` の enum の定数で渡し、409 は競合の種類で、どちらも理由ごとの problem type と `title` になる。
 集約ごとの型を作らず、JDK の例外と Spring の HTTP の例外を業務上の失敗に使わない。
 HTTP のステータス、本文、ログレベルは `error` モジュールの `ApiExceptionHandler` が決め、Controller は try と catch を書かない。
-決定理由は [ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md) と [ADR-125](../../adr/ADR-125-derive-problem-types-from-failure-reasons.md) に示す。
+決定理由は [ADR-062](../../adr/ADR-062-map-business-exceptions-to-404-409-422.md) と [ADR-127](../../adr/ADR-127-derive-problem-types-from-failure-reasons.md) に示す。
 
 ## 定義
 

@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-125: 失敗の理由の enum から problem type と title のキーを作る'
+title: 'ADR-127: 失敗の理由の enum から problem type と title のキーを作る'
 description: problem type を /problems/<パス>、title のキーを problem.title.<パス> にして同じパスから作り、パスをモジュールの 422 では /problems/<module>/<kebab-case> の <module>/<kebab-case>、モジュールによらない problem では CommonProblem の定数の kebab-case にし、モジュールの名前を理由の enum のパッケージから取り、OpenAPI の ProblemDetail.type に x-extensible-enum ですべての type を載せる決定。ADR-058 の業務固有の problem type の形を改める。
 tags: [adr, backend, api, error, frontend]
 ---
 
-# ADR-125: 失敗の理由の enum から problem type と title のキーを作る
+# ADR-127: 失敗の理由の enum から problem type と title のキーを作る
 
 ## Status
 

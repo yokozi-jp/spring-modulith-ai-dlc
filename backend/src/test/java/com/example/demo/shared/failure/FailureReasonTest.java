@@ -8,7 +8,7 @@ import com.example.demo.tenancy.domain.model.TenantFailure;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** 理由の enum のパッケージから、モジュールの名前を取ることを確かめる（ADR-125）。 */
+/** 理由の enum のパッケージから、モジュールの名前を取ることを確かめる（ADR-127）。 */
 class FailureReasonTest {
 
   @Test

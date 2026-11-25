@@ -38,6 +38,7 @@ import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.PropertyResolver;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.type.AnnotatedTypeMetadata;
+import org.springframework.modulith.events.core.Staleness;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
@@ -55,7 +56,8 @@ import org.springframework.validation.annotation.Validated;
 @EnableConfigurationProperties({
   EventPublicationResubmissionConfig.Properties.class,
   EventPublicationResubmissionConfig.AbandonProperties.class,
-  EventPublicationResubmissionConfig.ResubmitOnceProperties.class
+  EventPublicationResubmissionConfig.ResubmitOnceProperties.class,
+  EventPublicationResubmissionConfig.StalenessMonitorProperties.class
 })
 class EventPublicationResubmissionConfig {
 
@@ -179,7 +181,7 @@ class EventPublicationResubmissionConfig {
   }
 
   /**
-   * 有効で、手での 1 回の再投入でないときだけ、@Scheduled と Staleness Monitor を動かす。
+   * 有効で、手での 1 回の再投入でないときだけ、@Scheduled の定期の再投入（古い出版を FAILED に戻す処理を含む）を動かす。
    *
    * <p>有効かどうかを決めるのはこの条件だけで、{@link Properties} には持たない。 Boot の束ね方は {@code yes} や {@code 1}
    * も真と読むが、この条件は {@code true}（大文字小文字を問わない）だけを真とするためである。
@@ -190,7 +192,7 @@ class EventPublicationResubmissionConfig {
   /* package */ static class Scheduling {}
 
   /**
-   * 手での 1 回の再投入の対象があるとき、Web のサーバーと定期の実行（Staleness Monitor を含む）を止める。
+   * 手での 1 回の再投入の対象があるとき、Web のサーバーと定期の実行を止める。
    *
    * <p>同じイメージを 1 回だけ起動する入口であり、対象の設定 1 つで、HTTP の待ち受けと定期の再投入を動かさないようにする。 環境変数の値より優先するため、プロパティの先頭に足す。
    *
@@ -229,10 +231,10 @@ class EventPublicationResubmissionConfig {
   /**
    * 再投入の設定値。
    *
-   * @param waitAge 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。PUBLISHED の Staleness Monitor
-   *     の閾値にも使う。リスナーの処理時間より十分に長くする
-   * @param inFlightStaleness PROCESSING と RESUBMITTED の Staleness Monitor
-   *     の閾値。最後の出版か再投入の時刻から測る。{@code lock-at-most-for} の 2 倍より長くする
+   * @param waitAge 最初の失敗から 1 回目の再投入までの待ち時間で、2 回目からの待ち時間の基準。PUBLISHED の出版を古いとして FAILED
+   *     に戻す閾値にも使う。リスナーの処理時間より十分に長くする
+   * @param inFlightStaleness PROCESSING と RESUBMITTED の出版を古いとして FAILED
+   *     に戻す閾値。最後の出版か再投入の時刻から測る。{@code lock-at-most-for} の 2 倍より長くする
    * @param interval 前の回の終わりから次の回までの間隔
    * @param maxPerRun 1 回の実行で再投入する件数の上限
    * @param lockAtMostFor ロックを持つ上限。実行が落ちて解放できなかったとき、この時間を過ぎると他のインスタンスが取れる。1 回の実行の最長の時間より十分に長くする
@@ -256,6 +258,22 @@ class EventPublicationResubmissionConfig {
      */
     /* package */ Duration lockAtLeastFor() {
       return interval.dividedBy(2);
+    }
+
+    /**
+     * 古い出版を FAILED に戻す閾値。{@code PUBLISHED} は {@code wait-age}、{@code PROCESSING} と {@code
+     * RESUBMITTED} は {@code in-flight-staleness} にする（ADR-079）。
+     *
+     * <p>Spring Modulith は古くなりうる 3 つの状態だけを問い合わせる（{@link Staleness#isMonitored}）。
+     */
+    /* package */ Staleness staleness() {
+      return status ->
+          switch (status) {
+            case PUBLISHED -> waitAge;
+            case PROCESSING, RESUBMITTED -> inFlightStaleness;
+            case COMPLETED, FAILED, ABANDONED ->
+                throw new IllegalArgumentException("status cannot become stale: " + status);
+          };
     }
 
     /** {@code default} の方針があるか。 */
@@ -286,9 +304,10 @@ class EventPublicationResubmissionConfig {
     }
 
     /**
-     * PROCESSING と RESUBMITTED の Staleness Monitor の閾値が、ロックを持つ上限の 2 倍より長いか（ADR-079）。
+     * PROCESSING と RESUBMITTED の出版を FAILED に戻す閾値が、ロックを持つ上限の 2 倍より長いか（ADR-079）。
      *
-     * <p>再投入の時刻から、executor の空きの待ちとリスナーの処理が、それぞれ {@code lock-at-most-for} まで続きうる。
+     * <p>古い出版を FAILED に戻す処理はロックの中で動くが、再投入した出版の executor の空きの待ちはその回の中で {@code lock-at-most-for}
+     * まで、リスナーの処理はロックを放した後も {@code lock-at-most-for} まで続きうる。 どちらも再投入の時刻から測るため、2 倍を超えるまでは処理中でありうる。
      */
     @AssertTrue(
         message =
@@ -348,6 +367,32 @@ class EventPublicationResubmissionConfig {
     /** 行の {@code completion_attempts}（再投入した回数 + 1）が、もう再投入しない回数か。 */
     /* package */ boolean exceeded(final int completionAttempts) {
       return completionAttempts > abandonAfterAttempts;
+    }
+  }
+
+  /**
+   * Spring Modulith の {@code spring.modulith.events.staleness} のうち、組み込みの Staleness Monitor の閾値。
+   *
+   * <p>どれかを書くと、Spring Modulith 2.2.0 は組み込みの Staleness Monitor を定期のタスクに登録し、古い出版をロックの外で FAILED に戻す。
+   * 古い出版を FAILED に戻す処理はロックの中で呼ぶため（{@link FailedPublicationSweep}、ADR-079）、書いたら起動に失敗させる。 {@code
+   * check-interval} だけではタスクを登録しないため、見ない。
+   *
+   * @param published {@code PUBLISHED} の閾値
+   * @param processing {@code PROCESSING} の閾値
+   * @param resubmitted {@code RESUBMITTED} の閾値
+   */
+  /* package */ @ConfigurationProperties("spring.modulith.events.staleness")
+  @Validated
+  record StalenessMonitorProperties(
+      @Nullable Duration published, @Nullable Duration processing, @Nullable Duration resubmitted) {
+
+    /** 組み込みの Staleness Monitor の閾値をどれも書いていないか。 */
+    @AssertTrue(
+        message =
+            "spring.modulith.events.staleness.published, processing and resubmitted must not be set:"
+                + " stale publications are marked failed inside the resubmission lock")
+    /* package */ boolean isBuiltInMonitorOff() {
+      return published == null && processing == null && resubmitted == null;
     }
   }
 

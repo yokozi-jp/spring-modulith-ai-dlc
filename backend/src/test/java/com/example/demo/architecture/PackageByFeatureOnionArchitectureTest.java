@@ -564,7 +564,7 @@ class PackageByFeatureOnionArchitectureTest {
                 + "enum でない型やモジュールの外の型では type が定まらないため。"
                 + "直し方：理由を enum にし、com.example.demo.<module> の下の、理由を投げる層のパッケージに置く。"
                 + "規約：docs/backend/class-roles/business-exception.md、"
-                + "docs/adr/ADR-125-derive-problem-types-from-failure-reasons.md");
+                + "docs/adr/ADR-127-derive-problem-types-from-failure-reasons.md");
   }
 
   /**

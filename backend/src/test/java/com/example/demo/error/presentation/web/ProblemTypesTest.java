@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-/** 応答が返す problem type の一覧と、その title が日本語と英語の messages にあることを確かめる（ADR-125）。 */
+/** 応答が返す problem type の一覧と、その title が日本語と英語の messages にあることを確かめる（ADR-127）。 */
 class ProblemTypesTest {
 
   @Test

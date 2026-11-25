@@ -91,12 +91,12 @@ final class ApiProblemDetails {
     return problem;
   }
 
-  /** モジュールによらない problem を作る。detail は付けない（ADR-125）。 */
+  /** モジュールによらない problem を作る。detail は付けない（ADR-127）。 */
   /* package */ ProblemDetail problem(final CommonProblem common, final Locale locale) {
     return typedProblem(common.status(), ProblemTypes.path(common), locale);
   }
 
-  /** 業務規則の違反の 422 を作る。type と title は理由から決まり、detail は付けない（ADR-125）。 */
+  /** 業務規則の違反の 422 を作る。type と title は理由から決まり、detail は付けない（ADR-127）。 */
   /* package */ ProblemDetail businessRuleViolationProblem(
       final FailureReason reason, final Locale locale) {
     return typedProblem(HttpStatus.UNPROCESSABLE_CONTENT, ProblemTypes.path(reason), locale);

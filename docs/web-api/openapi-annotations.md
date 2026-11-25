@@ -72,7 +72,7 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
   `<Name>`は`NotFound`、`Conflict`、`UnprocessableContent`のいずれかである。
 - `springdoc.override-with-generic-response`は`false`であり、`ApiExceptionHandler`の応答は自動では付かない。
 - `ProblemDetail`の`type`の`x-extensible-enum`は、`error.presentation.web`の`ProblemDetailsConfig`が付ける。
-  422の理由の値は、`FailureReason`を実装するenumから集まるため、operationごとに書かない（[ADR-125](../adr/ADR-125-derive-problem-types-from-failure-reasons.md)）。
+  422の理由の値は、`FailureReason`を実装するenumから集まるため、operationごとに書かない（[ADR-127](../adr/ADR-127-derive-problem-types-from-failure-reasons.md)）。
 
 ステータスコードの選び方は[HTTPステータスコードの選択](status-codes.md)に従う。
 

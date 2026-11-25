@@ -18,7 +18,7 @@ public final class BusinessRuleViolationException extends RuntimeException {
   /**
    * 理由とログ用のメッセージから業務規則の違反の例外を作る。原因は持たない。
    *
-   * <p>理由を enum の定数に限る。type は定数の名前から作るため、enum でない実装は名前を保てない（ADR-125）。
+   * <p>理由を enum の定数に限る。type は定数の名前から作るため、enum でない実装は名前を保てない（ADR-127）。
    *
    * @param <E> 理由の enum
    */

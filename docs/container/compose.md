@@ -110,7 +110,7 @@ services:
 ## 外部システムの偽物
 
 外部システムは、本番のコードで偽らず、ローカルとテストの compose に置く WireMock で偽る（[ADR-072](../adr/ADR-072-fake-external-systems-with-wiremock.md)）。
-例は `docker/compose.yml` と `docker/compose-test.yml` の `wiremock` である。
+例は `docker/compose.yml` と `docker/compose-test.yml` の `wiremock` で、決済代行と SES v2 の API の両方を 1 つのコンテナで偽る。
 
 - WireMock のイメージはタグと digest で固定し、テストの依存の `org.wiremock:wiremock-standalone` の版の正本にする。jar の版は `backend/build.gradle` が `docker/compose-test.yml` のイメージの tag から読む。`docker/compose.yml` のイメージは手で `docker/compose-test.yml` と同じにする。
 - `command` に `--disable-http2-plain` を付ける。
@@ -120,6 +120,11 @@ services:
 - healthcheck は `/__admin/health` を `curl` で確かめる。
 - ポートは `127.0.0.1` に限って公開する（開発用 8090、compose-test は slot 0 で 8082）。
   backend は compose の network の中から service 名（`http://wiremock:8080`）で呼ぶ。
+- SES v2 の API は、backend の環境変数 `AWS_ENDPOINT_URL_SESV2` で WireMock に向ける（[ADR-125](../adr/ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
+  `SesV2ClientConfig` が、Spring の設定にあるこの環境変数を Client の接続先にする。
+  同じ backend に、ダミーの `AWS_ACCESS_KEY_ID` と `AWS_SECRET_ACCESS_KEY` と、`AWS_REGION` を渡す。
+- 手元で送ったメールは、開発用の WireMock（`http://127.0.0.1:8090`）の要求の記録から読む。
+  条件の書き方は[E2E テストの方針と書き方](../e2e/testing-strategy.md#送ったメールを読む)にある。
 - 失敗と拒否は、マッピングファイルに置かず、テストが管理 API で実行中に足す。
 - WireMock は本番の構成に置かない。
 
