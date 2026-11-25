@@ -4,8 +4,8 @@ Hikari の接続の使用状況と、jOOQ のクエリの件数と時間が見�
 
 ## Sub-features
 
-- Hikari：`hikaricp_connections_active`、`_pending`、`_acquire_milliseconds_*`、`_timeout_total`
-- jOOQ：`jooq_query_milliseconds_*`（[ADR-070](../../../../docs/adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）
+- Hikari：`hikaricp_connections_active`、`_pending`、`_acquire_seconds_*`、`_timeout_total`
+- jOOQ：`jooq_query_seconds_*`（[ADR-070](../../../../docs/adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）
 
 ## How to get to it (user POV)
 

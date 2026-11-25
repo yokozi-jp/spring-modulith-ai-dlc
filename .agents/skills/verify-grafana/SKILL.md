@@ -53,8 +53,10 @@ bash .kiro/skills/verify-grafana/scripts/check.sh all
 変数 `$job` は `<OTEL_SERVICE_NAMESPACE>/<OTEL_SERVICE_NAME>`、それ以外は `.+` に置き換える。
 `.+` は All の展開と同じである。
 `.*` にすると属性の無い系列が通り、画面の No data を見逃す。
-指標の名前と属性は Micrometer のものである。
-OpenTelemetry の semantic conventions の名前ではない。
+指標の名前と属性は OpenTelemetry の semantic conventions である（[ADR-133](../../../docs/adr/ADR-133-align-metrics-with-opentelemetry-semantic-conventions.md)）。
+GC、Hikari、jOOQ など、semantic conventions に定義が無い指標は Micrometer の名前のままである。
+`dashboards` は、空のままにすると決めたパネルを `GAP` と表示し、失敗にしない。
+`rate(...[5m])` を使うパネルと Error のパネルは、5 分の間 request を送り続け、5xx を含めないと空になる（手順は [red-http.md](features/red-http.md)）。
 
 ## Evidence
 
