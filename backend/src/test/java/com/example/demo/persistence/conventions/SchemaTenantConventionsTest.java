@@ -160,7 +160,19 @@ class SchemaTenantConventionsTest {
     private IndexRow uniqueIndex(
         final String schema, final String name, final String firstColumn, final boolean primary) {
       return new IndexRow(
-          schema, TABLE, name, BTREE, primary, 2, 2, false, false, false, true, firstColumn);
+          schema,
+          TABLE,
+          name,
+          BTREE,
+          primary,
+          2,
+          2,
+          false,
+          false,
+          false,
+          true,
+          firstColumn,
+          List.of());
     }
   }
 
@@ -230,6 +242,15 @@ class SchemaTenantConventionsTest {
       assertThat(keys(SchemaTenantConventions.foreignKeys(relations, columns, List.of())))
           .containsExactlyInAnyOrder(
               "K1 ordering.t_order_line.order_id", "K1 tenancy.m_user_identity.user_id");
+    }
+
+    @Test
+    @DisplayName("K1：履歴の表（h_）は、外部キーのない参照の列を拒否しない")
+    void skipsArchiveTables() {
+      final List<ColumnRow> history =
+          List.of(new ColumnRow(TENANCY, "h_membership", USER_ID, BIGINT, "b", "", "", null, true));
+
+      assertThat(SchemaTenantConventions.foreignKeys(relations, history, List.of())).isEmpty();
     }
 
     @Test

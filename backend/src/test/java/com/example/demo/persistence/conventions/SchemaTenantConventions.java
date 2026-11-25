@@ -153,6 +153,8 @@ final class SchemaTenantConventions {
    * <p>参照の列は、{@link
    * SchemaTableConventions#references}（P3）と同じく、同じスキーマのほかのテーブルの主キーと同じ名前の列とする。スキーマをまたぐ外部キーはP4が拒否する。
    *
+   * <p>{@code archived_at}を持つ履歴の表は、参照先の行が消えても残すため、外部キーのない参照の列を判定しない。
+   *
    * @param relations テーブルとビュー
    * @param columns カラム
    * @param constraints 制約
@@ -191,9 +193,15 @@ final class SchemaTenantConventions {
                         + "の外部キーにし、参照先に同じ組のユニークインデックスを作る（"
                         + CONSTRAINTS_DOC
                         + "）。"));
+    final Set<String> archiveTables =
+        columns.stream()
+            .filter(row -> row.table().startsWith(ArchiveDeclarationConventions.PREFIX))
+            .map(row -> row.schema() + "." + row.table())
+            .collect(Collectors.toSet());
     final Stream<ConventionViolation> missing =
         columns.stream()
             .filter(row -> SchemaConventions.isBusinessSchema(row.schema()))
+            .filter(row -> !archiveTables.contains(row.schema() + "." + row.table()))
             .filter(row -> primaryKeyColumns.contains(row.schema() + "." + row.column()))
             .filter(row -> !row.column().equals(primaryKeys.get(row.schema() + "." + row.table())))
             .filter(row ->

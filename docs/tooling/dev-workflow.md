@@ -257,14 +257,16 @@ Redisのセッションは引き継がない。
 ```bash
 task be-seed-reset CONFIRM_RESET=yes   # 業務データを消して代表データを入れ直す
 task be-seed                           # 業務データが空のときだけ代表データを入れる
+task be-seed-tenancy                   # テナントと所属だけを入れる
 ```
+
+`task be-seed`は業務データが空のときだけ代表データを入れ、`task be-seed-tenancy`は業務データを入れずにテナントと所属を毎回入れるので、テナントと所属だけが要るE2Eは`task be-seed-tenancy`を使う（[DB操作コマンドのリファレンス](../database/commands.md)）。
 
 代表データ（商品5件、注文6件、決済2件）は、`TenancySeeds`の2つのテナント（サンプル商事、サンプル物産）の両方に入る（[ADR-107](../adr/ADR-107-isolate-tenants-with-rls-set-per-transaction.md)）。
 業務データが空かの判定とresetの削除は、`tenancy.m_tenant`のテナントごとに、そのテナントを設定して行う。
 業務テーブルはRLSでテナントごとに分かれ、テナントを設定しないまま読むとエラーになるからである（[PostgreSQLのマルチテナント設計](../database/postgresql-multitenancy.md#全テナントの行を書き換える処理)）。
 
-reset は業務テーブルの5表（`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`ordering.t_idempotency_key`、`payment.t_payment`）だけを消す。
-`ordering.t_idempotency_key`を消し、`tenancy.t_idempotency_key`を残す理由は、[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「保存期間と掃除」にある。
+reset は業務テーブルの6表（`product.m_product`、`product.t_idempotency_key`、`ordering.t_order`、`ordering.t_order_line`、`ordering.t_idempotency_key`、`payment.t_payment`）だけを消す（キーの表を消す理由と、`tenancy.t_idempotency_key`を残す理由は[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「保存期間と掃除」）。
 `tenancy`の表、`modulith`の出版の表、Liquibaseの管理表は残す。
 消した注文を指す出版が残ることがあり、手での1回の再投入（`EVENT_PUBLICATION_RESUBMIT_ONCE_TARGET`）で再投入しても注文がないか状態が違うので、決済代行は呼ばれない。
 出版も消したいときは`task compose-reset CONFIRM_RESET=yes`でDBを作り直す。
@@ -313,6 +315,8 @@ task e2e
 
 開発用のKeycloak（`127.0.0.1:8080`）が動いていれば、slot 0を飛ばしてslot 1以降を使う。
 `task e2e-up`がwebかbackendのポートを使用中と報告して止まったときは、そのポートを使うプロセスを止める。
+`task e2e-up`は`task be-seed-tenancy`でテナントと所属だけを入れる（[代表データを入れ直すとき](#代表データを入れ直すとき)）。
+商品は各テストが商品を登録するAPIで作る（[ADR-130](../adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
 
 失敗した環境を調べるときは`E2E_KEEP_ENV=1 task e2e`で残す。
 `task e2e-up`は起動だけで片付けないので、直接実行したときは、出力のComposeプロジェクトを`-p`に渡し、`docker compose -p spring-modulith-test-<n> -f docker/compose-test.yml --profile e2e down --volumes --remove-orphans`で自分で片付ける。

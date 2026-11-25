@@ -7,10 +7,13 @@ import com.tngtech.archunit.core.domain.JavaClass;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import org.jooq.Table;
+import org.jooq.TableField;
 
 /** 本番のクラスが宣言した集約を、テストから読む。 */
 public final class AggregateDeclarations {
@@ -20,27 +23,38 @@ public final class AggregateDeclarations {
   }
 
   /** 本番のクラスの、AggregateTable 型の static フィールドの値を集める。 */
-  // private な定数の宣言を読むため、可視性を変える。
-  @SuppressWarnings({"PMD.AvoidAccessibilityAlteration", "unchecked"})
   /* package */ static List<AggregateTable<?, ?, ?>> all() {
-    final List<AggregateTable<?, ?, ?>> aggregates = new ArrayList<>();
-    for (final JavaClass javaClass :
-        new ClassFileImporter()
-            .withImportOption(new ProductionCodeOnly())
-            .importPackagesOf(DemoApplication.class)) {
-      for (final Field field : javaClass.reflect().getDeclaredFields()) {
-        if (Modifier.isStatic(field.getModifiers())
-            && AggregateTable.class.isAssignableFrom(field.getType())) {
-          field.setAccessible(true);
-          try {
-            aggregates.add((AggregateTable<?, ?, ?>) field.get(null));
-          } catch (IllegalAccessException e) {
-            throw new IllegalStateException("cannot read " + field, e);
-          }
-        }
-      }
+    return byOwner().values().stream().flatMap(List::stream).toList();
+  }
+
+  /** 本番のクラスの、AggregateTable 型の static フィールドの値を、宣言したクラスごとに集める。 */
+  /* package */ static Map<Class<?>, List<AggregateTable<?, ?, ?>>> byOwner() {
+    return new ClassFileImporter()
+        .withImportOption(new ProductionCodeOnly()).importPackagesOf(DemoApplication.class).stream()
+            .map(JavaClass::reflect)
+            .map(owner -> Map.entry(owner, declaredIn(owner)))
+            .filter(entry -> !entry.getValue().isEmpty())
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  private static List<AggregateTable<?, ?, ?>> declaredIn(final Class<?> owner) {
+    return Arrays.stream(owner.getDeclaredFields())
+        .filter(field ->
+            Modifier.isStatic(field.getModifiers())
+                && AggregateTable.class.isAssignableFrom(field.getType()))
+        .<AggregateTable<?, ?, ?>>map(AggregateDeclarations::read)
+        .toList();
+  }
+
+  // private な定数の宣言を読むため、可視性を変える。
+  @SuppressWarnings("PMD.AvoidAccessibilityAlteration")
+  private static AggregateTable<?, ?, ?> read(final Field field) {
+    field.setAccessible(true);
+    try {
+      return (AggregateTable<?, ?, ?>) field.get(null);
+    } catch (IllegalAccessException e) {
+      throw new IllegalStateException("cannot read " + field, e);
     }
-    return aggregates;
   }
 
   /** 本番の集約の宣言を、テーブルと列の名前で返す。 */
@@ -49,10 +63,15 @@ public final class AggregateDeclarations {
         .map(aggregate ->
             new DeclaredAggregate(
                 qualified(aggregate.table()),
+                aggregate.key().getName(),
                 aggregate.children().stream()
                     .map(child ->
-                        new DeclaredChild(qualified(child.table()), child.parentKey().getName()))
-                    .toList()))
+                        new DeclaredChild(
+                            qualified(child.table()),
+                            child.parentKey().getName(),
+                            qualified(child.archive().table())))
+                    .toList(),
+                aggregate.duplicateKey().stream().map(TableField::getName).toList()))
         .toList();
   }
 

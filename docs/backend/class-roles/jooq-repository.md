@@ -75,7 +75,7 @@ jOOQ の Repository は業務規則を持たない。
   `AggregateTable.of(T_ORDER, T_ORDER.PUBLIC_ID, order -> order.id().value(), T_ORDER.ORDER_ID, LINES)` は、ルートのテーブル、ルートを一つに決める一意の列、集約ルートからその列の値を取る関数、内部の主キー、子を渡す。
   関数を宣言に持つため、`insert` と `update` に一意の列の値を別に渡さず、別の集約ルートの値と組にして渡す誤りが書けない。
   定数の型は `AggregateTable<TOrderRecord, UUID, Order>` のように、第 3 型引数に集約ルートのクラスを指定する。`update` が版の持ち主をこの型で受け取るため、版の数値を返すラムダは渡せない。
-  `ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO)` は、子のテーブル、親の内部の主キーを持つ外部キーの列、親の中で行を同定する自然キーの列を渡す。
+  `ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, Tables.H_ORDER_LINE, T_ORDER_LINE.LINE_NO)` は、子のテーブル、親の内部の主キーを持つ外部キーの列、削除する前の行を写す履歴の表、親の中で行を同定する自然キーの列を渡す（[履歴の表](../../database/postgresql-logical-design.md#履歴の表)）。
   自然キーの列の型は `Integer`、`Long`、`Short`、`String`、`UUID` に限り、その列の組を子のテーブルの一意制約で裏づける。
   外部キーの列は、親の内部の主キーと同じ型（`Long`）であることしかコンパイルで確かめられない。正しい列を渡したことは、`@DatabaseTest` の往復で確かめる。
 - `add` は、`tableWriter.insert(ORDER, order, ルートの列の値, 子の全行)` を呼ぶ。
@@ -85,6 +85,11 @@ jOOQ の Repository は業務規則を持たない。
   内部の主キーは `TableWriter` が `RETURNING` で受けて子の外部キーに書くため、読み直さない。
   一意制約の違反（`23505`）は `Kind.UNIQUE` の、`lock_timeout` までに行のロックを取れないこと（`55P03`）は `Kind.LOCK` の `ConflictException` に、`TableWriter` が変える。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
+- 同じ集約の 2 回目の保存を処理済みとして正常に終える集約は、`of` の代わりに `AggregateTable.ofIdempotentOn(T_PAYMENT, T_PAYMENT.PUBLIC_ID, payment -> payment.id().value(), T_PAYMENT.PAYMENT_ID, List.of(T_PAYMENT.TENANT_PUBLIC_ID, T_PAYMENT.ORDER_PUBLIC_ID))` で宣言する（`JooqPaymentRepository`）。
+  5 番目の引数は重複を許す一意索引の列で、子はその後ろに渡す。
+  列は、述語と式のない一意索引の列とちょうど同じ組にし（テナントの列を含む）、ルートを一つに決める一意の列を含めない。
+  その `add` は `boolean` を返し、`tableWriter.insert(...)` の戻り値をそのまま返す。衝突したら何も書かずに `false` が返り、ほかの一意制約の違反は `ConflictException` になる。
+  `of` で宣言した集約の `insert` は常に `true` を返すため、戻り値を使わない。
 - `update` は、`tableWriter.update(ORDER, order, ルートの列の値, 子の全行)` を呼ぶ。
   `order` は `Versioned` を実装する集約ルートで、`TableWriter` がその `lockNo()` を期待する版にする。
   ルートの列の値と子の全行は、`add` と同じラムダと変換を共有する。
@@ -208,6 +213,7 @@ import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
 import static org.jooq.impl.DSL.multiset;
 import static org.jooq.impl.DSL.select;
 
+import com.example.demo.jooq.ordering.Tables;
 import com.example.demo.shared.persistence.AggregateTable;
 import com.example.demo.shared.persistence.ChildTable;
 import com.example.demo.shared.persistence.ColumnValues;
@@ -219,7 +225,7 @@ class JooqOrderRepository implements OrderRepository {
 
   /** 注文の明細。親の中の行は、明細番号で同定する。 */
   private static final ChildTable<TOrderLineRecord> LINES =
-      ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, T_ORDER_LINE.LINE_NO);
+      ChildTable.of(T_ORDER_LINE, T_ORDER_LINE.ORDER_ID, Tables.H_ORDER_LINE, T_ORDER_LINE.LINE_NO);
 
   /** 注文の集約。ルートは公開 ID で一つに決める。 */
   private static final AggregateTable<TOrderRecord, UUID, Order> ORDER =
@@ -402,6 +408,9 @@ Repository のテストは列と集約の往復と子の行の差分だけを確
 - [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。同じ子のテーブルを別の集約で宣言しない。［テストで検査：AggregateDeclarationsTest（宣言の重複）、AggregateDeclarationInspectionTest（外部キーとの突き合わせ）］
 - [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を catch して `ConflictException` に変えない。［自分で点検］
 - [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
+- [ ] 同じ集約の 2 回目を処理済みとする集約は `ofIdempotentOn` で宣言し、列を述語と式のない一意索引の列とちょうど同じ組にして、ルートを一つに決める一意の列を含めない。［テストで検査：AggregateDeclarationInspectionTest（一意索引との突き合わせ）］
+- [ ] `ofIdempotentOn` で宣言したクラスの `add` は `boolean` を返す。［テストで検査：AggregateDeclarationsTest.idempotentAggregateOwnersReturnBooleanFromAdd］
+- [ ] その `add` は `insert` の戻り値をそのまま返し、呼び出し側は `false` を処理済みとして扱う。［自分で点検］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］
 - [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査 + 自分で点検（`Versioned` そのものを指定しない。読み直した版で集約ルートを作り直して渡さない）］
 - [ ] 集約ルートを受け取る public メソッドは、`add` と `update` だけにする（`save` や `delete` のような名前は、`TableWriter.update` を呼んでも H3 が検出する）。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］

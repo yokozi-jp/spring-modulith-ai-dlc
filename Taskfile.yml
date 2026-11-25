@@ -151,7 +151,7 @@ tasks:
 
   # task e2e と .agents/skills/verify-demo/scripts/stack.sh が呼ぶ。
   e2e-up:
-    desc: frontendとbackendをビルドし、compose-testの依存とbackendを起動してmigrationと代表データを入れる（片付けない）
+    desc: frontendとbackendをビルドし、compose-testの依存とbackendを起動してmigrationとテナントと所属を入れる（片付けない）
     silent: true
     deps: [_ensure-test-env]
     cmds:
@@ -182,8 +182,7 @@ tasks:
         compose build backend
         compose up -d --wait postgres keycloak wiremock
         task be-migrate COMPOSE_ENV_FILE="$TEST_ENV_FILE"
-        # spec が読む商品と代表の注文を入れる（ADR-073）。slot の env ファイルは test の目印と loopback の DB_HOST と slot の DB_PORT を持つ。
-        task be-seed COMPOSE_ENV_FILE="$TEST_ENV_FILE"
+        task be-seed-tenancy COMPOSE_ENV_FILE="$TEST_ENV_FILE"
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
         if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${TEST_BACKEND_PORT}/actuator/health/readiness" >/dev/null; then
@@ -642,10 +641,11 @@ tasks:
       - vp fmt
 
   fe-check:
-    desc: フロントエンドのformat、Oxlint（Tailwindとshadcn規則を含む）、型を検査
+    desc: フロントエンドのformat、Oxlint（Tailwindとshadcn規則を含む）、型と、E2Eのシーダーへの依存を検査
     dir: frontend
     cmds:
       - vp check
+      - task: lint-e2e-seed
       # e2e の補助は、Playwright の外から Node が直接 import する（検証スキルの drive.mjs）。相対の import に拡張子がないと、ここでしか壊れない。
       - |
         E2E_USERNAME=check E2E_PASSWORD=check PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:1 \
@@ -734,6 +734,13 @@ tasks:
       - bash tooling/db-clock-lint/test.sh
       - bash tooling/db-clock-lint/db-clock-lint.sh .
 
+  lint-e2e-seed:
+    desc: E2E のコードが開発用のシーダーの代表データ（SEED-）を名指ししていないか検査
+    silent: true
+    cmds:
+      - bash tooling/e2e-seed-lint/test.sh
+      - bash tooling/e2e-seed-lint/e2e-seed-lint.sh .
+
   # Backend
   be-run:
     desc: 業務データが空なら代表データを入れてから、バックエンドをホスト上で起動
@@ -749,6 +756,12 @@ tasks:
     cmds:
       - task: _be-seed
         vars: { SEED_MODE: seed, SEED_ENV_FILE: '{{.COMPOSE_ENV_FILE}}' }
+
+  be-seed-tenancy:
+    desc: ローカルのDBにテナントと所属だけを入れ、業務データを入れない
+    cmds:
+      - task: _be-seed
+        vars: { SEED_MODE: tenancy, SEED_ENV_FILE: '{{.COMPOSE_ENV_FILE}}' }
 
   be-seed-reset:
     desc: 明示確認付きでローカルの業務データを消して代表データを入れ直す

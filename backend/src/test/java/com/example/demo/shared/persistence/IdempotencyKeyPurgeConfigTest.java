@@ -45,6 +45,8 @@ class IdempotencyKeyPurgeConfigTest {
           assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofHours(1));
           assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofHours(1));
           assertThat(tasks.getFirst().getRunnable().toString()).contains("purgeOnce");
+          tasks.getFirst().getRunnable().run();
+          Mockito.verify(context.getBean(IdempotencyKeyPurge.class)).purgeOnce();
         });
   }
 

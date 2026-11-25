@@ -133,13 +133,17 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("enabled が true なら resubmitOnce を interval の固定の遅延のタスクとして 1 つ登録する")
   void enabledRegistersResubmitOnceAsFixedDelayTask() {
-    scheduledRunner()
+    runnerWithResubmitter()
+        .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
+        .withPropertyValues(ENABLED + "=true")
         .run(context -> {
           final List<FixedDelayTask> tasks = fixedDelayTasks(context);
           assertThat(tasks).as("固定の遅延のタスク").hasSize(1);
           assertThat(tasks.getFirst().getIntervalDuration()).isEqualTo(Duration.ofMinutes(1));
           assertThat(tasks.getFirst().getInitialDelayDuration()).isEqualTo(Duration.ofMinutes(1));
           assertThat(tasks.getFirst().getRunnable().toString()).contains("resubmitOnce");
+          tasks.getFirst().getRunnable().run();
+          Mockito.verify(context.getBean(EventPublicationResubmitter.class)).resubmitOnce();
         });
   }
 

@@ -8,7 +8,7 @@ tags: [convention, e2e, playwright, testing]
 # E2E テストの方針と書き方
 
 E2E テストは、複数画面にまたがる主要な利用者の流れだけを Playwright と Chromium で確かめる。
-各テストは公開 API で自分専用のデータを作り、共有データを変更せず、実行順に依存しない。
+各テストは画面と公開 API で自分専用のデータを作り、共有データを変更せず、実行順に依存しない。
 認証は setup project が一度だけ Keycloak の画面で行い、`storageState` をコミットしない。
 変更後は `task e2e` で確かめる。
 道具と環境を選んだ理由は [ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md) にある。
@@ -29,9 +29,10 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 `telemetry.ts` と `pages.ts` は Playwright の中だけで使うため、相対の import に拡張子を付けない。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
+`frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/products`）で商品を作る `productFactory` を持つ。
 `environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts` は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
 `task fe-check` が、この 4 つを Node で import できることを確かめる。
-`frontend/apps/web/e2e/orders.ts` は、注文の作成の画面の操作、シーダーの商品の読み取り、決済の欄の文言の確認（`expectPaymentText`）を持つ。
+`frontend/apps/web/e2e/orders.ts` は、注文の作成の画面の操作と、決済の欄の文言の確認（`expectPaymentText`）を持つ。
 決済の欄は、確定した注文に決済記録がない間、確定から 15 秒まで 1 秒ごとに自分で読み直し、その間は処理中を出す。
 期間が過ぎても記録がなければ再投入待ちを出し、読み直しのボタンを出す。
 `expectPaymentText` は画面を読み直さず、欄の文言が変わるのを最大 30 秒待つ。
@@ -39,7 +40,8 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 
 業務の流れの spec は次の 2 つである。
 
-- `order-payment.spec.ts`：注文の作成、確定、Listener の請求、決済の表示と、決済代行の 5xx、タイムアウト、拒否、CSRF、シーダーの代表の状態の表示を確かめる。
+- `order-payment.spec.ts`：注文の作成、確定、Listener の請求、決済の表示と、決済代行の 5xx、タイムアウト、拒否、CSRF を確かめる。
+  一覧の状態の絞り込み、取消済みの注文の詳細、作成の画面で販売終了の商品を出さないことも、自分で作った注文と商品で確かめる。
 - `order-conflict.spec.ts`：同じ注文を 2 つのタブで開き、楽観的ロックの競合と、画面が示す回復の選択肢ごとの結果を確かめる。
 
 `frontend/apps/web/playwright.config.ts` の設定は次のとおりである。
@@ -57,15 +59,24 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 
 ## テストデータ
 
-- 各テストは、必要なデータを公開 API で作る。
-  他のテストと衝突しないよう、名前や識別子に一意な値を含める。
-- 共有のデータ（`test-user` など）は読むだけにし、変更しない。
+E2E は開発用のシーダー（`LocalDataSeeder`）の代表データを使わない（[ADR-130](../adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
+各テストは、自分専用のデータを画面か公開 API で作る。
+
+- 注文は、画面か公開 API で作る。決済代行の拒否、5xx、遅延は `failChargesFor` で作る（[外部システムの偽物](#外部システムの偽物)）。
+- 商品は、`fixtures.ts` の `productFactory` で作る。
+  `productFactory({ onSale: false })` は販売終了の商品を作り、`unitPrice` で単価を決める。
+  商品コードと商品名は呼ぶたびに一意になる。
+- `productFactory` は、テストの page（共有の `storageState` でログインし、テナントを選んだ状態）の Cookie で、商品を登録する API（`POST /api/products`）を呼ぶ。
+  CSRF の token（`__Host-XSRF-TOKEN` の値を `X-XSRF-TOKEN` に付ける）と `Idempotency-Key` は `productFactory` の中でだけ付ける。
+  `page.request` は CSRF の token を自分では付けないので、spec が `page.request` で直接送る更新の要求は 403 になる（`order-payment.spec.ts` が確かめる）。
+- 他のテストと衝突しないよう、客先注文番号には `uniqueCode` で一意な値を含める。
+  一覧には並列のテストのデータも並ぶので、自分の商品名と客先注文番号で絞って数える。
+- 共有するのは、テナントと所属（`task e2e-up` が `task be-seed-tenancy` で入れる）と、Keycloak の利用者（`docker/keycloak/realm.json`）だけである。
+  共有のデータは読むだけにし、変更しない。
 - テストの実行順や、他のテストが作ったデータに依存しない。
-- 公開 API で作れない状態が必要になったら、DB fixture を使う前に ADR で判断する。
-- `task e2e` は migration の後に Datafaker のシーダーで代表データを一度入れる（[ADR-073](../adr/ADR-073-read-seeded-data-in-e2e.md)）。
-  spec はシーダーの商品と代表の注文（`SEED-C01` から `SEED-C06`）を読むだけにし、変更しない。
-  商品名は乱数の値なので固定で書かず、`GET /api/products` の結果で選ぶ。
-  変更する注文は、そのテストが画面か公開 API で作る。
+- spec に `SEED-` の文字列を書かない。`task fe-check` の `lint-e2e-seed` が失敗にする。
+- 画面と公開 API で作れない状態が必要になっても、テストのためだけの入口（Profile やプロパティで有効にする入口、テストのための別プロセス）を作らない。
+  業務の操作として API が要るなら、その API を本番に足す。
 
 ## 外部システムの偽物
 
@@ -92,7 +103,7 @@ backend が送ったメールは、compose-test の WireMock（`.env.test` の `
 setup project は、`storageState` を持たない browser context で `/oauth2/authorization/web` を開き、Keycloak の画面で `test-user` としてログインする。
 `/` から始めると、SPA が API の 401 を受けて自分でログインへ遷移し、setup project の遷移と競合する。
 この遷移そのものは、ログアウト後に `/` を開く `logout.spec.ts` のテストと、未認証で認証必須の画面を開く `unauthenticated-redirect.spec.ts` が確かめる。
-`test-user` は代表データで 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
+`test-user` は `task e2e-up` が入れる所属で 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
 認証の前後で `__Host-APP_SESSION` Cookie の値が変わったことで認証済みと判断し、サンプル商事を選ぶ。
 選んだ後に web の origin の `/` へ移り、`__Host-APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。
 `__Host-APP_SESSION` は認証の開始時点で発行されるため、Cookie があることだけを認証の証拠にしない。
@@ -160,7 +171,8 @@ slot 0 の port は次のとおりである。
 2. `task e2e-up` を実行する。
    slot の web と backend の port（slot 0 は 5173 と 8080）が空いていることを確かめ、frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
-3. PostgreSQL、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用し、`task be-seed` で代表データを入れる。
+3. PostgreSQL、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用する。
+   `task be-seed-tenancy`（[DB 操作コマンドのリファレンス](../database/commands.md)）でテナントと所属だけを入れる。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
    Playwright が `webServer` で Vite preview を起動し、終了時に止める。

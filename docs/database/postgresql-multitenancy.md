@@ -38,7 +38,7 @@ tags: [convention, database, postgresql, multi-tenancy, rls, future-arch-guideli
 ## RLSでテナントを分ける業務テーブル
 
 changesetが作るスキーマのうち、`modulith`と`tenancy`を除くスキーマの表を、すべて業務テーブルとしてRLSでテナントごとに分ける。
-今の業務テーブルは、`product.m_product`、`ordering.t_order`、`ordering.t_order_line`、`ordering.t_idempotency_key`、`payment.t_payment`である。
+今の業務テーブルは、`product.m_product`、`product.t_idempotency_key`、`ordering.t_order`、`ordering.t_order_line`、`ordering.t_idempotency_key`、`payment.t_payment`である。
 
 - 業務テーブルは、テナントの`public_id`を`tenant_public_id`（`uuid`、NOT NULL）として持つ。
   テナントの主キーは持たない（[PostgreSQLの主キー](postgresql-primary-keys.md#主キーと公開用idの使い分け)）。

@@ -39,6 +39,9 @@ class ProblemTypesTest {
             "/problems/ordering/not-draft",
             "/problems/ordering/product-discontinued",
             "/problems/ordering/product-not-found",
+            "/problems/product/blank-product-code",
+            "/problems/product/blank-product-name",
+            "/problems/product/unit-price-below-minimum",
             "/problems/tenancy/last-admin",
             "/problems/tenancy/not-tenant-member",
             "/problems/tenancy/tenant-already-selected");

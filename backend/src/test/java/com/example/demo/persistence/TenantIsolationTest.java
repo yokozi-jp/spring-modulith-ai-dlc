@@ -1,5 +1,6 @@
 package com.example.demo.persistence;
 
+import static com.example.demo.jooq.ordering.Tables.H_ORDER_LINE;
 import static com.example.demo.jooq.ordering.Tables.T_IDEMPOTENCY_KEY;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER;
 import static com.example.demo.jooq.ordering.Tables.T_ORDER_LINE;
@@ -8,6 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
 
 import com.example.demo.jooq.DefaultCatalog;
+import com.example.demo.jooq.product.tables.TIdempotencyKey;
 import com.example.demo.product.TestProducts;
 import com.example.demo.shared.persistence.ModuleRoleTransactionManager;
 import com.example.demo.shared.persistence.ModuleRoles;
@@ -59,6 +61,10 @@ class TenantIsolationTest {
 
   /** 注文のモジュール。 */
   private static final String ORDERING_MODULE = "ordering";
+
+  /** product のスキーマの Idempotency-Key の表。 */
+  private static final TIdempotencyKey PRODUCT_IDEMPOTENCY_KEY =
+      com.example.demo.jooq.product.Tables.T_IDEMPOTENCY_KEY;
 
   /** 業務の表のテナントの列。 */
   private static final String TENANT_COLUMN = "tenant_public_id";
@@ -117,7 +123,7 @@ class TenantIsolationTest {
     void seedOtherTenant() {
       BusinessSeeds.insert(
           dsl, OTHER, new Faker(Locale.ENGLISH, new Random(377L)), UUID::randomUUID, SEEDED_AT);
-      // Idempotency-Key の表は代表データに含めないので、ここで 1 行入れる。
+      // Idempotency-Key の表は代表データに含めないので、ここで 1 行ずつ入れる。
       AsModule.run(
           dsl,
           ORDERING_MODULE,
@@ -130,6 +136,43 @@ class TenantIsolationTest {
                       .set(T_IDEMPOTENCY_KEY.PAYLOAD_HASH, new byte[] {1})
                       .set(T_IDEMPOTENCY_KEY.EXPIRES_AT, SEEDED_AT)
                       .set(TestCommonColumns.at(SEEDED_AT).forInsert(T_IDEMPOTENCY_KEY))
+                      .execute()));
+      AsModule.run(
+          dsl,
+          PRODUCT_MODULE,
+          OTHER,
+          tx ->
+              TestCommonColumns.runAs(() ->
+                  tx.insertInto(PRODUCT_IDEMPOTENCY_KEY)
+                      .set(PRODUCT_IDEMPOTENCY_KEY.USER_PUBLIC_ID, UUID.randomUUID())
+                      .set(PRODUCT_IDEMPOTENCY_KEY.IDEMPOTENCY_KEY, UUID.randomUUID())
+                      .set(PRODUCT_IDEMPOTENCY_KEY.PAYLOAD_HASH, new byte[] {1})
+                      .set(PRODUCT_IDEMPOTENCY_KEY.EXPIRES_AT, SEEDED_AT)
+                      .set(TestCommonColumns.at(SEEDED_AT).forInsert(PRODUCT_IDEMPOTENCY_KEY))
+                      .execute()));
+      seedArchivedOrderLine();
+    }
+
+    /** 別のテナントの、削除した明細の履歴の行を入れる。代表データは明細を削除しないため、ここで足す。 */
+    private void seedArchivedOrderLine() {
+      AsModule.run(
+          dsl,
+          ORDERING_MODULE,
+          OTHER,
+          tx ->
+              TestCommonColumns.runAs(() ->
+                  tx.insertInto(H_ORDER_LINE)
+                      .set(H_ORDER_LINE.ORDER_LINE_ID, 1L)
+                      .set(H_ORDER_LINE.ORDER_ID, 1L)
+                      .set(H_ORDER_LINE.LINE_NO, 1)
+                      .set(H_ORDER_LINE.PRODUCT_PUBLIC_ID, UUID.randomUUID())
+                      .set(H_ORDER_LINE.ORDERED_COUNT, 1)
+                      .set(H_ORDER_LINE.ORDERED_UNIT_PRICE_JPY, BigDecimal.TEN)
+                      .set(TestCommonColumns.at(SEEDED_AT).forInsert(H_ORDER_LINE))
+                      .set(H_ORDER_LINE.ARCHIVED_AT, SEEDED_AT)
+                      .set(H_ORDER_LINE.ARCHIVED_BY, "seed")
+                      .set(H_ORDER_LINE.ARCHIVED_PGM_CD, "seed")
+                      .set(H_ORDER_LINE.ARCHIVED_TX_ID, "seed")
                       .execute()));
     }
 

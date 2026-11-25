@@ -39,8 +39,11 @@ tags: [reference, database, liquibase, jooq, taskfile, gradle]
   対象DBのスキーマまたはデータを失う可能性がある。
 - **`task be-seed`**：ローカルの業務データが空のときだけ開発用の代表データを入れる。
   ローカルかテストのDBの業務の表へ行を追加する。
+- **`task be-seed-tenancy`**：業務データの有無によらず、テナントと所属の足りない行だけを入れ、業務データを入れない。
+  ローカルかテストのDBの`tenancy`の表へ行を追加する。
+  `task e2e-up`が呼ぶ。
 - **`task be-seed-reset CONFIRM_RESET=yes`**：ローカルの業務データを消して代表データを入れ直す。
-  ローカルかテストのDBの業務テーブルの5表の行を失う。
+  ローカルかテストのDBの業務テーブルの6表の行を失う。
 
 場面ごとのローカル実行順は[開発ワークフロー](../tooling/dev-workflow.md)を参照する。
 本番の前進適用と切り戻し手順は[DBのデプロイと切り戻し](runbook-deploy-and-rollback.md)を参照する。

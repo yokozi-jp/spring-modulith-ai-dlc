@@ -1,5 +1,6 @@
 package com.example.demo.testkit;
 
+import static com.example.demo.jooq.tables.FixtureItemDetailArchiveTable.FIXTURE_ITEM_DETAIL_ARCHIVE;
 import static com.example.demo.jooq.tables.FixtureItemDetailTable.FIXTURE_ITEM_DETAIL;
 import static com.example.demo.jooq.tables.FixtureItemTable.FIXTURE_ITEM;
 
@@ -9,6 +10,7 @@ import org.jooq.DSLContext;
 import org.jooq.Name;
 import org.jooq.SQLDialect;
 import org.jooq.impl.DSL;
+import org.jooq.impl.SQLDataType;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
@@ -17,7 +19,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 /**
  * テスト専用の {@code fixture} スキーマに、{@code t_fixture_item} と子の {@code t_fixture_item_detail} を作る JUnit
- * 拡張。
+ * 拡張。{@code t_fixture_item} は、主キーの {@code item_id} のほかに {@code item_code} の一意制約を持つ。
  *
  * <p>業務テーブルがまだないため、shared の共通処理（{@code TableWriter} など）を実 PostgreSQL で確かめるテストだけが使う。
  *
@@ -41,10 +43,16 @@ public final class FixtureTablesExtension implements BeforeAllCallback, AfterAll
           dsl.createTable(FIXTURE_ITEM)
               .columns(FIXTURE_ITEM.fields())
               .primaryKey(FIXTURE_ITEM.ITEM_ID)
+              .unique(FIXTURE_ITEM.ITEM_CODE)
               .execute();
           dsl.createTable(FIXTURE_ITEM_DETAIL)
               .columns(FIXTURE_ITEM_DETAIL.fields())
               .primaryKey(FIXTURE_ITEM_DETAIL.ITEM_ID, FIXTURE_ITEM_DETAIL.DETAIL_NO)
+              .execute();
+          dsl.createTable(FIXTURE_ITEM_DETAIL_ARCHIVE)
+              .column(DSL.name("archive_id"), SQLDataType.BIGINT.generatedAlwaysAsIdentity())
+              .columns(FIXTURE_ITEM_DETAIL_ARCHIVE.fields())
+              .primaryKey(DSL.name("archive_id"))
               .execute();
           dsl.query("GRANT USAGE ON SCHEMA {0} TO {1}", FIXTURE_SCHEMA, appRole).execute();
           dsl.query(

@@ -5,6 +5,7 @@ package com.example.demo.jooq.product;
 
 
 import com.example.demo.jooq.product.tables.MProduct;
+import com.example.demo.jooq.product.tables.TIdempotencyKey;
 
 import javax.annotation.processing.Generated;
 
@@ -26,4 +27,9 @@ public class Tables {
      * 商品
      */
     public static final MProduct M_PRODUCT = MProduct.M_PRODUCT;
+
+    /**
+     * 冪等性キー
+     */
+    public static final TIdempotencyKey T_IDEMPOTENCY_KEY = TIdempotencyKey.T_IDEMPOTENCY_KEY;
 }

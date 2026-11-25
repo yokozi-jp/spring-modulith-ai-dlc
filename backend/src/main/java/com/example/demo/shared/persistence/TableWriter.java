@@ -6,10 +6,13 @@ import com.example.demo.shared.failure.NotFoundException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.InsertReturningStep;
+import org.jooq.InsertSetMoreStep;
 import org.jooq.Record;
 import org.jooq.Record1;
 import org.jooq.Result;
@@ -24,8 +27,9 @@ import org.springframework.stereotype.Component;
  * も受け取らず、ルートの条件、版の条件、子の外部キーの条件は、宣言から {@code TableWriter} が作る。
  *
  * <p>{@link #update} は、ルートの行を {@code 一意の列 AND lock_no = 期待値}
- * で更新して版を進める。ルートの行ロックの下で、子を差分（削除、更新、追加）で書く。{@link #insert} は、ルートを書いてから子を複数行の INSERT で書く。ルートの内部の主キーは
- * {@code RETURNING} で受けるため、Repository は読み直さない。
+ * で更新して版を進める。ルートの行ロックの下で、子を差分（削除、更新、追加）で書く。{@link #insert} は、ルートを書いてから子を複数行の INSERT で書く。{@link
+ * AggregateTable#ofIdempotentOn} で宣言した重複を許す列の衝突は例外にせず、入れなかったことを返す。ルートの内部の主キーは {@code RETURNING}
+ * で受けるため、Repository は読み直さない。
  *
  * <p>共通カラム、版の加算、件数の判定、{@code 55P03}（種類 {@code LOCK}）と {@code 23505}（種類 {@code UNIQUE}）の {@link
  * ConflictException} への変換は、すべてここで行う。変換は例外の型ではなく SQLSTATE で決める。どの入口も、読み取り専用ではない、開いているトランザクションの中で呼ぶ。
@@ -59,28 +63,36 @@ public class TableWriter {
   /**
    * 集約を INSERT する。ルートを書き、子を複数行の INSERT で書く。
    *
+   * <p>{@link AggregateTable#ofIdempotentOn} で重複を許す列を宣言した集約は、{@code INSERT ... ON CONFLICT (その列) DO
+   * NOTHING} で書く。同じ値の行を書いて未コミットのトランザクションがあれば、そのトランザクションの終わりまで待ち、コミットされれば何も書かずに {@code false}
+   * を返す。入れなかったときは子を書かない。
+   *
    * <p>子を宣言していない集約は、{@code childRows} を省く。
    *
    * @param aggregate 集約の宣言
    * @param root 新しい集約ルート。ルートの一意の列の値は、宣言の {@code keyOf} で集約ルートから取る
    * @param rootColumns ルートの業務の列の値。ルートの一意の列と内部の主キーは書けない
    * @param childRows 宣言した子すべての行（{@link ChildTable#rows}）。空の子は空の一覧で作る
+   * @return 入れたら {@code true}、重複を許す列の衝突で入れなかったら {@code false}。{@link AggregateTable#of} で宣言した集約は常に
+   *     {@code true}
    * @throws IllegalArgumentException 宣言した子を渡していない場合、宣言していない子か同じ子を二度渡した場合、書けない列を渡した場合
    * @throws IllegalStateException トランザクションが開いていない、または読み取り専用の場合
-   * @throws ConflictException 一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
+   * @throws ConflictException 重複を許す列以外の一意制約に違反した場合（種類は {@code UNIQUE}）、行ロックを {@code lock_timeout}
    *     までに取れない場合（種類は {@code LOCK}）。原因は持たない
    */
-  public <R extends Record, K, A extends Versioned> void insert(
+  public <R extends Record, K, A extends Versioned> boolean insert(
       final AggregateTable<R, K, A> aggregate,
       final A root,
       final Consumer<ColumnValues<R>> rootColumns,
       final ChildRows<?>... childRows) {
     requireTransaction(dsl);
     final List<ChildRows<?>> rows = inDeclaredOrder(aggregate, Arrays.asList(childRows));
-    final long id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
-    for (final ChildRows<?> childRow : rows) {
-      children.insertAll(id, childRow);
+    final Optional<Long> id = insertRoot(aggregate, aggregate.keyOf(root), rootColumns);
+    if (id.isEmpty()) {
+      return false;
     }
+    rows.forEach(childRow -> children.insertAll(id.get(), childRow));
+    return true;
   }
 
   /**
@@ -159,22 +171,28 @@ public class TableWriter {
     }
   }
 
-  /** ルートを INSERT し、RETURNING で受けた内部の主キーを返す。 */
-  private <R extends Record, K> long insertRoot(
+  /**
+   * ルートを INSERT し、RETURNING で受けた内部の主キーを返す。
+   *
+   * @return 内部の主キー。重複を許す列の衝突で入れなかったら空
+   */
+  private <R extends Record, K> Optional<Long> insertRoot(
       final AggregateTable<R, K, ?> aggregate,
       final K key,
       final Consumer<ColumnValues<R>> rootColumns) {
     final Table<R> table = aggregate.table();
     final ColumnValues<R> values = collect(aggregate, rootColumns);
+    final InsertSetMoreStep<R> insert =
+        dsl.insertInto(table)
+            .set(aggregate.key(), key)
+            .set(values.values())
+            .set(commonColumns.forInsert(table));
+    final InsertReturningStep<R> step =
+        aggregate.duplicateKey().isEmpty()
+            ? insert
+            : insert.onConflict(aggregate.duplicateKey()).doNothing();
     return ConflictTranslator.executeOrConflict(
-        () ->
-            dsl.insertInto(table)
-                .set(aggregate.key(), key)
-                .set(values.values())
-                .set(commonColumns.forInsert(table))
-                .returningResult(aggregate.id())
-                .fetchSingle()
-                .value1(),
+        () -> step.returningResult(aggregate.id()).fetchOptional(Record1::value1),
         () -> "table=" + table.getName() + ", key=" + key);
   }
 

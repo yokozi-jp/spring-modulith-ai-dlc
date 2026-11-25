@@ -198,10 +198,34 @@ class SchemaConventionsTest {
     void acceptsGistOnlyForExclusionConstraints() {
       final IndexRow exclusion =
           new IndexRow(
-              ITEM, TABLE, "ex_m_item", "gist", false, 2, 2, false, false, true, false, null);
+              ITEM,
+              TABLE,
+              "ex_m_item",
+              "gist",
+              false,
+              2,
+              2,
+              false,
+              false,
+              true,
+              false,
+              null,
+              List.of());
       final IndexRow plainGist =
           new IndexRow(
-              ITEM, TABLE, "idx_2_m_item", "gist", false, 1, 1, false, false, false, false, null);
+              ITEM,
+              TABLE,
+              "idx_2_m_item",
+              "gist",
+              false,
+              1,
+              1,
+              false,
+              false,
+              false,
+              false,
+              null,
+              List.of());
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(exclusion, plainGist))))
           .containsExactly("K7 item.idx_2_m_item");
@@ -212,7 +236,19 @@ class SchemaConventionsTest {
     void rejectsExpressionIndexes() {
       final IndexRow row =
           new IndexRow(
-              ITEM, TABLE, "idx_1_m_item", BTREE, false, 1, 1, true, false, false, false, null);
+              ITEM,
+              TABLE,
+              "idx_1_m_item",
+              BTREE,
+              false,
+              1,
+              1,
+              true,
+              false,
+              false,
+              false,
+              null,
+              List.of());
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(row))))
           .containsExactly("K8 item.idx_1_m_item");
@@ -223,7 +259,19 @@ class SchemaConventionsTest {
     void rejectsPartialAndIncludeIndexes() {
       final IndexRow partial =
           new IndexRow(
-              ITEM, TABLE, "idx_2_m_item", BTREE, false, 1, 1, false, true, false, false, null);
+              ITEM,
+              TABLE,
+              "idx_2_m_item",
+              BTREE,
+              false,
+              1,
+              1,
+              false,
+              true,
+              false,
+              false,
+              null,
+              List.of());
       final IndexRow include = index(ITEM, BTREE, false, 1, 2);
 
       assertThat(keys(SchemaTableConventions.indexes(List.of(partial, include))))
@@ -507,6 +555,25 @@ class SchemaConventionsTest {
               "P3 item.m_item.customer_id",
               "P3 item.m_item.product_public_id",
               "P3 item.m_item.legacy_public_id");
+    }
+
+    @Test
+    @DisplayName("P3：履歴の表（h_）の archived_tx_id は、行を指さない列として受け入れ、ほかの表では拒否する")
+    void acceptsArchivedTraceIdOnlyInHistoryTables() {
+      final String varchar = "character varying(32)";
+      final ColumnRow history =
+          new ColumnRow(ITEM, "h_item", "archived_tx_id", varchar, "b", "", "", null);
+
+      assertThat(
+              SchemaTableConventions.references(
+                  List.of(relation(ITEM, "r", true, null)), List.of(history)))
+          .isEmpty();
+      assertThat(
+              keys(
+                  SchemaTableConventions.references(
+                      List.of(relation(ITEM, "r", true, null)),
+                      List.of(column(ITEM, "archived_tx_id", varchar)))))
+          .containsExactly("P3 item.m_item.archived_tx_id");
     }
 
     @Test

@@ -25,7 +25,7 @@ const e2e = (file) => import(pathToFileURL(join(web, "e2e", file)).href);
 // 資格情報と決済代行の URL は .env.test から e2e/environment.ts が読み、なければ止まる。
 const { chooseSeededTenant, idpOrigin, signInOnKeycloak, webOrigin } = await e2e("environment.ts");
 const { chargeRequestCount, failChargesFor } = await e2e("payment-gateway.ts");
-const orders = await e2e("orders.ts");
+const orders = { ...(await e2e("orders.ts")), ...(await import("./seeded.mjs")) };
 
 const [journeyArg, ...rest] = process.argv.slice(2);
 if (journeyArg === undefined) {

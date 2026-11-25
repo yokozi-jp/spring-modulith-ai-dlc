@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jooq.DSLContext;
 
-/** 商品の行をテストで登録する補助。ステップ 1 には商品を作る操作がないため、product のロールで DSLContext から直接 INSERT する。 */
+/** 商品の行をテストで登録する補助。product のロールで DSLContext から直接 INSERT する。 */
 // テストの補助であり、テストケースを持たない。
 @SuppressWarnings("PMD.TestClassWithoutTestCases")
 public final class TestProducts {
