@@ -39,7 +39,7 @@ harness は、変更が通る複数の関門と、規約の置き場で構成し
 - **契約の検査**：OpenAPI 契約をコミットし、Spectral、oasdiff、Orval の再生成で差分と破壊的変更を検査します（[ADR-052](docs/adr/ADR-052-commit-openapi-contract-and-check-generated-client.md)）。
 - **Git フック（Lefthook）**：commit-msg で commitlint を実行します。
   pre-commit では betterleaks のシークレットスキャン、フロントエンドと API 契約の検査、hadolint、Docker ビルド検査、compose config、markdownlint、OKF 検査を実行します。
-  pre-push では ADR 検査、betterleaks の履歴スキャン（現在のブランチから辿れる範囲）、バックエンドの lint とテスト、backend イメージのビルド、フロントエンドのテストとビルド、actionlint、zizmor を実行します。
+  pre-push では ADR 検査、betterleaks の履歴スキャン（現在のブランチから辿れる範囲）、バックエンドの lint、フロントエンドのテストとビルド、actionlint、zizmor を実行します。
 - **CI（GitHub Actions）**：Backend CI、Frontend CI、E2E、Docker CI（hadolint）、Secret Scan、Static Analysis（Semgrep）、Trivy と dep-scan による脆弱性スキャン、DAST（OWASP ZAP）、OKF 検証、API Contract（破壊的変更の検出）を実行します。
   リリースは release-please、依存更新は Dependabot が担います。
 - **steering と docs**：規約の正文は `docs/` に置き、`.kiro/steering/` は読む文書への案内だけを持ちます（[ADR-038](docs/adr/ADR-038-route-steering-to-docs-knowledge.md)）。
