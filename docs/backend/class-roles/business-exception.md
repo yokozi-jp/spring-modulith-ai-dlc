@@ -85,6 +85,7 @@ rollback させたい失敗は、例外にする。
 - Repository の実装は、Spring と jOOQ の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を Repository の外へ出さず、自分で catch して変えることもしない。
   書き込みは `TableWriter` が、SQLSTATE で見分けて、原因を付けずに種類を付けた `ConflictException` に変える（[jOOQ の Repository](jooq-repository.md)）。
   種類は、版の不一致が `ConflictException.Kind.VERSION`、行ロックの失敗（`55P03`）が `Kind.LOCK`、一意制約の違反（`23505`）が `Kind.UNIQUE` である。
+  同じ `Idempotency-Key` の要求の終わりを待ち切れなかった失敗（キーの行の `55P03`）は、`shared.persistence` の `IdempotencyKeyWriter` が `Kind.IDEMPOTENCY_IN_PROGRESS` にする（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
 - 三つの型は原因（cause）を持たない。
   コンストラクタは原因を受け取らず、後から `initCause` を呼ぶと `IllegalStateException` になる。
 
@@ -104,7 +105,7 @@ rollback させたい失敗は、例外にする。
 | JDK の例外ほか（`IllegalStateException`、`IllegalArgumentException`、`NoSuchElementException`） | 500  | `about:blank`、`title` は `problem.title.500`、`detail` なし                                              | ERROR、例外と原因の連鎖付き、`Unhandled API exception`                      | 予期しない例外として送出する |
 
 `title` は `Accept-Language` から解決した言語で返り、404 の本文は対象がない場合と存在を隠す場合で同じになる。
-409 の type は、`Kind.VERSION` が `/problems/version-conflict`、`Kind.LOCK` が `/problems/lock-timeout`、`Kind.UNIQUE` が `/problems/unique-violation` である。
+409 の type は、`Kind.VERSION` が `/problems/version-conflict`、`Kind.LOCK` が `/problems/lock-timeout`、`Kind.UNIQUE` が `/problems/unique-violation`、`Kind.IDEMPOTENCY_IN_PROGRESS` が `Retry-After` 付きの `/problems/idempotency-key-in-progress` である。
 Listener の扱いは[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の「Spring Modulith のイベントの失敗」に合わせる。
 業務上の失敗の三つの型は、自動で再試行しない。
 ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を `FAILED` で残す（レジストリが DLQ を兼ねる）。
@@ -112,7 +113,7 @@ Listener の扱いは[非同期処理の失敗時の再試行と回復](../../in
 
 `23505` と `55P03` の Spring の例外のメッセージには SQL が入り、`23505` では重複したキーの値も入る。
 三つの型は原因を持たないため、これらの SQL と値は INFO のログに出ない（[可観測性の規約](../../observability/conventions.md)の「発生源で渡さない値」）。
-409 の `conflict.kind` は `version`、`lock`、`unique` のどれかで、どの競合かをログで区別する。
+409 の `conflict.kind` は `version`、`lock`、`unique`、`idempotency_in_progress` のどれかで、どの競合かをログで区別する。
 404、409、422 のログの `problem.type` は、応答の type と同じ値である。
 
 ## 最小の例と典型的な例

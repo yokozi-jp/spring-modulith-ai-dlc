@@ -172,7 +172,10 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 
 ## 同期の記録
 
-同期コミット：`e4b52ee7cb70d32e6ca6062a7064d607b5f56074`（main。#551 の Pull Request の土台）
+同期コミット：`7502ba4c571a37c7134ced687faf67019f206137`（main。#551 の Pull Request の土台）
+
+#742 の変更（`ConfirmOrderCommandHandler.handle` と `CancelOrderCommandHandler.handle` が `idempotency.execute` で包まれた後）を読んだ。
+同じ冪等性キーの再送は、保存した Result を返して `confirm` と `cancel` の本体を実行しない。そのため確定と取消の書き込みと `OrderConfirmed` の発行は 1 回のままで、モデルの `CmdRead` と `CmdWrite` は変わらない。
 
 #551 の Pull Request のコード（決済記録を `INSERT ... ON CONFLICT DO NOTHING` で入れ、0 件なら 1 回目の決済記録を返すようにした後）で、`ChargeOrderCommandHandler`、`PaymentRepository`、`JooqPaymentRepository`、`TableWriter.insert`、`AggregateTable.ofIdempotentOn` を読み、対応表の `DReadPayment`、`DReply`、`DInsert` がモデルと一致することを確かめた。
 同時の 2 回目の INSERT は 1 回目のトランザクションの終わりを待ち、例外にならずに完了する。

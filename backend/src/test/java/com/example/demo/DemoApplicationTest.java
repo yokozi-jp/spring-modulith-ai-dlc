@@ -275,6 +275,15 @@ class DemoApplicationTest {
         "spring.http.clients.redirects が dont-follow であること");
   }
 
+  @Test
+  @DisplayName("送信 HTTP クライアントの共通設定が、接続と読み取りのタイムアウトを持つ")
+  void httpClientsHaveTimeouts() {
+    final HttpClientSettings settings = applicationContext.getBean(HttpClientSettings.class);
+    assertEquals(
+        Duration.ofSeconds(1), settings.connectTimeout(), "spring.http.clients.connect-timeout");
+    assertEquals(Duration.ofSeconds(5), settings.readTimeout(), "spring.http.clients.read-timeout");
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {PAYMENT_GATEWAY, MAIL_SENDER})
   @DisplayName("外部システムの呼び出しの最悪の時間は、トランザクション中の待機の上限より短い")

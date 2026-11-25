@@ -2,6 +2,7 @@ package com.example.demo.ordering.presentation.web;
 
 import com.example.demo.ordering.application.ChangeOrderLinesCommand;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -26,15 +27,16 @@ public record ChangeOrderLinesRequest(
     lines = List.copyOf(lines);
   }
 
-  /** パス変数の注文 ID と合わせて Command へ変換する。 */
-  public ChangeOrderLinesCommand toCommand(final UUID orderId) {
+  /** パス変数の注文 ID とヘッダーの冪等性キーと合わせて Command へ変換する。 */
+  public ChangeOrderLinesCommand toCommand(
+      final UUID orderId, final IdempotencyKey idempotencyKey) {
     return new ChangeOrderLinesCommand(
         orderId.toString(),
         lines.stream()
-            .map(
-                line ->
-                    new ChangeOrderLinesCommand.Line(line.productId().toString(), line.quantity()))
+            .map(line ->
+                new ChangeOrderLinesCommand.Line(line.productId().toString(), line.quantity()))
             .toList(),
-        new ExpectedLockNo(lockNo));
+        new ExpectedLockNo(lockNo),
+        idempotencyKey);
   }
 }

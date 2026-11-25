@@ -38,6 +38,10 @@ Command はモジュールルートの公開契約でもない。
   Bean Validation の制約も付けない。
 - component は Java の標準型（`String`、`int`、`BigDecimal`、`Instant`、`List`）と、ネストした record だけにする。
   例外として、既存の集約を変える Command は `shared.concurrency` の `ExpectedLockNo` を持てる。
+  `Idempotency-Key` を求める操作（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)の「対象」）の Command は、`shared.idempotency` の `IdempotencyKey` を `idempotencyKey` に持ち、`IdempotentCommand` を実装する。
+  Controller が受け取ったキーを、Request の `toCommand` の引数で渡す。
+  `tenancy` の所属の役割の変更と所属の削除の Command は、[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540) のスライス 3b まで、まだ実装しない（`IdempotencyArchTest` の一時的な除外）。
+  Listener がイベントから作る Command は持たない。
 - 入力が集約の ID とロック番号だけでも Command を作る（`CancelOrderCommand(String orderId, ExpectedLockNo expectedLockNo)`）。
 - Controller が作り、既存の集約の状態を変える Command は、クライアントが参照の応答で受け取ったロック番号を `ExpectedLockNo expectedLockNo` に持ち、`shared.concurrency` の `VersionedCommand` を実装する（`ConfirmOrderCommand`、`CancelOrderCommand`、`ShipOrderCommand`）。
   [Request](request.md) が受け取った数値から `ExpectedLockNo` を作る。
@@ -60,7 +64,7 @@ Command はモジュールルートの公開契約でもない。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自分にネストした record、`shared.concurrency` の `ExpectedLockNo` と `VersionedCommand`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、自分にネストした record、`shared.concurrency` の `ExpectedLockNo` と `VersionedCommand`、`shared.idempotency` の `IdempotencyKey` と `IdempotentCommand`。
 - **依存してはいけない型**：Domain の型（`OrderId`、`Quantity`）、モジュールルートの型、`presentation.web` の Request、jOOQ の生成型、Spring と Jakarta Bean Validation の型、他モジュールの型。
 
 ## 最小の例と典型的な例

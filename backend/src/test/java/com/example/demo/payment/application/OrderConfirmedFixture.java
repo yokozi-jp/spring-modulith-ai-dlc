@@ -11,8 +11,10 @@ import com.example.demo.ordering.application.DraftOrderCommandHandler;
 import com.example.demo.shared.concurrency.ExpectedLockNo;
 import com.example.demo.shared.tenancy.TenantContext;
 import com.example.demo.shared.tenancy.TenantId;
+import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.AsModule;
 import com.example.demo.testkit.AsTenant;
+import com.example.demo.testkit.IdempotencyKeys;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import java.time.Instant;
@@ -87,7 +89,10 @@ final class OrderConfirmedFixture {
                 "ordering",
                 tenant,
                 tx ->
-                    confirmOrder.handle(new ConfirmOrderCommand(orderId, new ExpectedLockNo(1)))));
+                    AppUsers.signedIn(() ->
+                        confirmOrder.handle(
+                            new ConfirmOrderCommand(
+                                orderId, new ExpectedLockNo(1), IdempotencyKeys.next())))));
   }
 
   /** 共通カラムの trace ID を取れるよう、observation の中で処理を呼ぶ。 */
