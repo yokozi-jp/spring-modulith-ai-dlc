@@ -5,8 +5,8 @@ databaseChangeLog:
       comment: >-
         tenancy モジュールに、Idempotency-Key と保存した CommandHandler の Result の表（t_idempotency_key）を作る（ADR-126、#540）。
         列とユニークインデックスは 029 の ordering の表と同じにする。
-        tenancy の表は RLS の外に置き（ADR-107）、テナントなしでトランザクションを始められるので、RLS を付けず、tenant_public_id に既定値を付けない。
-        キーの表の文が tenant_public_id を書き、条件に入れて、別のテナントの行に当たらないようにする。
+        tenancy のスキーマは RLS の外なので（ADR-107）、RLS も tenant_public_id の既定値も付けない。
+        キーの表の文が tenant_public_id を書き、条件に入れる。
         権限は 014 の既定の権限（ALTER DEFAULT PRIVILEGES）で tenancy_module に付く。
       preConditions:
         - dbms:
