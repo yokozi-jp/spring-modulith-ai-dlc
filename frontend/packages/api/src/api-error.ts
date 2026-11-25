@@ -70,6 +70,21 @@ export function redirectToLoginOnUnauthorized(error: unknown): void {
   globalThis.location.assign(loginPath);
 }
 
+/** 同じ Idempotency-Key の要求をサーバーが処理している 409 の problem type（ADR-126）。 */
+const idempotencyKeyInProgressType = "/problems/idempotency-key-in-progress";
+
+/**
+ * 同じ Idempotency-Key の要求の処理中の 409 なら true を返す。版の競合などほかの 409 は false にする。
+ * @public
+ */
+export function isIdempotencyKeyInProgress(error: unknown): error is ApiProblemError {
+  return (
+    error instanceof ApiProblemError &&
+    error.status === 409 &&
+    error.problem?.type === idempotencyKeyInProgressType
+  );
+}
+
 /** 再試行してよい 4xx（RFC 9110 §15.5.9 の 408、RFC 6585 §4 の 429）。 */
 const retryableClientErrors = new Set([408, 429]);
 
@@ -85,4 +100,25 @@ export function retryUnlessClientError(failureCount: number, error: unknown): bo
   }
   // ponytail: 429 の Retry-After を見ず、TanStack Query の既定の間隔で再試行する。バックエンドに rate limit を入れるときに Retry-After を見る。
   return failureCount < 3;
+}
+
+/**
+ * mutation を同じ変数（同じ Idempotency-Key）で再試行するかを決める（ADR-126）。
+ * ネットワークの失敗（fetch の TypeError）、5xx、408、429、処理中の 409 だけを、3 回まで再試行する。
+ * ほかの 4xx と、版の競合などほかの 409 は再試行しない。
+ */
+export function retryIdempotentMutation(failureCount: number, error: unknown): boolean {
+  if (failureCount >= 3) {
+    return false;
+  }
+  if (!(error instanceof ApiProblemError)) {
+    return error instanceof TypeError;
+  }
+  // ponytail: Retry-After を読まない。既定の backoff の最初の待ち（1 秒）が、処理中の 409 の Retry-After（1 秒）以上である。
+  // サーバーがそれより長い Retry-After を返すようになったら、ApiProblemError に値を持たせて retryDelay で待つ。
+  return (
+    error.status >= 500 ||
+    retryableClientErrors.has(error.status) ||
+    isIdempotencyKeyInProgress(error)
+  );
 }

@@ -25,6 +25,8 @@ tags: [convention, frontend, optimistic-locking, problem-details, accessibility]
 ## 入力と版
 
 - 409 の要求を自動で再送しない。
+  例外は同じ `Idempotency-Key` の要求の処理中の 409（`/problems/idempotency-key-in-progress`）で、mutation の既定が同じキーで自動で再試行する（[状態表示の分担](routing-and-state.md#状態表示の分担)）。
+  再試行を使い切った処理中の 409 は版の競合として扱わず、`failureNotice` が操作によらない処理中の説明で通知し、form の選択肢を出さない。
 - 入力中の値を捨てない。再取得や競合で query の data が変わっても、form の値を自動で作り直さない。
 - form の値を query の data から作り直すのは、自分の更新が成功した後と、利用者が「変更を捨てて最新を表示する」を選んだときだけにする。
 - 最新の `lockNo` を黙って差し込んで再送しない。form は、編集を始めた版の `lockNo` を持ち続け、自分の更新が成功したら、成功の後の版を新しい起点にする。

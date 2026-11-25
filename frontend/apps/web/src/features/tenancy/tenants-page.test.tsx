@@ -69,16 +69,21 @@ describe("テナントを選ぶ画面", () => {
     expect(router.state.location.pathname).toBe("/tenants");
   });
 
-  it("problem でない失敗では、カタログの文言を出す", async () => {
+  it("problem でない失敗では、カタログの文言を出し、Idempotency-Key のない選択を自動で再送しない", async () => {
+    let requests = 0;
     server.use(
       getListMembershipsMockHandler({ items: [tradingTenant] }),
-      http.put("*/api/current-tenant", () => new HttpResponse("Bad Gateway", { status: 502 })),
+      http.put("*/api/current-tenant", () => {
+        requests += 1;
+        return new HttpResponse("Bad Gateway", { status: 502 });
+      }),
     );
     const { user } = await renderRoute("/tenants");
 
     await user.click(await screen.findByRole("button", { name: "サンプル商事" }));
 
     await expect(screen.findByText("テナントを選べませんでした。")).resolves.toBeTruthy();
+    expect(requests).toBe(1);
   });
 });
 

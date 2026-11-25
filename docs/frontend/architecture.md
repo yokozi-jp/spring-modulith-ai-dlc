@@ -130,7 +130,7 @@ frontend/packages/ui/
 ```
 
 `main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
-`createQueryClient()` は、`@frontend/api/api-error` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
+`createQueryClient()` は、`@frontend/api/api-error` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry` と `defaultOptions.mutations.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
 本番とテスト（`testing/query-client.ts`）は同じ関数で `QueryClient` を作る。
 `main.tsx` は描画の前に `lib/telemetry.ts` の `initTelemetry()` を呼ぶが、SDKの読み込みを待たずに描画を始める。
 

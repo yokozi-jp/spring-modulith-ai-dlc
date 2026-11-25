@@ -112,6 +112,11 @@ errorの表示はcatalogの文言を使い、`error.message` を画面に出さ�
 ただし、408と429は再試行してよい応答なので（RFC 9110 §15.5.9、RFC 6585 §4）、5xxと同じく再試行する。
 loaderの `preloadQuery` も `defaultOptions.queries.retry` に従い、5xx、408、429と通信の失敗は最大3回再試行してから `RouteError` になる。
 
+mutationは `defaultOptions.mutations.retry`（`retryIdempotentMutation`）に従い、通信の失敗、5xx、408、429、同じ `Idempotency-Key` の要求の処理中の409だけを、TanStack Queryの既定の間隔で最大3回再試行する。
+再試行は同じ変数で `mutationFn` を呼ぶので、変数の `headers` の `Idempotency-Key` も同じになる（[再試行への備え](../web-api/http-methods.md#再試行への備え)）。
+ほかの4xxと、版の競合などほかの409は再試行しない。
+`Idempotency-Key` を送らないmutation（テナントの選択）は、生成Hookの `mutation` の options に `retry: false` を渡す。
+
 route固有の `pendingComponent` や `errorComponent` は、`react/no-multi-comp` があるためroute fileとは別のファイルに置く。
 
 ## mutationの後のcache

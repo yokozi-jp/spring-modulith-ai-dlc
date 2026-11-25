@@ -53,7 +53,7 @@ API 層は業務の処理を持たない。
 アプリの `src/api/` は次を守る。
 
 - `main.tsx` は `createQueryClient()` で `QueryClient` を作り、テストの `createTestQueryClient()`（`src/testing/query-client.ts`）も同じ関数から作る。
-- `createQueryClient()` は、`QueryCache` と `MutationCache` の `onError` に `redirectToLoginOnUnauthorized` を、`defaultOptions.queries.retry` に `retryUnlessClientError` を渡し、`MutationCache` の `onSettled` で全 query を無効化する（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
+- `createQueryClient()` は、`QueryCache` と `MutationCache` の `onError` に `redirectToLoginOnUnauthorized` を、`defaultOptions.queries.retry` に `retryUnlessClientError` を、`defaultOptions.mutations.retry` に `retryIdempotentMutation` を渡し、`MutationCache` の `onSettled` で全 query を無効化する（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
 - `preloadQuery` は `queryClient.query()` を呼び、無効化された query だけを取得し直す（[状態表示の分担](../routing-and-state.md#状態表示の分担)）。
 
 ## 生成物の扱い
@@ -100,7 +100,11 @@ component は同じ生成 query options を `useSuspenseQuery` で読む（`fron
 典型的な例は `createQueryClient` である（`frontend/apps/web/src/api/query-client.ts`）。
 
 ```ts
-import { redirectToLoginOnUnauthorized, retryUnlessClientError } from "@frontend/api/api-error";
+import {
+  redirectToLoginOnUnauthorized,
+  retryIdempotentMutation,
+  retryUnlessClientError,
+} from "@frontend/api/api-error";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 /** 本番とテストが同じ設定で使う QueryClient を作る。 */
@@ -115,7 +119,12 @@ export function createQueryClient(): QueryClient {
       // 遅れが画面で問題になったら、refetchType か mutationKey で無効化の範囲を絞る。
       onSettled: () => queryClient.invalidateQueries(),
     }),
-    defaultOptions: { queries: { retry: retryUnlessClientError } },
+    defaultOptions: {
+      queries: { retry: retryUnlessClientError },
+      // 再試行は同じ変数で mutationFn を呼ぶので、変数の headers の Idempotency-Key も同じになる（ADR-126）。
+      // キーを送らない mutation（テナントの選択）は、呼び出し側で retry: false にする。
+      mutations: { retry: retryIdempotentMutation },
+    },
   });
   return queryClient;
 }

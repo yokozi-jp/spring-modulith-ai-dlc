@@ -35,6 +35,13 @@ const tenantNotSelectedType = "/problems/tenant-not-selected";
 const csrfProblem = { type: csrfTokenInvalidType, title: "Invalid", status: 403 };
 const permissionProblem = { type: "about:blank", title: "Forbidden", status: 403 };
 const tenantProblem = { type: tenantNotSelectedType, title: "No tenant selected", status: 403 };
+const inProgressType = "/problems/idempotency-key-in-progress";
+const inProgressProblem = { type: inProgressType, title: "In progress", status: 409 };
+const versionConflictProblem = {
+  type: "/problems/version-conflict",
+  title: "Updated by another request",
+  status: 409,
+};
 
 describe("api-error", () => {
   beforeEach(async () => {
@@ -66,6 +73,7 @@ describe("api-error", () => {
       );
 
       expect(contract).toContain(tenantNotSelectedType);
+      expect(contract).toContain(inProgressType);
     });
   });
 
@@ -188,6 +196,37 @@ describe("api-error", () => {
       expect(api.retryUnlessClientError(3, serverError)).toBeFalsy();
       expect(api.retryUnlessClientError(2, networkError)).toBe(true);
       expect(api.retryUnlessClientError(3, networkError)).toBeFalsy();
+    });
+  });
+
+  describe("retryIdempotentMutation", () => {
+    it.each([
+      ["通信の失敗", () => new TypeError("Failed to fetch")],
+      ["5xx", () => new api.ApiProblemError(503, undefined)],
+      ["408", () => new api.ApiProblemError(408, undefined)],
+      ["429", () => new api.ApiProblemError(429, undefined)],
+      ["処理中の 409", () => new api.ApiProblemError(409, inProgressProblem)],
+    ])("%s は 3 回まで再試行する", (_name, error) => {
+      expect(api.retryIdempotentMutation(2, error())).toBe(true);
+      expect(api.retryIdempotentMutation(3, error())).toBeFalsy();
+    });
+
+    it.each([
+      ["版の競合の 409", () => new api.ApiProblemError(409, versionConflictProblem)],
+      ["problem のない 409", () => new api.ApiProblemError(409, undefined)],
+      ["422", () => new api.ApiProblemError(422, undefined)],
+      ["400", () => new api.ApiProblemError(400, undefined)],
+      ["本文を読めない失敗", () => new SyntaxError("Unexpected token")],
+    ])("%s は再試行しない", (_name, error) => {
+      expect(api.retryIdempotentMutation(0, error())).toBeFalsy();
+    });
+
+    it("処理中の type でも 409 でなければ、処理中とみなさない", () => {
+      expect(
+        api.isIdempotencyKeyInProgress(
+          new api.ApiProblemError(400, { ...inProgressProblem, status: 400 }),
+        ),
+      ).toBeFalsy();
     });
   });
 });

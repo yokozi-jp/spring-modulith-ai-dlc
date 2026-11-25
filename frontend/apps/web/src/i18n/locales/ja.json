@@ -24,7 +24,8 @@
   "loginAgain": "もう一度ログイン",
   "notice": {
     "generalTitle": "操作を完了できませんでした",
-    "generalFailure": "時間をおいてもう一度お試しください。"
+    "generalFailure": "時間をおいてもう一度お試しください。",
+    "inProgress": "前の操作をまだ処理しています。しばらく待ってから画面を読み込み直し、結果を確かめてください。"
   },
   "orders": {
     "missingValue": "（なし）",

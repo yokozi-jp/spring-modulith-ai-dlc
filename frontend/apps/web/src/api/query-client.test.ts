@@ -1,5 +1,6 @@
 import { ApiProblemError } from "@frontend/api/api-error";
 import { apiFetch } from "@frontend/api/api-fetch";
+import { idempotencyKeyHeaders } from "@frontend/api/idempotency-key";
 import { MutationObserver, QueryObserver } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
@@ -25,6 +26,39 @@ function respondToUpdate(status: 204 | 409) {
   }
   // oxlint-disable-next-line unicorn/no-null -- 204 は本文を持てない。
   return new HttpResponse(null, { status });
+}
+
+/** 送った要求の Idempotency-Key を記録し、responses を順に返す（最後の応答を繰り返す）。 */
+function serveUpdates(...responses: (() => Response)[]) {
+  const keys: (string | null)[] = [];
+  server.use(
+    http.post(itemsUrl, ({ request }) => {
+      keys.push(request.headers.get("Idempotency-Key"));
+      const respond = responses[Math.min(keys.length, responses.length) - 1];
+      if (respond === undefined) {
+        throw new Error("応答がない");
+      }
+      return respond();
+    }),
+  );
+  return keys;
+}
+
+function problem(status: number, type: string) {
+  return () =>
+    HttpResponse.json(
+      { type, title: "problem", status },
+      { status, headers: { "Content-Type": "application/problem+json" } },
+    );
+}
+
+/** 生成の mutation と同じく、変数の headers を送る mutation を 1 回の操作として送る。 */
+function mutateWithKey() {
+  const mutation = new MutationObserver(createTestQueryClient(), {
+    mutationFn: ({ headers }: { headers: Record<string, string> }) =>
+      apiFetch<{ status: number }>(itemsUrl, { method: "POST", headers }),
+  });
+  return mutation.mutate({ headers: idempotencyKeyHeaders() });
 }
 
 /** 最初の GET はすぐ返し、2 回目以降の GET（再取得）は release を呼ぶまで返さない。 */
@@ -112,5 +146,48 @@ describe("createQueryClient", () => {
     await expect(mutation.mutate()).rejects.toMatchObject({ status: 401 });
 
     expect(assign).toHaveBeenCalledExactlyOnceWith("/oauth2/authorization/web");
+  });
+
+  it("mutation の 503 の後、同じ Idempotency-Key で再試行し、204 で成功する", async () => {
+    const keys = serveUpdates(problem(503, "about:blank"), () => respondToUpdate(204));
+
+    await expect(mutateWithKey()).resolves.toMatchObject({ status: 204 });
+
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(keys[0]);
+    expect(keys[0]).toMatch(/^"[0-9a-f-]{36}"$/u);
+  });
+
+  it("mutation の処理中の 409 は同じ Idempotency-Key で再試行し、通信の失敗も再試行する", async () => {
+    const keys = serveUpdates(
+      problem(409, "/problems/idempotency-key-in-progress"),
+      () => HttpResponse.error(),
+      () => respondToUpdate(204),
+    );
+
+    await expect(mutateWithKey()).resolves.toMatchObject({ status: 204 });
+
+    expect(keys).toHaveLength(3);
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it("mutation の 503 が続くと、3 回の再試行の後に失敗する", async () => {
+    const keys = serveUpdates(problem(503, "about:blank"));
+
+    await expect(mutateWithKey()).rejects.toMatchObject({ status: 503 });
+
+    expect(keys).toHaveLength(4);
+  });
+
+  it.each([
+    ["版の競合の 409", 409, "/problems/version-conflict"],
+    ["業務の規則の 422", 422, "/problems/ordering/not-draft"],
+    ["ペイロードの不一致の 400", 400, "/problems/idempotency-key-payload-mismatch"],
+  ])("mutation の %s は再試行しない", async (_name, status, type) => {
+    const keys = serveUpdates(problem(status, type));
+
+    await expect(mutateWithKey()).rejects.toMatchObject({ status, problem: { type } });
+
+    expect(keys).toHaveLength(1);
   });
 });

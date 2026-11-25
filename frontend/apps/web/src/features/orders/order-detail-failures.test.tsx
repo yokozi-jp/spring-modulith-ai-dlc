@@ -54,6 +54,25 @@ async function submitConflictingChange() {
   return { user, bodies };
 }
 
+/** 確定と明細の変更の要求の Idempotency-Key を記録し、responses を順に返す（最後の応答を繰り返す）。 */
+function serveKeyed(method: "put" | "post", path: string, ...responses: (() => Response)[]) {
+  const keys: (string | null)[] = [];
+  server.use(
+    http[method](`*/api/orders/:orderId/${path}`, ({ request }) => {
+      keys.push(request.headers.get("Idempotency-Key"));
+      const respond = responses[Math.min(keys.length, responses.length) - 1];
+      if (respond === undefined) {
+        throw new Error("応答がない");
+      }
+      return respond();
+    }),
+  );
+  return keys;
+}
+
+const inProgressTitle = "同じ Idempotency-Key の要求を処理しています";
+const inProgress = { type: "/problems/idempotency-key-in-progress" };
+
 describe("注文の詳細の画面の失敗", () => {
   beforeEach(() => {
     stubCsrfCookie();
@@ -191,6 +210,66 @@ describe("注文の詳細の画面の失敗", () => {
     await waitFor(() => {
       expect(notice().textContent).toContain(text);
     });
+  });
+});
+
+describe("注文の詳細の画面の Idempotency-Key の再試行", () => {
+  beforeEach(() => {
+    stubCsrfCookie();
+    server.use(getListProductsMockHandler(products));
+  });
+
+  it("確定の 503 は同じ Idempotency-Key で自動で再試行し、成功を通知する", async () => {
+    serveDetail(draftOrder());
+    const keys = serveKeyed(
+      "post",
+      "confirm",
+      () => problemResponse(503, "Service Unavailable"),
+      noContent,
+    );
+    const { user } = await renderRoute(detailPath);
+
+    await user.click(await screen.findByRole("button", { name: "確定する" }));
+
+    await expect(within(notice()).findByText("注文を確定しました。")).resolves.toBeTruthy();
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(keys[0]);
+  });
+
+  it("失敗の通知の後に確定を押し直すと、新しい Idempotency-Key で送る", async () => {
+    serveDetail(draftOrder());
+    const keys = serveKeyed(
+      "post",
+      "confirm",
+      () =>
+        problemResponse(422, "下書きではない注文です", { type: "/problems/ordering/not-draft" }),
+      noContent,
+    );
+    const { user } = await renderRoute(detailPath);
+    await user.click(await screen.findByRole("button", { name: "確定する" }));
+    await expect(within(notice()).findByText("下書きではない注文です")).resolves.toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "確定する" }));
+
+    await expect(within(notice()).findByText("注文を確定しました。")).resolves.toBeTruthy();
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).not.toBe(keys[0]);
+  });
+
+  it("明細の変更の処理中の 409 が続くと、処理中を通知し、競合の選択肢を出さず入力を残す", async () => {
+    serveDetail(draftOrder());
+    const keys = serveKeyed("put", "lines", () =>
+      problemResponse(409, inProgressTitle, inProgress),
+    );
+    const { user } = await renderRoute(detailPath);
+
+    await saveQuantity(user, "3");
+
+    await expect(within(notice()).findByText(inProgressTitle)).resolves.toBeTruthy();
+    expect(notice().textContent).toContain("前の操作をまだ処理しています。");
+    expect(screen.queryByRole("button", { name: "変更を捨てて最新を表示する" })).toBeNull();
+    expect(screen.getByLabelText("数量")).toHaveProperty("value", "3");
+    expect(keys).toStrictEqual([keys[0], keys[0], keys[0], keys[0]]);
   });
 });
 
