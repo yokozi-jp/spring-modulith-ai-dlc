@@ -10,6 +10,7 @@ import static com.example.demo.jooq.tenancy.Tables.M_MEMBERSHIP;
 import static com.example.demo.jooq.tenancy.Tables.M_TENANT;
 import static com.example.demo.jooq.tenancy.Tables.M_USER_IDENTITY;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.demo.LocalDataSeeder.Mode;
 import com.example.demo.LocalDataSeeder.Outcome;
@@ -41,7 +42,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
-/** 開発用の代表データのシーダーの、件数、再実行、reset、ID の形を確かめる。 */
+/** 開発用の代表データのシーダーの、件数、再実行、reset、環境の判定、ID の形を確かめる。 */
 @DatabaseTest
 // 生成したテーブルと AssertJ を static import で読みやすくする。
 // 読み取りの補助メソッドが増えるため、メソッド数の上限も外す。
@@ -126,6 +127,37 @@ class LocalDataSeederTest {
   }
 
   @Test
+  @DisplayName("tenancy は、業務データが空でも 2 つのテナントと所属だけを入れて業務データを入れず、何度入れても増やさない")
+  void tenancySeedsOnlyTenantsAndMemberships() {
+    for (final TenantId tenant : TENANTS) {
+      LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
+          inModule(tenant, AsModule.moduleOf(table), tx -> tx.deleteFrom(table).execute()));
+    }
+
+    assertThat(SEEDER.seed(dsl, Mode.TENANCY)).isEqualTo(Outcome.TENANCY_SEEDED);
+    final Map<String, List<String>> first = memberships();
+    assertThat(SEEDER.seed(dsl, Mode.TENANCY)).isEqualTo(Outcome.TENANCY_SEEDED);
+
+    assertThat(first)
+        .isEqualTo(
+            Map.of(
+                TenancySeeds.TEST_USER_SUBJECT,
+                List.of("サンプル商事:MEMBER", "サンプル物産:MEMBER"),
+                TenancySeeds.TEST_ADMIN_SUBJECT,
+                List.of("サンプル商事:ADMIN")));
+    assertThat(memberships()).as("2 回目の tenancy の後の所属").isEqualTo(first);
+    for (final TenantId tenant : TENANTS) {
+      for (final Table<?> table : LocalDataSeeder.BUSINESS_TABLES) {
+        assertThat(
+                this.<Boolean>inModule(
+                    tenant, AsModule.moduleOf(table), tx -> tx.fetchExists(table)))
+            .as("テナント %s の %s の行", tenant, table)
+            .isFalse();
+      }
+    }
+  }
+
+  @Test
   @DisplayName("reset は業務データだけを消して同じ代表データを入れ直し、出版の行を残す")
   void resetReplacesOnlyBusinessDataWithSameValues() {
     final UUID publication = UUID.fromString("11111111-1111-4111-8111-111111111111");
@@ -162,6 +194,24 @@ class LocalDataSeederTest {
             dsl.fetchExists(
                 EVENT_PUBLICATION_ARCHIVE, EVENT_PUBLICATION_ARCHIVE.ID.eq(publication)))
         .isTrue();
+  }
+
+  @Test
+  @DisplayName("目印が local か test で DB_HOST が loopback のときだけ、ローカルの環境とみなす")
+  // loopback の判定を確かめるテストのデータであり、接続先の設定ではない。
+  @SuppressWarnings("PMD.AvoidUsingHardCodedIP")
+  void acceptsOnlyLocalEnvironment() {
+    assertThat(LocalDataSeeder.isLocalEnvironment(env("local", "localhost"))).isTrue();
+    assertThat(LocalDataSeeder.isLocalEnvironment(env("test", "127.0.0.1"))).isTrue();
+    for (final Map<String, String> rejected :
+        List.of(
+            env("stg", "localhost"),
+            env("local", "db.example.com"),
+            Map.of("DB_HOST", "localhost"))) {
+      assertThat(LocalDataSeeder.isLocalEnvironment(rejected)).isFalse();
+      assertThatThrownBy(() -> LocalDataSeeder.requireLocalEnvironment(rejected))
+          .isInstanceOf(IllegalStateException.class);
+    }
   }
 
   @Test
@@ -370,5 +420,9 @@ class LocalDataSeederTest {
   private static List<Field<?>> without(final Table<?> table, final Field<?>... excluded) {
     final List<Field<?>> excludedFields = List.of(excluded);
     return Stream.of(table.fields()).filter(field -> !excludedFields.contains(field)).toList();
+  }
+
+  private static Map<String, String> env(final String environment, final String host) {
+    return Map.of("OTEL_DEPLOYMENT_ENVIRONMENT_NAME", environment, "DB_HOST", host);
   }
 }
