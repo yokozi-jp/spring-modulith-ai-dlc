@@ -15,11 +15,14 @@ import type {
 } from 'msw';
 
 import type {
-  ProductSummaryListResponse
+  ProductSummaryListResponse,
+  ProductSummaryResponse
 } from '../../models';
 
 
 export const getListProductsResponseMock = (overrideResponse: Partial<Extract<ProductSummaryListResponse, object>> = {}): ProductSummaryListResponse => ({items: Array.from({ length: faker.number.int({min: 1, max: 10}) }, (_, i) => i + 1).map(() => ({productCode: "P-0001", productId: "0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60", productName: "ボールペン", salesStatus: "ON_SALE", unitPrice: 120})), ...overrideResponse})
+
+export const getFindProductByIdResponseMock = (overrideResponse: Partial<Extract<ProductSummaryResponse, object>> = {}): ProductSummaryResponse => ({productCode: "P-0001", productId: "0b6c8f6e-2f4a-4c1e-9d3b-7a1e5c2d4f60", productName: "ボールペン", salesStatus: "ON_SALE", unitPrice: 120, ...overrideResponse})
 
 
 export const getListProductsMockHandler = (overrideResponse?: ProductSummaryListResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<ProductSummaryListResponse> | ProductSummaryListResponse), options?: RequestHandlerOptions) => {
@@ -43,7 +46,20 @@ export const getRegisterProductMockHandler = (overrideResponse?: void | ((info: 
       })
   }, options)
 }
+
+export const getFindProductByIdMockHandler = (overrideResponse?: ProductSummaryResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<ProductSummaryResponse> | ProductSummaryResponse), options?: RequestHandlerOptions) => {
+  return http.get('*/api/products/:productId', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+
+
+    return HttpResponse.json(overrideResponse !== undefined
+    ? (typeof overrideResponse === "function" ? await overrideResponse(info) : overrideResponse)
+    : getFindProductByIdResponseMock(),
+      { status: 200
+      })
+  }, options)
+}
 export const getProductMock = () => [
   getListProductsMockHandler(),
-  getRegisterProductMockHandler()
+  getRegisterProductMockHandler(),
+  getFindProductByIdMockHandler()
 ]

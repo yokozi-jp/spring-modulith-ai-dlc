@@ -15,13 +15,13 @@ import java.math.BigDecimal;
  *
  * @param productCode 商品コード。テナントの中で一意にする
  * @param productName 商品名
- * @param unitPrice 単価（円）。0 以上で、小数は 2 桁まで
+ * @param unitPrice 単価（円）。0.01 以上で、小数は 2 桁まで
  * @param salesStatus 販売の状態のコード値（ON_SALE か DISCONTINUED）
  */
 public record RegisterProductRequest(
     @NotBlank @Size(min = 1, max = 20) @Schema(example = "P-0001") String productCode,
     @NotBlank @Size(min = 1, max = 100) @Schema(example = "ボールペン") String productName,
-    @NotNull @DecimalMin("0.00") @Digits(integer = 10, fraction = 2) @Schema(example = "120.00")
+    @NotNull @DecimalMin("0.01") @Digits(integer = 10, fraction = 2) @Schema(example = "120.00")
         BigDecimal unitPrice,
     @NotNull @Pattern(regexp = "^(ON_SALE|DISCONTINUED)$") @Schema(example = "ON_SALE")
         String salesStatus) {

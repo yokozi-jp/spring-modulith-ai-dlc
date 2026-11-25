@@ -495,6 +495,38 @@ paths:
       summary: 商品を登録する。
       tags:
       - product
+  /api/products/{productId}:
+    get:
+      description: 商品がなければ 404 を返す。
+      operationId: findProductById
+      parameters:
+      - description: 商品の ID
+        in: path
+        name: productId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductSummaryResponse"
+          description: 商品
+        "400":
+          $ref: "#/components/responses/BadRequestProblem"
+        "401":
+          $ref: "#/components/responses/UnauthorizedProblem"
+        "403":
+          $ref: "#/components/responses/ForbiddenProblem"
+        "404":
+          $ref: "#/components/responses/NotFoundProblem"
+        "500":
+          $ref: "#/components/responses/InternalServerErrorProblem"
+      summary: 商品を返す。
+      tags:
+      - product
 components:
   parameters:
     IdempotencyKey:
@@ -932,7 +964,7 @@ components:
       - items
     ProductSummaryResponse:
       type: object
-      description: 商品の一覧の1行を返す API の本文。
+      description: 商品の一覧の1行と、商品1件を返す API の本文。
       properties:
         productCode:
           type: string
@@ -984,9 +1016,9 @@ components:
           pattern: ^(ON_SALE|DISCONTINUED)$
         unitPrice:
           type: number
-          description: 単価（円）。0 以上で、小数は 2 桁まで
+          description: 単価（円）。0.01 以上で、小数は 2 桁まで
           example: 120.0
-          minimum: 0.00
+          minimum: 0.01
       required:
       - productCode
       - productName

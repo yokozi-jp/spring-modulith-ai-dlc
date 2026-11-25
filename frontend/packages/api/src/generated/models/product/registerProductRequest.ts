@@ -25,8 +25,8 @@ export interface RegisterProductRequest {
      */
   salesStatus: string;
   /**
-     * 単価（円）。0 以上で、小数は 2 桁まで
-     * @minimum 0
+     * 単価（円）。0.01 以上で、小数は 2 桁まで
+     * @minimum 0.01
      */
   unitPrice: number;
 }

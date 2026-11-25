@@ -30,7 +30,9 @@ import type {
   ConflictProblemResponse,
   ForbiddenProblemResponse,
   InternalServerErrorProblemResponse,
+  NotFoundProblemResponse,
   ProductSummaryListResponse,
+  ProductSummaryResponse,
   RegisterProductHeaders,
   RegisterProductRequest,
   UnauthorizedProblemResponse
@@ -368,3 +370,196 @@ export const useRegisterProduct = <TError = ErrorType<BadRequestProblemResponse 
       > => {
       return useMutation(getRegisterProductMutationOptions(options), queryClient);
     }
+    export type findProductByIdResponse200 = {
+  data: ProductSummaryResponse
+  status: 200
+}
+
+export type findProductByIdResponse400 = {
+  data: BadRequestProblemResponse
+  status: 400
+}
+
+export type findProductByIdResponse401 = {
+  data: UnauthorizedProblemResponse
+  status: 401
+}
+
+export type findProductByIdResponse403 = {
+  data: ForbiddenProblemResponse
+  status: 403
+}
+
+export type findProductByIdResponse404 = {
+  data: NotFoundProblemResponse
+  status: 404
+}
+
+export type findProductByIdResponse500 = {
+  data: InternalServerErrorProblemResponse
+  status: 500
+}
+
+export type findProductByIdResponseSuccess = (findProductByIdResponse200) & {
+  headers: Headers;
+};
+export type findProductByIdResponseError = (findProductByIdResponse400 | findProductByIdResponse401 | findProductByIdResponse403 | findProductByIdResponse404 | findProductByIdResponse500) & {
+  headers: Headers;
+};
+
+export const getFindProductByIdUrl = (productId: string,) => {
+
+
+
+
+  return `/api/products/${productId}`
+}
+
+/**
+ * 商品がなければ 404 を返す。
+ * @summary 商品を返す。
+ */
+export const findProductById = async (productId: string, options?: Parameters<typeof apiFetch>[1]): Promise<findProductByIdResponseSuccess> => {
+
+  return apiFetch<findProductByIdResponseSuccess>(getFindProductByIdUrl(productId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getFindProductByIdQueryKey = (productId: string,) => {
+    return [
+    `/api/products/${productId}`
+    ] as const;
+    }
+
+
+export const getFindProductByIdQueryOptions = <TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getFindProductByIdQueryKey(productId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof findProductById>>> = ({ signal }) => findProductById(productId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: productId !== null && productId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type FindProductByIdQueryResult = NonNullable<Awaited<ReturnType<typeof findProductById>>>
+export type FindProductByIdQueryError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useFindProductById<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof findProductById>>,
+          TError,
+          Awaited<ReturnType<typeof findProductById>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindProductById<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof findProductById>>,
+          TError,
+          Awaited<ReturnType<typeof findProductById>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindProductById<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 商品を返す。
+ */
+
+export function useFindProductById<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getFindProductByIdQueryOptions(productId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getFindProductByIdSuspenseQueryOptions = <TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(productId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getFindProductByIdQueryKey(productId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof findProductById>>> = ({ signal }) => findProductById(productId, { signal, ...requestOptions });
+
+
+
+
+
+   return  queryOptionsBuilder({ queryKey, ...queryOptions, queryFn: queryOptions?.queryFn ?? queryFn}) as UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> } & { throwOnError?: ((this: never, error: TError) => boolean) & { readonly __inferenceOnly: never } }
+}
+
+export type FindProductByIdSuspenseQueryResult = NonNullable<Awaited<ReturnType<typeof findProductById>>>
+export type FindProductByIdSuspenseQueryError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useFindProductByIdSuspense<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options: { query:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindProductByIdSuspense<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindProductByIdSuspense<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 商品を返す。
+ */
+
+export function useFindProductByIdSuspense<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getFindProductByIdSuspenseQueryOptions(productId,options)
+
+  const query = useSuspenseQuery(queryOptions, queryClient) as  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+

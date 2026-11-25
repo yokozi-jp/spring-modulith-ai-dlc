@@ -58,8 +58,8 @@ E2E は開発用のシーダーを使わない。
 - 注文は、今までどおり画面か公開 API で作る。決済代行の拒否、5xx、遅延は WireMock の `failChargesFor` で作る。
 - テナントと所属は、`task e2e-up` が `task be-seed-tenancy`（シーダーの `tenancy` のモード）で入れ、業務データを入れない。
 - 本番に、商品を登録する API（`POST /api/products`、operationId は `registerProduct`）を足す。
-  作成だけを足し、更新、削除、画面は作らない。
-  本文は `productCode`（1 から 20 文字）、`productName`（1 から 100 文字）、`unitPrice`（0 以上で小数 2 桁まで）、`salesStatus`（`ON_SALE` か `DISCONTINUED`）で、201 と `Location` を返す。
+  作成と、作成した商品 1 件の参照（`GET /api/products/{productId}`、operationId は `findProductById`）を足し、更新、削除、画面は作らない。
+  本文は `productCode`（1 から 20 文字）、`productName`（1 から 100 文字）、`unitPrice`（0.01 以上で小数 2 桁まで）、`salesStatus`（`ON_SALE` か `DISCONTINUED`）で、201 と、商品 1 件の参照を指す `Location` を返す。
   商品コードの重複は、注文の作成の客先注文番号と同じく、`/problems/unique-violation` の 409 で返す。
   書き込みは `TableWriter` を通し、`product` のロール、テナントの RLS、共通カラムを既存の書き込みと同じ仕組みで通す。
 - 商品を登録できるのは、テナントを選んだ認証済みの利用者なら誰でもとする（注文の作成と同じ扱い）。

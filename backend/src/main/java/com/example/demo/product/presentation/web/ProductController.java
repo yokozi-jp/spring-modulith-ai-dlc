@@ -3,6 +3,7 @@ package com.example.demo.product.presentation.web;
 import com.example.demo.product.ProductQueries;
 import com.example.demo.product.application.RegisterProductCommandHandler;
 import com.example.demo.product.application.RegisterProductResult;
+import com.example.demo.shared.failure.NotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -10,8 +11,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -79,5 +82,24 @@ class ProductController {
     // ponytail: ページングしない。参照業務機能の商品は数件である。数百件を超えるなら ADR-013 のカーソルを足す。
     return new ProductSummaryListResponse(
         productQueries.search().stream().map(ProductSummaryResponse::from).toList());
+  }
+
+  /**
+   * 商品を返す。
+   *
+   * <p>商品がなければ 404 を返す。
+   *
+   * @param productId 商品の ID
+   * @return 商品
+   */
+  @Operation(operationId = "findProductById")
+  @ApiResponse(responseCode = "200")
+  @ApiResponse(responseCode = "404", ref = "#/components/responses/NotFoundProblem")
+  @GetMapping("/{productId}")
+  /* package */ ProductSummaryResponse details(@PathVariable final UUID productId) {
+    return productQueries
+        .findById(productId.toString())
+        .map(ProductSummaryResponse::from)
+        .orElseThrow(() -> new NotFoundException("product not found: productId=" + productId));
   }
 }

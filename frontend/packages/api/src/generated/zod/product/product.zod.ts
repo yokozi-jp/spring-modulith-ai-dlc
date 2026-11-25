@@ -16,7 +16,7 @@ export const ListProductsResponse = zod.object({
   "productName": zod.string().describe('商品名'),
   "salesStatus": zod.string().describe('販売の状態のコード値（ON_SALE か DISCONTINUED）'),
   "unitPrice": zod.number().describe('単価')
-}).describe('商品の一覧の1行を返す API の本文。')).describe('商品の一覧の行')
+}).describe('商品の一覧の1行と、商品1件を返す API の本文。')).describe('商品の一覧の行')
 }).describe('商品の一覧を items で包んで返す API の本文。')
 
 /**
@@ -35,7 +35,7 @@ export const registerProductBodyProductCodeMax = 20;
 export const registerProductBodyProductNameMax = 100;
 
 export const registerProductBodySalesStatusRegExp = new RegExp('^(ON_SALE|DISCONTINUED)$');
-export const registerProductBodyUnitPriceMin = 0;
+export const registerProductBodyUnitPriceMin = 0.01;
 
 
 
@@ -43,8 +43,24 @@ export const RegisterProductBody = zod.object({
   "productCode": zod.string().min(1).max(registerProductBodyProductCodeMax).describe('商品コード。テナントの中で一意にする'),
   "productName": zod.string().min(1).max(registerProductBodyProductNameMax).describe('商品名'),
   "salesStatus": zod.string().regex(registerProductBodySalesStatusRegExp).describe('販売の状態のコード値（ON_SALE か DISCONTINUED）'),
-  "unitPrice": zod.number().min(registerProductBodyUnitPriceMin).describe('単価（円）。0 以上で、小数は 2 桁まで')
+  "unitPrice": zod.number().min(registerProductBodyUnitPriceMin).describe('単価（円）。0.01 以上で、小数は 2 桁まで')
 }).describe('商品を登録する API の本文。')
 
 export const RegisterProductResponse = zod.void()
+
+/**
+ * 商品がなければ 404 を返す。
+ * @summary 商品を返す。
+ */
+export const FindProductByIdParams = zod.object({
+  "productId": zod.uuid().describe('商品の ID')
+})
+
+export const FindProductByIdResponse = zod.object({
+  "productCode": zod.string().describe('商品コード'),
+  "productId": zod.uuid().describe('商品の ID'),
+  "productName": zod.string().describe('商品名'),
+  "salesStatus": zod.string().describe('販売の状態のコード値（ON_SALE か DISCONTINUED）'),
+  "unitPrice": zod.number().describe('単価')
+}).describe('商品の一覧の1行と、商品1件を返す API の本文。')
 

@@ -1,6 +1,7 @@
 package com.example.demo.product.presentation.web;
 
 import static com.example.demo.jooq.product.Tables.M_PRODUCT;
+import static com.example.demo.testkit.AppUsers.inTenant;
 import static com.example.demo.testkit.AppUsers.oidcLogin;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -32,9 +33,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.web.bind.annotation.RequestMethod;
 
-/** 商品の登録と一覧の API のステータスコード、Location、Problem Details を HTTP の形で検証する。 */
+/** 商品の登録、一覧、1 件の API のステータスコード、Location、Problem Details を HTTP の形で検証する。 */
 @SuppressWarnings({
   "PMD.AvoidDuplicateLiterals",
   "PMD.SignatureDeclareThrowsException",
@@ -91,6 +93,7 @@ class ProductApiTest {
   @Test
   @DisplayName("テナントの MEMBER が商品を登録すると 201 と Location を返し、選んだテナントに、利用者と登録のユースケースを記録して保存する")
   @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 201)
+  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 200)
   void registerReturnsCreatedAndStoresInSelectedTenant() throws Exception {
     final String productCode = UniqueCodes.next("P");
 
@@ -105,13 +108,13 @@ class ProductApiTest {
     final String productId =
         Objects.requireNonNull(location).substring(location.lastIndexOf('/') + 1);
     mockMvc
-        .perform(get("/api/products").with(oidcLogin()))
-        .andExpect(jsonPath("$.items.length()").value(1))
-        .andExpect(jsonPath("$.items[0].productId").value(productId))
-        .andExpect(jsonPath("$.items[0].productCode").value(productCode))
-        .andExpect(jsonPath("$.items[0].productName").value("name of " + productCode))
-        .andExpect(jsonPath("$.items[0].unitPrice").value(120.50))
-        .andExpect(jsonPath("$.items[0].salesStatus").value("DISCONTINUED"));
+        .perform(get(location).with(oidcLogin()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.productId").value(productId))
+        .andExpect(jsonPath("$.productCode").value(productCode))
+        .andExpect(jsonPath("$.productName").value("name of " + productCode))
+        .andExpect(jsonPath("$.unitPrice").value(120.50))
+        .andExpect(jsonPath("$.salesStatus").value("DISCONTINUED"));
     assertThat(
             AsModule.<List<String>>call(
                 dsl,
@@ -126,6 +129,53 @@ class ProductApiTest {
                         .fetchSingle(
                             row -> List.of(row.value1().toString(), row.value2(), row.value3()))))
         .isEqualTo(List.of(AppUsers.TENANT_ID, AppUsers.USER_ID, "product.RegisterProduct"));
+  }
+
+  @Test
+  @DisplayName("2 つのテナントは同じ商品コードの商品を登録でき、どちらのテナントからも相手の商品は見えない")
+  void sameProductCodeIsRegisteredPerTenant() throws Exception {
+    final String productCode = UniqueCodes.next("P");
+    final RequestPostProcessor otherTenant = inTenant(UUID.randomUUID().toString(), "MEMBER");
+    final String location =
+        register(oidcLogin(), productCode, "120.00", "ON_SALE")
+            .andExpect(status().isCreated())
+            .andReturn()
+            .getResponse()
+            .getHeader(HttpHeaders.LOCATION);
+
+    register(otherTenant, productCode, "80.00", "ON_SALE").andExpect(status().isCreated());
+
+    mockMvc
+        .perform(get("/api/products").with(oidcLogin()))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].unitPrice").value(120.00));
+    mockMvc
+        .perform(get("/api/products").with(otherTenant))
+        .andExpect(jsonPath("$.items.length()").value(1))
+        .andExpect(jsonPath("$.items[0].unitPrice").value(80.00));
+    mockMvc
+        .perform(get(Objects.requireNonNull(location)).with(otherTenant))
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  @DisplayName("存在しない商品は 404 を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 404)
+  void missingProductReturnsNotFound() throws Exception {
+    mockMvc
+        .perform(get("/api/products/" + UUID.randomUUID()).with(oidcLogin()))
+        .andExpect(status().isNotFound())
+        .andExpect(jsonPath("$.type").value("about:blank"));
+  }
+
+  @Test
+  @DisplayName("UUID でない商品 ID は about:blank の 400 を返す")
+  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 400)
+  void malformedProductIdReturnsBadRequest() throws Exception {
+    mockMvc
+        .perform(get("/api/products/not-a-uuid").with(oidcLogin()))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.type").value("about:blank"));
   }
 
   @Test
@@ -146,7 +196,7 @@ class ProductApiTest {
   }
 
   @Test
-  @DisplayName("21 文字の商品コード、負の単価、定義にない販売の状態は、検証の 400 を返し、商品を登録しない")
+  @DisplayName("21 文字の商品コード、0 以下の単価、小数 3 桁の単価、定義にない販売の状態は、検証の 400 を返し、商品を登録しない")
   @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 400)
   void invalidProductReturnsValidationProblem() throws Exception {
     final String tooLong = "P".repeat(21);
@@ -155,6 +205,7 @@ class ProductApiTest {
         List.of(
             register(tooLong, "120.00", "ON_SALE"),
             register(valid, "-1.00", "ON_SALE"),
+            register(valid, "0.00", "ON_SALE"),
             register(valid, "120.001", "ON_SALE"),
             register(valid, "120.00", "on_sale"))) {
       rejected
@@ -168,9 +219,18 @@ class ProductApiTest {
 
   private ResultActions register(
       final String productCode, final String unitPrice, final String salesStatus) throws Exception {
+    return register(oidcLogin(), productCode, unitPrice, salesStatus);
+  }
+
+  private ResultActions register(
+      final RequestPostProcessor user,
+      final String productCode,
+      final String unitPrice,
+      final String salesStatus)
+      throws Exception {
     return mockMvc.perform(
         post("/api/products")
-            .with(oidcLogin())
+            .with(user)
             .with(csrf())
             .contentType(MediaType.APPLICATION_JSON)
             .content(

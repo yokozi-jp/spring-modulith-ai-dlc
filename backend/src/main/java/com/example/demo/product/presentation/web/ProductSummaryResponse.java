@@ -7,7 +7,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 /**
- * 商品の一覧の1行を返す API の本文。
+ * 商品の一覧の1行と、商品1件を返す API の本文。
  *
  * @param productId 商品の ID
  * @param productCode 商品コード

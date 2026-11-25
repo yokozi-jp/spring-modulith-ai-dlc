@@ -6,6 +6,7 @@ import com.example.demo.product.domain.model.Product;
 import com.example.demo.product.domain.model.ProductId;
 import com.example.demo.product.domain.model.ProductRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +27,12 @@ class ProductQueryService implements ProductQueries {
   @Transactional(readOnly = true)
   public List<ProductSummary> search() {
     return productRepository.findAll().stream().map(ProductQueryService::toSummary).toList();
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Optional<ProductSummary> findById(final String productId) {
+    return findByIds(List.of(productId)).stream().findFirst();
   }
 
   @Override
