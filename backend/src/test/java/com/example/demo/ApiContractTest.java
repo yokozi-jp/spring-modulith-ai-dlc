@@ -455,7 +455,6 @@ class ApiContractTest {
         .andExpect(header().string("X-Content-Type-Options", "nosniff"))
         .andExpect(header().string("X-Frame-Options", "DENY"))
         .andExpect(header().string("Cross-Origin-Resource-Policy", "same-origin"))
-        // includeSubDomains を付けない（ADR-014）。
         .andExpect(header().string("Strict-Transport-Security", "max-age=31536000"));
   }
 }

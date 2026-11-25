@@ -23,7 +23,6 @@ tags: [convention, frontend, build, delivery, cache, future-arch-guidelines]
 - バックエンドのpathの404を `index.html` で置き換えない。
 - 配信点は、ADR-014が定めるsecurity headerを付けられる方式にする。
 - SPAのHTMLに`Cross-Origin-Opener-Policy: same-origin`を付ける（[ADR-132](../adr/ADR-132-add-corp-and-coop-to-delivered-security-headers.md)）。
-  OIDCはredirectで、popupを使わない。popupでログインするIdPを使うときは、ADR-132を改める。
 - CSPの`form-action`にIdPのoriginを加える。
   ログアウトのフォーム送信がIdPへredirectされ、ブラウザがredirect先にもform-actionを適用するためである。
 - CSPの最後に `report-to csp-endpoint` を置き、`Reporting-Endpoints: csp-endpoint="/csp-report"` を付ける（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。

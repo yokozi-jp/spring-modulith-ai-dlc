@@ -42,7 +42,7 @@ ADR-014 が定めた、配信点が正本で同じヘッダーを複数層から
 Vite の開発サーバーと preview は `securityHeaders` で付ける。
 
 ADR-014 の「最終的な SPA の HTML 応答に付けるヘッダー」の一覧に、`Cross-Origin-Opener-Policy: same-origin` を足す。
-現行の一覧は[ビルドと配信](../frontend/build-and-delivery.md)の「配信点の条件」に置く。
+配信点が満たす条件は[ビルドと配信](../frontend/build-and-delivery.md)の「配信点の条件」に書く。
 
 次は取り込まない。
 
@@ -60,13 +60,13 @@ ADR-014 の「最終的な SPA の HTML 応答に付けるヘッダー」の一�
 
 ### Negative
 
-- popup でログインする IdP や、`window.opener` で別のオリジンと通信する機能を足すときは、COOP を `same-origin-allow-popups` へ緩める判断が要る。
+- popup でログインする IdP を使うときは、COOP を `same-origin-allow-popups` へ緩める判断が要る。
 - API の応答を別のオリジンの no-cors で読み込む利用ができなくなる。ADR-014 が別オリジンのクライアントを許可しないので、新しい制約にはならない。
 
 ### Neutral
 
 - COOP は配信点が正本なので、CDN やリバースプロキシへ移すときは、その層で同じ値を付ける。
-- `includeSubDomains` を付けるときは、全 subdomain の HTTPS 化を確認したうえで、この ADR を改める。
+- `includeSubDomains` を付ける条件の正本は ADR-014 である。条件を満たして付けるときは、この ADR の HSTS の記述を改める。
 
 ## Alternatives Considered
 
