@@ -152,8 +152,7 @@ MCPで意図して`normalize`する場合は、人が`mcp.json`の`disabledTools
 1. `docs/<領域>/`を作り、最初の文書と`index.md`を置く。
 2. `docs/index.md`に、領域の`index.md`へのリンクを「いつ読むか」付きで1行加える。
 3. [steeringの書き方](steering-authoring.md)に従い、`.kiro/steering/<領域>.md`を作って対象ファイルへ`fileMatch`させる。ルートの`AGENTS.md`が領域のsteeringを兼ねる場合は省く。
-4. steering`docs-navigation`の「領域ごとの入口」に1行加える。
-5. `task okf-check`を実行する。
+4. `task okf-check`を実行する。
 
 ## 手順とコード例の確かめ方
 
