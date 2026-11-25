@@ -22,7 +22,7 @@ public class CancelExpiredOrderCommandHandler {
   }
 
   /** 注文を取り消し、読み込んだ版で保存する。 */
-  @NoRoleRequired(reason = "Listener から呼ぶ。認証がない")
+  @NoRoleRequired(NoRoleRequired.Basis.CALLED_WITHOUT_AUTHENTICATION)
   @Transactional
   public CancelExpiredOrderResult handle(final CancelExpiredOrderCommand command) {
     final Order order =

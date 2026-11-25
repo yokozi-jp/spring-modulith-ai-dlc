@@ -19,7 +19,7 @@ public class ReserveStockCommandHandler {
   }
 
   /** 注文の明細を読み、在庫を引き当てる。 */
-  @NoRoleRequired(reason = "Listener から呼ぶ。認証がない")
+  @NoRoleRequired(NoRoleRequired.Basis.CALLED_WITHOUT_AUTHENTICATION)
   @Transactional
   public ReserveStockResult handle(final ReserveStockCommand command) {
     return orderQueries

@@ -20,7 +20,7 @@ public class CapturePaymentCommandHandler {
   }
 
   /** 注文の代金を請求する。 */
-  @NoRoleRequired(reason = "Listener から呼ぶ。認証がない")
+  @NoRoleRequired(NoRoleRequired.Basis.CALLED_WITHOUT_AUTHENTICATION)
   @Transactional
   public CapturePaymentResult handle(final CapturePaymentCommand command) {
     return new CapturePaymentResult(

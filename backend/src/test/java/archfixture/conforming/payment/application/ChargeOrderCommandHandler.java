@@ -20,7 +20,7 @@ public class ChargeOrderCommandHandler {
   }
 
   /** 顧客の注文の状態の名前を読む。 */
-  @NoRoleRequired(reason = "Listener から呼ぶ。認証がない")
+  @NoRoleRequired(NoRoleRequired.Basis.CALLED_WITHOUT_AUTHENTICATION)
   @Transactional
   public ChargeOrderResult handle(final ChargeOrderCommand command) {
     return new ChargeOrderResult(

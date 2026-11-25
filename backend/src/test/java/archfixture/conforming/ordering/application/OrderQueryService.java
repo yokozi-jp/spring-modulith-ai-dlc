@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 注文の読み取り窓口を実装する。 */
-@NoRoleRequired(reason = "見える範囲は SQL で絞る")
 @Service
 class OrderQueryService implements OrderQueries {
 
@@ -29,6 +28,7 @@ class OrderQueryService implements OrderQueries {
   }
 
   @Override
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public Optional<OrderDetails> findDetails(final String orderId) {
     final IdempotencyKey key = new IdempotencyKey(orderId);
@@ -38,6 +38,7 @@ class OrderQueryService implements OrderQueries {
   }
 
   @Override
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<OrderSummary> search(final OrderSearchCriteria criteria) {
     return orderRepository.findByCustomer(new CustomerId(criteria.customerId())).stream()

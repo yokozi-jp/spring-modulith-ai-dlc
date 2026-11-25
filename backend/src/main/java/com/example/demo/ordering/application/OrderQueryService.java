@@ -17,8 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 注文の参照を、Repository で読んだ集約から作る。 */
-@NoRoleRequired(
-    reason = "注文の参照はテナントの全員に許し、決済の Listener からも呼ぶ。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
 @Service
 class OrderQueryService implements OrderQueries {
 
@@ -31,6 +29,7 @@ class OrderQueryService implements OrderQueries {
   }
 
   @Override
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public Optional<OrderDetails> findDetails(final String orderId) {
     return orderRepository
@@ -39,6 +38,7 @@ class OrderQueryService implements OrderQueries {
   }
 
   @Override
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<OrderSummary> search(final OrderSearchCriteria criteria) {
     // ponytail: ページングしない。参照業務機能の注文の件数は少ない。数百件を超えるなら ADR-013 のカーソルを足す。

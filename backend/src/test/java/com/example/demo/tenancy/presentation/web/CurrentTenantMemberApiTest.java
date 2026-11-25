@@ -21,6 +21,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -245,6 +247,20 @@ class CurrentTenantMemberApiTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors[0].pointer").value("/lockNo"));
     remove(member, 0, asAdmin)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.type").value("/problems/validation-error"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"ADMIN", "MEMBER"})
+  @DisplayName("不正な入力は役割を確かめる前に 400 になり、管理者でない利用者も 403 でなく 400 を受け取る")
+  void invalidInputIsBadRequestBeforeTheRoleCheck(final String role) throws Exception {
+    final RequestPostProcessor user = inTenant(tenant, role);
+
+    changeRole(member, "OWNER", 1, user)
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.errors[0].pointer").value("/role"));
+    remove(member, 0, user)
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.type").value("/problems/validation-error"));
   }

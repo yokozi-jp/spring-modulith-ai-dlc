@@ -22,7 +22,7 @@ public class CancelOrderCommandHandler {
   }
 
   /** ロック番号を確かめて注文を取り消し、保存する。 */
-  @NoRoleRequired(reason = "注文の操作はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional
   public CancelOrderResult handle(final CancelOrderCommand command) {
     final Order order =

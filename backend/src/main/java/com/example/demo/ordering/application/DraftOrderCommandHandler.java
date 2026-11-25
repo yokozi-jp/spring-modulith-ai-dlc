@@ -35,7 +35,7 @@ public class DraftOrderCommandHandler {
   }
 
   /** 明細の商品を読んで下書きの注文を作り、保存する。 */
-  @NoRoleRequired(reason = "注文の操作はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional
   public DraftOrderResult handle(final DraftOrderCommand command) {
     final List<OrderedItem> items =

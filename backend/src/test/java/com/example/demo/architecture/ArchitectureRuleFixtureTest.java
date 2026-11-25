@@ -66,18 +66,11 @@ class ArchitectureRuleFixtureTest {
 
   /** method security のアノテーションの置き場所の規則を、違反フィクスチャに当てたもの。 */
   private static final ArchRule METHOD_SECURITY_IN_APPLICATION =
-      ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(VIOLATING);
+      AuthorizationArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(VIOLATING);
 
   /** {@code @PreAuthorize} に役割と権限の名前でない式を書く違反フィクスチャのクラス名。 */
   private static final String SCRIPTED_AUTHORIZATION =
       "ordering.application.ScriptedAuthorizationCommandHandler";
-
-  /** 役割の判断の宣言の規則を、違反フィクスチャに当てたもの。 */
-  private static final ArchRule AUTHORIZATION_DECLARED =
-      ProxyRulesArchTest.applicationHandlersDeclareAuthorizationRule(VIOLATING);
-
-  /** {@code @NoRoleRequired} の reason を空と空白だけにする違反フィクスチャのクラス名。 */
-  private static final String BLANK_REASON = "ordering.application.BlankReasonCommandHandler";
 
   /** モジュールのロールの規則が、違反フィクスチャの各メソッドを検出することを確かめる行。 */
   private static final List<Arguments> MODULE_ROLE_ROWS =
@@ -286,44 +279,44 @@ class ArchitectureRuleFixtureTest {
               "ordering.domain.model.OrderArchive.archive("),
           row(
               "preAuthorizeUsesOnlyRoleOrAuthorityNames: クラスの式",
-              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
               SCRIPTED_AUTHORIZATION + "> の @PreAuthorize(\"isAuthenticated()\")"),
           row(
               "preAuthorizeUsesOnlyRoleOrAuthorityNames: 引数を参照する SpEL",
-              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
               SCRIPTED_AUTHORIZATION + ".approve("),
           row(
               "preAuthorizeUsesOnlyRoleOrAuthorityNames: Bean を参照する SpEL",
-              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
               SCRIPTED_AUTHORIZATION + ".reject("),
           row(
               "preAuthorizeUsesOnlyRoleOrAuthorityNames: or で組んだ式",
-              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
               SCRIPTED_AUTHORIZATION + ".hold("),
           row(
               "preAuthorizeUsesOnlyRoleOrAuthorityNames: 引用符のない役割",
-              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
               SCRIPTED_AUTHORIZATION + ".ship("),
           row(
               "preAuthorizeUsesOnlyRoleOrAuthorityNames: 空の式",
-              ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+              AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
               SCRIPTED_AUTHORIZATION + ".release("),
           row(
               "applicationHandlersDeclareAuthorization: CommandHandler の宣言がない",
-              AUTHORIZATION_DECLARED,
-              "ordering.application.UndeclaredRoleCommandHandler.handle() とそのクラスに"),
+              AuthorizationArchTest.applicationHandlersDeclareAuthorization,
+              "ordering.application.UndeclaredRoleCommandHandler.handle() に"),
           row(
               "applicationHandlersDeclareAuthorization: QueryService の interface の実装の宣言がない",
-              AUTHORIZATION_DECLARED,
+              AuthorizationArchTest.applicationHandlersDeclareAuthorization,
               "ordering.application.UndeclaredRoleQueryService.run()"),
           row(
-              "applicationHandlersDeclareAuthorization: メソッドの reason が空",
-              AUTHORIZATION_DECLARED,
-              BLANK_REASON + ".handle()> の @NoRoleRequired(reason = \"\")"),
+              "authorizationIsDeclaredOnlyOnce: 同じメソッドに両方",
+              AuthorizationArchTest.authorizationIsDeclaredOnlyOnce,
+              "ordering.application.DoublyAuthorizedCommandHandler.handle()"),
           row(
-              "applicationHandlersDeclareAuthorization: クラスの reason が空白だけ",
-              AUTHORIZATION_DECLARED,
-              BLANK_REASON + "> の @NoRoleRequired(reason = \"  \")"));
+              "authorizationIsDeclaredOnlyOnce: @PreAuthorize のクラスのメソッドに @NoRoleRequired",
+              AuthorizationArchTest.authorizationIsDeclaredOnlyOnce,
+              "ordering.application.AdminExemptingCommandHandler.handle()"));
 
   @Test
   @DisplayName("規約どおりのフィクスチャはすべてのクラス役割規則を満たす")
@@ -473,7 +466,7 @@ class ArchitectureRuleFixtureTest {
         Arguments.of(
             "@PreAuthorize の役割と権限の名前だけの式",
             RoleNameAuthorizations.class,
-            List.of(ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames)));
+            List.of(AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames)));
   }
 
   /** {@code @PreAuthorize} の式の規則が許す、役割か権限の名前だけの式を持つフィクスチャ。 */
@@ -700,9 +693,10 @@ class ArchitectureRuleFixtureTest {
         ProxyRulesArchTest.publicBeanMethodsAreNotFinal,
         ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
         ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
-        ProxyRulesArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(basePackage),
-        ProxyRulesArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
-        ProxyRulesArchTest.applicationHandlersDeclareAuthorizationRule(basePackage),
+        AuthorizationArchTest.methodSecurityAnnotationsAreOnlyOnApplicationClassesRule(basePackage),
+        AuthorizationArchTest.preAuthorizeUsesOnlyRoleOrAuthorityNames,
+        AuthorizationArchTest.applicationHandlersDeclareAuthorization,
+        AuthorizationArchTest.authorizationIsDeclaredOnlyOnce,
         ClassRoleArchTest.moduleListenersAreApplicationListeners,
         ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
         ClassRoleArchTest.tenantIsBoundOnlyByTenantSelectionFilterAndListenerAspectRule(

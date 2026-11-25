@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 決済記録の参照を、Repository で読んだ集約から作る。 */
-@NoRoleRequired(reason = "決済の参照はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る。持ち主で絞るのは #188 で足す")
 @Service
 class PaymentQueryService implements PaymentQueries {
 
@@ -27,6 +26,7 @@ class PaymentQueryService implements PaymentQueries {
   }
 
   @Override
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<PaymentSummary> search(final PaymentSearchCriteria criteria) {
     return paymentRepository

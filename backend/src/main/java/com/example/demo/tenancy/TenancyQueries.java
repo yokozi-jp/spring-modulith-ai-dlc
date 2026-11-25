@@ -24,7 +24,11 @@ public interface TenancyQueries {
   /**
    * テナントに所属している利用者と、テナントのロック番号を返す。テナントがなければ空を返す。
    *
+   * <p>呼び出した利用者が、選んだテナントで ADMIN の役割を持つことを求める（実装の {@code @PreAuthorize}、ADR-129）。
+   *
    * @param tenantId テナントの ID
+   * @throws org.springframework.security.authorization.AuthorizationDeniedException
+   *     呼び出した利用者が、選んだテナントで ADMIN の役割を持たない場合
    */
   Optional<TenantMembersDetails> findMembers(String tenantId);
 }

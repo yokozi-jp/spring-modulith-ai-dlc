@@ -75,7 +75,7 @@ class PackageByFeatureOnionArchitectureTest {
   private static final String MODULE_DOMAIN_MODEL = ".*.domain.model..";
 
   /** 基底パッケージに続く、各モジュールの Application のパッケージ。 */
-  private static final String MODULE_APPLICATION = ".*.application..";
+  /* package */ static final String MODULE_APPLICATION = ".*.application..";
 
   /** Domain Model のパッケージ。 */
   private static final String DOMAIN_MODEL_PACKAGE = "..domain.model..";
@@ -623,6 +623,7 @@ class PackageByFeatureOnionArchitectureTest {
                 .or(type(PreAuthorize.class))
                 // 本番では basePackage.. に含まれる。フィクスチャの basePackage の外にあるため、型で許す。
                 .or(type(NoRoleRequired.class))
+                .or(type(NoRoleRequired.Basis.class))
                 .or(LOMBOK_GENERATED))
         .allowEmptyShould(true)
         .because(

@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -249,7 +250,7 @@ class ObservabilityContractTest {
         .perform(MockMvcRequestBuilders.get(path).with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isForbidden());
 
-    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
+    assertDenialLogLeavesNoMdc(path, null);
   }
 
   @Test
@@ -262,10 +263,7 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("about:blank"));
 
-    final Attributes attributes = clientErrorAttributes(path);
-    assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
-    assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
-    assertNull(MDC.get(TENANT_ID.getKey()), "要求の後の MDC の tenant.id");
+    assertDenialLogLeavesNoMdc(path, AppUsers.TENANT_ID);
   }
 
   @Test
@@ -283,7 +281,7 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/tenant-not-selected"));
 
-    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
+    assertDenialLogLeavesNoMdc(path, null);
   }
 
   @Test
@@ -296,7 +294,7 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/csrf-token-invalid"));
 
-    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
+    assertDenialLogLeavesNoMdc(path, null);
   }
 
   @Test
@@ -313,11 +311,13 @@ class ObservabilityContractTest {
     assertNull(attributes.get(TENANT_ID), attributes::toString);
   }
 
-  private void assertDenialLogCarriesOnlyUserAndLeavesNoMdc(final String path) {
+  /** {@code path} の拒否のログが利用者と {@code tenantId}（null ならテナントなし）を持ち、要求の後の MDC に何も残らないことを確かめる。 */
+  private void assertDenialLogLeavesNoMdc(final String path, final @Nullable String tenantId) {
     final Attributes attributes = clientErrorAttributes(path);
     assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
-    assertNull(attributes.get(TENANT_ID), attributes::toString);
+    assertEquals(tenantId, attributes.get(TENANT_ID), attributes::toString);
     assertNull(MDC.get(USER_ID.getKey()), "要求の後の MDC の user.id");
+    assertNull(MDC.get(TENANT_ID.getKey()), "要求の後の MDC の tenant.id");
   }
 
   /** {@code path} の要求の受信の span と同じ trace の、{@code ApiExceptionHandler} の 4xx のログの属性を返す。 */

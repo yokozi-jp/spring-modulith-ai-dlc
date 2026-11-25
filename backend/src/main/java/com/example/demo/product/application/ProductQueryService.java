@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /** 商品の参照を、Repository で読んだ集約から作る。 */
-@NoRoleRequired(reason = "商品の参照はテナントの全員に許す。見える範囲は行レベルセキュリティでテナントに絞る")
 @Service
 class ProductQueryService implements ProductQueries {
 
@@ -25,12 +24,14 @@ class ProductQueryService implements ProductQueries {
   }
 
   @Override
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<ProductSummary> search() {
     return productRepository.findAll().stream().map(ProductQueryService::toSummary).toList();
   }
 
   @Override
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional(readOnly = true)
   public List<ProductSummary> findByIds(final List<String> productIds) {
     return productRepository

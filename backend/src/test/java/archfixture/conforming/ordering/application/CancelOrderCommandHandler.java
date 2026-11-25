@@ -22,7 +22,7 @@ public class CancelOrderCommandHandler {
   }
 
   /** 画面の版を確かめてから注文を取り消し、保存する。 */
-  @NoRoleRequired(reason = "見える範囲は SQL で絞る")
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional
   public CancelOrderResult handle(final CancelOrderCommand command) {
     final Order order =

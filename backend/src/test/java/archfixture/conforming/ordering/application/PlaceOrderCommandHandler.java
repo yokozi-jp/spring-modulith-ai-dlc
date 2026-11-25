@@ -42,7 +42,7 @@ public class PlaceOrderCommandHandler {
   }
 
   /** 上限を確かめて注文を保存し、受付のイベントを発行する。 */
-  @NoRoleRequired(reason = "見える範囲は SQL で絞る")
+  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional
   public PlaceOrderResult handle(final PlaceOrderCommand command) {
     final CustomerId customerId = new CustomerId(command.customerId());

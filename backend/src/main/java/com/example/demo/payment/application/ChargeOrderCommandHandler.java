@@ -61,7 +61,7 @@ public class ChargeOrderCommandHandler {
    *     注文がない場合。確定のイベントがあるのに注文がないのは内部の不変条件の違反（不具合）であり、業務の状態に記録すると隠れるため投げ、イベント出版を FAILED
    *     のデッドレターに残す（ADR-072）
    */
-  @NoRoleRequired(reason = "注文の確定のイベントの Listener から呼ぶ。認証がない")
+  @NoRoleRequired(NoRoleRequired.Basis.CALLED_WITHOUT_AUTHENTICATION)
   @Transactional
   public ChargeOrderResult handle(final ChargeOrderCommand command) {
     final OrderId orderId = new OrderId(UUID.fromString(command.orderId()));

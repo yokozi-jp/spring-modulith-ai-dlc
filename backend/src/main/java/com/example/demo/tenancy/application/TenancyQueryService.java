@@ -35,7 +35,7 @@ class TenancyQueryService implements TenancyQueries {
   }
 
   @Override
-  @NoRoleRequired(reason = "テナントを選ぶ前の filter、ログインの処理、所属の API から呼び、役割はまだない。見える範囲は利用者の ID で絞る")
+  @NoRoleRequired(NoRoleRequired.Basis.CALLER_PASSES_OWN_USER_ID)
   @Transactional(readOnly = true)
   public List<MembershipSummary> memberships(final String userId) {
     return membershipRepository.findByUser(new UserId(UUID.fromString(userId))).stream()
@@ -44,7 +44,7 @@ class TenancyQueryService implements TenancyQueries {
   }
 
   @Override
-  @NoRoleRequired(reason = "テナントを選ぶ前の filter、ログインの処理、所属の API から呼び、役割はまだない。見える範囲は利用者の ID で絞る")
+  @NoRoleRequired(NoRoleRequired.Basis.CALLER_PASSES_OWN_USER_ID)
   @Transactional(readOnly = true)
   public Optional<MembershipSummary> membership(final String userId, final String tenantId) {
     return membershipRepository

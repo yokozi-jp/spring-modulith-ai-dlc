@@ -93,8 +93,12 @@ class ClassRoleArchTest {
       resideInAPackage(APPLICATION_PACKAGE).and(simpleNameEndingWith(LISTENER));
 
   /** Application の {@code *CommandHandler}。 */
-  private static final DescribedPredicate<JavaClass> APPLICATION_COMMAND_HANDLER =
+  /* package */ static final DescribedPredicate<JavaClass> APPLICATION_COMMAND_HANDLER =
       resideInAPackage(APPLICATION_PACKAGE).and(simpleNameEndingWith(COMMAND_HANDLER));
+
+  /** Application の {@code *QueryService}。 */
+  /* package */ static final DescribedPredicate<JavaClass> APPLICATION_QUERY_SERVICE =
+      resideInAPackage(APPLICATION_PACKAGE).and(simpleNameEndingWith("QueryService"));
 
   /** 外部システムのインタフェースを実装する、{@code infrastructure.client} のクラス。 */
   private static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_CLIENT =
