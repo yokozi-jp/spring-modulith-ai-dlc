@@ -400,8 +400,6 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
 
 - `unsafeHandlersTakeIdempotencyKey`：`presentation.web`の、`@PostMapping`、`@PutMapping`、`@PatchMapping`、`@DeleteMapping`を付けたメソッドは、`@PathVariable`の引数の次の引数で`shared.idempotency.IdempotencyKey`を受ける。
   `@Operation`の拡張に`x-idempotency-key: none`を付けたメソッドは除く。
-  `tenancy`の所属の役割の変更と所属の削除は、[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)のスライス3bまで、`NOT_YET_IDEMPOTENT`で一時的に除く。
-  `temporaryExclusionsStillLackTheKey`が、除いた操作がまだキーを受け取っていないことを確かめ、受け取ったら一覧から消させる。
   `@RequestMapping(method = ...)`で書いたマッピングは検出しない。
 - `idempotentCommandHandlersExecuteThroughIdempotency`：`*CommandHandler`の、引数のCommandが`IdempotentCommand`である`handle`は、その中で`Idempotency.execute`を呼ぶ。
 

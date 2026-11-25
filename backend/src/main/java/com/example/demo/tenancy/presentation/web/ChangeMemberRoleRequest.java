@@ -1,6 +1,7 @@
 package com.example.demo.tenancy.presentation.web;
 
 import com.example.demo.shared.concurrency.ExpectedLockNo;
+import com.example.demo.shared.idempotency.IdempotencyKey;
 import com.example.demo.tenancy.application.ChangeMemberRoleCommand;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
@@ -18,9 +19,10 @@ public record ChangeMemberRoleRequest(
     @NotNull @Pattern(regexp = "^(ADMIN|MEMBER)$") @Schema(example = "MEMBER") String role,
     @NotNull @Min(1) @Schema(example = "1") long lockNo) {
 
-  /** 選んだテナントの ID とパス変数の利用者の ID と合わせて Command へ変換する。 */
-  public ChangeMemberRoleCommand toCommand(final String tenantId, final UUID userId) {
+  /** 選んだテナントの ID、パス変数の利用者の ID、ヘッダーの冪等性キーと合わせて Command へ変換する。 */
+  public ChangeMemberRoleCommand toCommand(
+      final String tenantId, final UUID userId, final IdempotencyKey idempotencyKey) {
     return new ChangeMemberRoleCommand(
-        tenantId, userId.toString(), role, new ExpectedLockNo(lockNo));
+        tenantId, userId.toString(), role, new ExpectedLockNo(lockNo), idempotencyKey);
   }
 }

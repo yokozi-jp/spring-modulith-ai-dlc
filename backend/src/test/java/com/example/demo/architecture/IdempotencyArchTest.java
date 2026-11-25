@@ -14,12 +14,10 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
-import com.tngtech.archunit.lang.conditions.ArchConditions;
 import io.swagger.v3.oas.annotations.Operation;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,17 +40,6 @@ class IdempotencyArchTest {
   private static final String BASE_PACKAGE = DemoApplication.class.getPackageName();
 
   /**
-   * キーをまだ受け取らない、一時的に除く操作（基底パッケージより下の {@code <クラス>.<メソッド>}）。
-   *
-   * <p>{@code tenancy} の所属の操作は、RLS のない表にキーを置く #540 のスライス 3b で対応し、そのときにこの一覧から消す。消し忘れは {@link
-   * #temporaryExclusionsStillLackTheKey} が止める。
-   */
-  private static final Set<String> NOT_YET_IDEMPOTENT =
-      Set.of(
-          "tenancy.presentation.web.CurrentTenantMemberController.changeRole",
-          "tenancy.presentation.web.CurrentTenantMemberController.remove");
-
-  /**
    * {@code Idempotency-Key} を求める HTTP メソッドの注釈。
    *
    * <p>ponytail: {@code @RequestMapping(method = ...)} で書いたマッピングは見ない。使い始めたら、その {@code method}
@@ -72,7 +59,7 @@ class IdempotencyArchTest {
   /** GET と HEAD 以外の Controller のメソッドは、パス変数の次の引数で {@code IdempotencyKey} を受け取る。 */
   @ArchTest
   /* package */ static final ArchRule unsafeHandlersTakeIdempotencyKey =
-      unsafeHandlersTakeIdempotencyKeyRule(BASE_PACKAGE, NOT_YET_IDEMPOTENT);
+      unsafeHandlersTakeIdempotencyKeyRule(BASE_PACKAGE);
 
   /**
    * {@code IdempotentCommand} を受け取る CommandHandler の {@code handle} は、{@code Idempotency.execute}
@@ -82,32 +69,8 @@ class IdempotencyArchTest {
   /* package */ static final ArchRule idempotentCommandHandlersExecuteThroughIdempotency =
       idempotentCommandHandlersExecuteThroughIdempotencyRule(BASE_PACKAGE);
 
-  /** 一時的に除く操作は、まだキーを受け取っていない。受け取ったら一覧から消させる。 */
-  @ArchTest
-  /* package */ static final ArchRule temporaryExclusionsStillLackTheKey =
-      methods()
-          .that(
-              DescribedPredicate.describe(
-                  "NOT_YET_IDEMPOTENT に挙げた操作",
-                  method -> NOT_YET_IDEMPOTENT.contains(operationName(BASE_PACKAGE, method))))
-          .should(
-              ArchConditions.not(
-                  takeIdempotencyKeyAfterPathVariables(
-                      BASE_PACKAGE + ".shared.idempotency.IdempotencyKey")))
-          .because(
-              "キーを受け取った操作を一覧に残すと、後で外したキーを unsafeHandlersTakeIdempotencyKey が見落とすため。"
-                  + "直し方：キーを受け取った操作を IdempotencyArchTest の NOT_YET_IDEMPOTENT から消す。"
-                  + "規約："
-                  + DOCS);
-
-  /**
-   * キーを受け取る Controller の規則を組み立てる。
-   *
-   * @param basePackage 基底パッケージ
-   * @param notYetIdempotent 一時的に除く操作（基底パッケージより下の {@code <クラス>.<メソッド>}）
-   */
-  /* package */ static ArchRule unsafeHandlersTakeIdempotencyKeyRule(
-      final String basePackage, final Set<String> notYetIdempotent) {
+  /** キーを受け取る Controller の規則を組み立てる。 */
+  /* package */ static ArchRule unsafeHandlersTakeIdempotencyKeyRule(final String basePackage) {
     final String idempotencyKey = basePackage + ".shared.idempotency.IdempotencyKey";
     return methods()
         .that()
@@ -115,12 +78,10 @@ class IdempotencyArchTest {
         .resideInAPackage(basePackage + ".*.presentation.web..")
         .and(
             DescribedPredicate.describe(
-                "@PostMapping、@PutMapping、@PatchMapping、@DeleteMapping を付け、"
-                    + "x-idempotency-key: none の印がなく、一時的に除く操作でない",
+                "@PostMapping、@PutMapping、@PatchMapping、@DeleteMapping を付け、x-idempotency-key: none の印がない",
                 method ->
                     UNSAFE_MAPPINGS.stream().anyMatch(method::isAnnotatedWith)
-                        && !marksNoKey(method)
-                        && !notYetIdempotent.contains(operationName(basePackage, method))))
+                        && !marksNoKey(method)))
         .should(takeIdempotencyKeyAfterPathVariables(idempotencyKey))
         .allowEmptyShould(true)
         .because(
@@ -148,11 +109,6 @@ class IdempotencyArchTest {
                 + " にし、本体を private メソッドに置く。"
                 + "規約："
                 + DOCS);
-  }
-
-  /** 基底パッケージより下の {@code <クラス>.<メソッド>} を返す。 */
-  private static String operationName(final String basePackage, final JavaMethod method) {
-    return method.getOwner().getName().substring(basePackage.length() + 1) + "." + method.getName();
   }
 
   /** {@code @Operation} の拡張に {@code x-idempotency-key: none} があるかを返す。 */

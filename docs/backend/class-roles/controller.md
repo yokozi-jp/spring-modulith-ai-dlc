@@ -74,7 +74,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `presentation.web` の Request と Response、同じモジュールの `application` の Command、Result、CommandHandler、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、Spring MVC の型、Jakarta Bean Validation の `@Valid`、`io.swagger.v3.oas.annotations` の `@Operation`、`shared.idempotency` の `IdempotencyKey`、`@Tag`、`@ApiResponse`、`@Header`、`@Content`、`@Schema`。
+- **依存してよい型**：`java..` の標準型、`org.jspecify..`、同じ `presentation.web` の Request と Response、同じモジュールの `application` の Command、Result、CommandHandler、自モジュールのルートの `<Feature>Queries`、参照の結果、検索条件、Spring MVC の型、Jakarta Bean Validation の `@Valid`、`io.swagger.v3.oas.annotations` の `@Operation`、`shared.idempotency` の `IdempotencyKey`、`shared.tenancy` の `TenantContext`（RLS の外の表の操作に、選んだテナントを渡すとき）、`@Tag`、`@ApiResponse`、`@Header`、`@Content`、`@Schema`。
 - **依存してはいけない型**：Domain の型（集約、値オブジェクト、Repository）、`<Feature>QueryService`、Infrastructure の型、jOOQ の API と生成型、他モジュールの型、`@Transactional`。
 
 ## 最小の例と典型的な例

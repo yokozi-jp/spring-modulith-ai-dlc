@@ -14,6 +14,7 @@ import com.example.demo.tenancy.TestTenancy;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.ContractCase;
+import com.example.demo.testkit.IdempotencyKeys;
 import com.example.demo.testkit.SharedTestConfiguration;
 import java.util.UUID;
 import org.jooq.DSLContext;
@@ -261,6 +262,7 @@ class CurrentTenantMemberApiTest {
         put(MEMBERS + "/" + userId)
             .with(user)
             .with(csrf())
+            .with(IdempotencyKeys.fresh())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"role\":\"" + role + "\",\"lockNo\":" + lockNo + "}"));
   }
@@ -271,6 +273,7 @@ class CurrentTenantMemberApiTest {
         delete(MEMBERS + "/" + userId)
             .param("lockNo", String.valueOf(lockNo))
             .with(user)
-            .with(csrf()));
+            .with(csrf())
+            .with(IdempotencyKeys.fresh()));
   }
 }
