@@ -23,7 +23,7 @@ compose-testを使うTaskは、実行ごとにslotを取り、slotのComposeプ�
 - **`task mutation-test`**：`be-mutation-test`の別名。
 - **`task fe-verify`**：フロントエンドの静的解析、未使用コード検査、テスト、テレメトリを無効にした本番ビルドを実行する。
 - **`task e2e`**：compose-testでbackendを起動し、Vite previewに対してPlaywrightのE2Eを実行して後片付けする（[E2Eテストの方針と書き方](../e2e/testing-strategy.md)）。
-- **`task e2e-up`**：`task e2e`の起動の手順（slotの取得、build、依存の起動、migration、fixtureサーバーの引数ファイル、backend）だけを実行し、片付けない。
+- **`task e2e-up`**：`task e2e`の起動の手順（slotの取得、build、依存の起動、migration、テナントと所属、backend）だけを実行し、片付けない。
   `task e2e`の外で起動して残すときにも使い、その呼び出し側が片付ける。
 - **`task e2e-collect-logs LOG=<パス>`**：compose-testのbackendのログを書き、秘密の値、セッションのCookieの値、JWTの形の文字列が入っていれば失敗する。
   `task e2e`が片付けの前に呼ぶ。`task e2e-up`で残したスタックを片付けるときも、その前に呼ぶ。
@@ -83,10 +83,10 @@ PITのHTMLとXMLのレポートは、変異対象がある場合に`backend/buil
 ## フロントエンド
 
 - **`task fe-check`**：workspaceのルートの`frontend`で`vp check`を実行し、Oxfmt、Oxlint、TypeScriptの型を非破壊で検査する。続けて`lint-e2e-seed`を実行する。
-  最後に、`e2e/`の`environment.ts`、`fixture-server.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts`をNodeで直接importでき（相対のimportに拡張子`.ts`がある）、Playwrightの外から使えることを確かめる。
+  最後に、`e2e/`の`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts`をNodeで直接importでき（相対のimportに拡張子`.ts`がある）、Playwrightの外から使えることを確かめる。
 - **`task lint-e2e-seed`**：`frontend/apps/web/e2e/`（`.auth/`を除く）に`SEED-`の文字列があれば失敗する。
   ディレクトリが無いときも失敗する。
-  E2Eは開発用のシーダーの代表データを読まず、各テストがデータを作る（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-fixture-server.md)）。
+  E2Eは開発用のシーダーの代表データを読まず、各テストがデータを作る（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-product-registration-api.md)）。
   検査の本体は`tooling/e2e-seed-lint/e2e-seed-lint.sh`で、検出の前に`tooling/e2e-seed-lint/test.sh`が、fixtureで終了コードと出力を確かめる。
 - **`task fe-knip`**：未参照ファイル、未使用export、未使用依存をKnipで検査する。
   `packages/ui`は`includeEntryExports: true`にし、`exports`で公開した部品の未使用exportも報告する。

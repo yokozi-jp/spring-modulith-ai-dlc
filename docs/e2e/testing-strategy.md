@@ -8,7 +8,7 @@ tags: [convention, e2e, playwright, testing]
 # E2E テストの方針と書き方
 
 E2E テストは、複数画面にまたがる主要な利用者の流れだけを Playwright と Chromium で確かめる。
-各テストは画面、公開 API、商品を作る fixture サーバーで自分専用のデータを作り、共有データを変更せず、実行順に依存しない。
+各テストは画面と公開 API で自分専用のデータを作り、共有データを変更せず、実行順に依存しない。
 認証は setup project が一度だけ Keycloak の画面で行い、`storageState` をコミットしない。
 変更後は `task e2e` で確かめる。
 道具と環境を選んだ理由は [ADR-057](../adr/ADR-057-adopt-playwright-for-e2e-tests.md) にある。
@@ -23,16 +23,15 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 
 `frontend/apps/web/e2e/` に、ログインや WireMock の初期化を行う `*.setup.ts` とシナリオの `*.spec.ts` を置く。
 `frontend/apps/web/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
-web の origin（`webOrigin`）、fixture サーバーの origin（`fixtureOrigin`）、IdP の origin（`idpOrigin`）は、slot が渡す `E2E_WEB_PORT`、`E2E_FIXTURE_PORT`、`OIDC_ISSUER_URI` から決め、無ければ slot 0 の値を使う。
-ログインの後に選ぶテナントの名前（`tenantName`）も持ち、テナントの選択と fixture サーバーの要求が同じ値を使う。
+web の origin（`webOrigin`）と IdP の origin（`idpOrigin`）は、slot が渡す `E2E_WEB_PORT` と `OIDC_ISSUER_URI` から決め、無ければ slot 0 の値を使う。
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup、ログアウトの spec、未認証の spec が共有する。
 `frontend/apps/web/e2e/pages.ts` は、ログアウトのボタンとトップページの見出しの locator、ログアウト後の画面と認証済みのトップページの確認、未認証で開いたときのログインの入力画面の確認を持つ。
 `telemetry.ts` と `pages.ts` は Playwright の中だけで使うため、相対の import に拡張子を付けない。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
-`frontend/apps/web/e2e/fixture-server.ts` は、fixture サーバーの `POST /products` で商品を作る `createProduct` を持ち、`fixtures.ts` の `productFactory` がそれを包む。
-`environment.ts`、`fixture-server.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts` は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
-`task fe-check` が、この 5 つを Node で import できることを確かめる。
+`frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/products`）で商品を作る `productFactory` を持つ。
+`environment.ts`、`fixtures.ts`、`orders.ts`、`payment-gateway.ts` は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
+`task fe-check` が、この 4 つを Node で import できることを確かめる。
 `frontend/apps/web/e2e/orders.ts` は、注文の作成の画面の操作と、決済の欄の文言の確認（`expectPaymentText`）を持つ。
 決済の欄は、確定した注文に決済記録がない間、確定から 15 秒まで 1 秒ごとに自分で読み直し、その間は処理中を出す。
 期間が過ぎても記録がなければ再投入待ちを出し、読み直しのボタンを出す。
@@ -47,48 +46,37 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 
 `frontend/apps/web/playwright.config.ts` の設定は次のとおりである。
 
-| 項目              | 値                                                                                                                            |
-| ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| project           | `setup`（`*.setup.ts`）と、`setup` に依存する `chromium`（`*.spec.ts`）                                                       |
-| locale            | `ja-JP`                                                                                                                       |
-| retry             | ローカル 0 回、CI 2 回                                                                                                        |
-| trace、screenshot | 失敗時だけ保存する                                                                                                            |
-| video             | 保存しない                                                                                                                    |
-| `webServer`       | `vp preview --mode test` を `webOrigin` で、fixture サーバーを `fixtureOrigin` で起動し、どちらも既存の server を再利用しない |
-| `fullyParallel`   | 有効（実行順への依存を早く見つけるため）                                                                                      |
-| workers           | 指定しない（Playwright の既定値）                                                                                             |
+| 項目              | 値                                                                             |
+| ----------------- | ------------------------------------------------------------------------------ |
+| project           | `setup`（`*.setup.ts`）と、`setup` に依存する `chromium`（`*.spec.ts`）        |
+| locale            | `ja-JP`                                                                        |
+| retry             | ローカル 0 回、CI 2 回                                                         |
+| trace、screenshot | 失敗時だけ保存する                                                             |
+| video             | 保存しない                                                                     |
+| `webServer`       | `vp preview --mode test` を `webOrigin` で起動し、既存の server を再利用しない |
+| `fullyParallel`   | 有効（実行順への依存を早く見つけるため）                                       |
+| workers           | 指定しない（Playwright の既定値）                                              |
 
 ## テストデータ
 
-E2E は開発用のシーダー（`LocalDataSeeder`）を使わない（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-fixture-server.md)）。
-各テストは、自分専用のデータを自分で作る。
+E2E は開発用のシーダー（`LocalDataSeeder`）の代表データを使わない（[ADR-129](../adr/ADR-129-create-e2e-data-per-test-with-product-registration-api.md)）。
+各テストは、自分専用のデータを画面か公開 API で作る。
 
 - 注文は、画面か公開 API で作る。決済代行の拒否、5xx、遅延は `failChargesFor` で作る（[外部システムの偽物](#外部システムの偽物)）。
 - 商品は、`fixtures.ts` の `productFactory` で作る。
   `productFactory({ onSale: false })` は販売終了の商品を作り、`unitPrice` で単価を決める。
   商品コードと商品名は呼ぶたびに一意になる。
+- `productFactory` は、テストの page（共有の `storageState` でログインし、テナントを選んだ状態）の Cookie で、商品を登録する API（`POST /api/products`）を呼ぶ。
+  CSRF の token（`__Host-XSRF-TOKEN` の値を `X-XSRF-TOKEN` に付ける）と `Idempotency-Key` は `productFactory` の中でだけ付ける。
+  `page.request` は CSRF の token を自分では付けないので、spec が `page.request` で直接送る更新の要求は 403 になる（`order-payment.spec.ts` が確かめる）。
 - 他のテストと衝突しないよう、客先注文番号には `uniqueCode` で一意な値を含める。
   一覧には並列のテストのデータも並ぶので、自分の商品名と客先注文番号で絞って数える。
-- 共有するのは、テナントと所属（fixture サーバーが起動時に入れる）と、Keycloak の利用者（`docker/keycloak/realm.json`）だけである。
+- 共有するのは、テナントと所属（`task e2e-up` が `task be-seed-tenancy` で入れる）と、Keycloak の利用者（`docker/keycloak/realm.json`）だけである。
   共有のデータは読むだけにし、変更しない。
 - テストの実行順や、他のテストが作ったデータに依存しない。
 - spec に `SEED-` の文字列を書かない。`task fe-check` の `lint-e2e-seed` が失敗にする。
-- 画面、公開 API、WireMock で作れない状態が必要になったら、fixture サーバーに入口を足す。
-  足すのは、spec が必要とする状態だけにする。
-  足す前に、その状態が本当に画面、公開 API、WireMock で作れないことを確かめる。
-  足すときは、同じ変更で下の入口の表に契約（パス、本文、応答）を書く。
-  本番の経路を迂回する状態（業務の不変条件を破る行など）を作る入口は、足す前に ADR で判断する。
-
-fixture サーバー（backend の `src/test` の `E2eFixtureServer`）は、Spring を起動せず、JDK の `HttpServer` を `127.0.0.1` にだけ開く。
-環境の目印（`OTEL_DEPLOYMENT_ENVIRONMENT_NAME`）が `local` か `test` で、`DB_HOST` が loopback のときだけ起動する。
-どの入口も、`Host` が `127.0.0.1:<port>` か `localhost:<port>` でなければ 403 を返す。
-想定外の失敗は 500 を返し、標準エラーのログに出す。
-入口は次のとおりである。
-
-| 入口             | 応答                                                                                                                                                                                                                                                                                                                                             |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /health`    | 200。起動時のテナントと所属の投入の後に listen するので、応答すれば共有のデータが揃っている                                                                                                                                                                                                                                                      |
-| `POST /products` | 本文 `{"tenant":"サンプル商事","onSale":true,"unitPrice":1200}` で商品を作り、201 で `productId`、`productCode`、`productName`、`unitPrice`、`onSale` を返す。未知のテナント、`onSale` の欠落、1 から 9999999999 の整数でない `unitPrice`、JSON でない本文は 400。Content-Type が `application/json` でなければ 415、本文が 8 KiB を超えれば 413 |
+- 画面と公開 API で作れない状態が必要になっても、テストのためだけの入口（Profile やプロパティで有効にする入口、テストのための別プロセス）を作らない。
+  業務の操作として API が要るなら、その API を本番に足す。
 
 ## 外部システムの偽物
 
@@ -115,7 +103,7 @@ backend が送ったメールは、compose-test の WireMock（`.env.test` の `
 setup project は、`storageState` を持たない browser context で `/oauth2/authorization/web` を開き、Keycloak の画面で `test-user` としてログインする。
 `/` から始めると、SPA が API の 401 を受けて自分でログインへ遷移し、setup project の遷移と競合する。
 この遷移そのものは、ログアウト後に `/` を開く `logout.spec.ts` のテストと、未認証で認証必須の画面を開く `unauthenticated-redirect.spec.ts` が確かめる。
-`test-user` は fixture サーバーが起動時に入れる所属で 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
+`test-user` は `task e2e-up` が入れる所属で 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
 認証の前後で `__Host-APP_SESSION` Cookie の値が変わったことで認証済みと判断し、サンプル商事を選ぶ。
 選んだ後に web の origin の `/` へ移り、`__Host-APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。
 `__Host-APP_SESSION` は認証の開始時点で発行されるため、Cookie があることだけを認証の証拠にしない。
@@ -167,7 +155,6 @@ slot 0 の port は次のとおりである。
 | 5433 | PostgreSQL                                                 |
 | 8081 | Keycloak                                                   |
 | 8082 | 決済代行と SES の WireMock（Playwright が管理 API を呼ぶ） |
-| 8083 | 商品を作る fixture サーバー（Playwright が起動する）       |
 
 - slot 0 の 5173 と 8080 は、開発用の Vite と Keycloak と同じ port である。
   slot を取るときに、port が `127.0.0.1` で応答する slot は飛ばす。
@@ -185,12 +172,10 @@ slot 0 の port は次のとおりである。
    slot の web と backend の port（slot 0 は 5173 と 8080）が空いていることを確かめ、frontend の依存の導入と build、Chromium の導入、backend イメージの build を行う。
    frontend は `vp build --mode test` で build し、`.env.test` の `FRONTEND_OTEL_ENABLED=true` で Faro を有効にする。
 3. PostgreSQL、Keycloak、WireMock を起動し、`task be-migrate` で migration を適用する。
-   backend の Gradle の `writeE2eFixtureArgs` が、fixture サーバーを起動する java のパス（テストと同じ toolchain の Java 25）と引数ファイルを `backend/build/e2e-fixture/` に書く。
+   `task be-seed-tenancy` でテナントと所属だけを入れ、業務データを入れない。
 4. backend を起動し、ホストから readiness を確かめる。
 5. Playwright を実行する。
-   Playwright が `webServer` で Vite preview と fixture サーバー（`tooling/e2e-fixture/serve.sh`）を起動し、終了時に止める。
-   fixture サーバーは slot の env ファイル（`TEST_ENV_FILE`、無ければ `.env.test`）から DB の接続先を読む。
-   fixture サーバーのログは標準エラーに出て、Playwright の出力に並ぶ。
+   Playwright が `webServer` で Vite preview を起動し、終了時に止める。
 6. 成否にかかわらず、`task e2e-collect-logs` で backend のログを `frontend/apps/web/test-results/backend.log` に書き、slot の project のコンテナと volume を削除して slot を返す。
    ログに `.env.test` の `OIDC_CLIENT_SECRET` か `E2E_PASSWORD` の値が入っていれば、テストが成功していても失敗にする。
    値の一致で見つからない秘密として、`__Host-APP_SESSION=` に続く Cookie の値と、`eyJ` で始まる 3 つの base64url をつないだ JWT の形の文字列も失敗にする。
