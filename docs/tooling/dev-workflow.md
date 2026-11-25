@@ -211,6 +211,9 @@ SESの接続先（`AWS_ENDPOINT_URL_SESV2`）などは、Springが`.env`から�
 期限を過ぎた冪等性キーの定期の掃除を足した変更の後は、既存の`.env`へ`.env.example`の`IDEMPOTENCY_KEY_PURGE_ENABLED`と`IDEMPOTENCY_KEY_PURGE_INTERVAL`の2行を足す（[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
 この行がないと、`task dev`と`task compose-up`は変数の不足で止まる。
 
+完了したイベント出版のarchiveの行を保持期限で消す変更の後は、既存の`.env`へ`.env.example`の`EVENT_PUBLICATION_ARCHIVE_RETENTION_ENABLED`の行を足す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)）。
+この行がないと、`task dev`と`task compose-up`は変数の不足で止まる。
+
 定期の再投入のロックの表（`010-create-shedlock-table`）を足した変更の後は、既存のローカルのDBに`task be-migrate`を実行する。
 表がないと、定期の再投入は毎回`Event publication resubmission failed`のWARNで失敗する。
 

@@ -55,12 +55,7 @@ class ResubmissionPoliciesTest {
 
   /** 方針の設定値。{@code default} と、倍率の違う {@code payment} を持つ。 */
   private static final EventPublicationResubmissionConfig.Properties PROPERTIES =
-      new EventPublicationResubmissionConfig.Properties(
-          Duration.ofMinutes(5),
-          Duration.ofMinutes(25),
-          Duration.ofMinutes(1),
-          100,
-          Duration.ofMinutes(10),
+      ResubmissionTestSupport.properties(
           Map.of(
               EventPublicationResubmissionConfig.DEFAULT_POLICY,
               new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1), null),

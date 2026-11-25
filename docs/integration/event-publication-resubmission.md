@@ -31,6 +31,7 @@ tags: [architecture, integration, async, spring-modulith, resilience]
   方針に `abandon-after-attempts` がなければ、この値が全リスナーの既定になる。
 - **手での 1 回の再投入のジョブ**（`EventPublicationResubmitOnce`）：運用者が 1 回だけ起動し、同じロックを取って再投入する。対象は `all`、`policy:<名前>`、`event-type:<クラス>` で、起動時に `Target` に読む。
 - **古い出版を `FAILED` に戻す処理**（`StalePublications`）：落ちたまま残った出版を、完了していないことと状態ごとの古さを確かめる 1 文の UPDATE で `FAILED` に戻す。掃き取りがロックの中で、再投入の前に呼ぶ。Spring Modulith の `markStalePublicationsFailed` と組み込みの Staleness Monitor は使わず、その閾値を書くと起動に失敗する。
+- **archive の行の保持期限の削除**（`EventPublicationArchiveRetentionConfig`）：`COMPLETED` の行を 7 日で消し、`ABANDONED` の行を残す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)、[改廃の方法](../database/table-retention-and-personal-data.md#改廃の方法)）。
 - **`in-flight-staleness`**：`PROCESSING` と `RESUBMITTED` の出版を、最後の出版か再投入の時刻から数えて `FAILED` に戻すまでの時間である。`PUBLISHED` の出版は `wait-age` で測る。
 
 ## Resilience4j との関係
@@ -54,7 +55,7 @@ circuit breaker が open の間に回数を消費する限界は、ADR-079 の C
 
 ## 環境変数
 
-次の 4 つの環境変数で挙動を切り替える。
+次の 5 つの環境変数で挙動を切り替える。
 意味の正文は[リスナーの方針](../observability/runbook-event-publication-resubmission.md#リスナーの方針)と ADR-079 にある。
 
 | 変数                                                 | 意味                                      |
@@ -63,15 +64,16 @@ circuit breaker が open の間に回数を消費する限界は、ADR-079 の C
 | `EVENT_PUBLICATION_RESUBMISSION_WAIT_AGE`            | 最初の待ち時間                            |
 | `EVENT_PUBLICATION_RESUBMISSION_INTERVAL`            | 定期の実行の間隔                          |
 | `EVENT_PUBLICATION_RESUBMISSION_IN_FLIGHT_STALENESS` | 処理中の出版を `FAILED` に戻すまでの時間  |
+| `EVENT_PUBLICATION_ARCHIVE_RETENTION_ENABLED`        | archive の行の保持期限の削除を動かすか    |
 
 設定箇所は次のとおりである。
 
-- **読み込み**：`backend/src/main/resources/application.yaml` の `event-publication.resubmission`。
+- **読み込み**：`backend/src/main/resources/application.yaml` の `event-publication.resubmission` と `event-publication.archive-retention`。
 - **ローカル**：`.env.example` から作る `.env`。
   値は `.env.example` を見る。
 - **テスト**：`.env.test.example` から作る `.env.test`。
   値は `.env.test.example` を見る。
 - **コンテナ**：`docker/compose.yml` が `.env` の値を渡す。
-  4 つとも必須である。
+  5 つとも必須である。
 - **本番**：このリポジトリに ECS のタスク定義はなく、値は未設定である。
   想定する値は ADR-079 にある。

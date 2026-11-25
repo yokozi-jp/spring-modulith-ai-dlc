@@ -334,7 +334,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
 ### Neutral
 
 - 本番と STG の環境変数の注入は、ECS のタスク定義を作るときに足す。
-- archive の表の保存期間と消し方は #542 で決める（[ADR-120](ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)）。
+- archive の表の保持期限と消し方は [ADR-120](ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md) にある。
 - `spring.datasource.hikari.connection-init-sql` の `SET` と HikariCP の `schema`（`search_path`）もセッションの設定であり、接続を多重化するプロキシの後ろでは保たれない。この ADR では扱わず、`lint-session-sql` も検出しない。
 - ShedLock の期限の式は、`cast(current_timestamp(6) as timestamp)`（セッションの TimeZone での時刻帯のない現在時刻）で時刻を書き、同じ式で比べる。
   `modulith.shedlock` の `lock_until` は `timestamptz` の列であり、書くときと読むときに同じセッションの TimeZone で変換されるため、接続の TimeZone によらず正しく動く（PostgreSQL 17 で実測）。

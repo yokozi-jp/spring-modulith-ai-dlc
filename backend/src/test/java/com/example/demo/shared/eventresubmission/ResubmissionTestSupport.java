@@ -22,6 +22,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -41,7 +42,7 @@ import org.springframework.modulith.events.FailedEventPublications;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.test.context.TestPropertySource;
 
-/** 再投入のテストで使う、Spring の文脈の設定、ジョブの組み立て、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
+/** 再投入のテストで使う、Spring の文脈の設定、設定値、ジョブの組み立て、ロックの期限、出版の行と archive の行、条件の関数に渡す出版、上限到達の ERROR の操作。 */
 // 再投入のテストが共有する組み立て、ロック、行の操作を一か所に集めるため、メソッドと型の数が多い。
 @SuppressWarnings({"PMD.CouplingBetweenObjects", "PMD.TooManyMethods"})
 final class ResubmissionTestSupport {
@@ -88,6 +89,21 @@ final class ResubmissionTestSupport {
    */
   /* package */ static StalePublications noStaleCheck() {
     return Mockito.mock(StalePublications.class);
+  }
+
+  /**
+   * 方針を {@code policies} にし、ほかの値を固定した再投入の設定値を作る。archive を読み戻す期間は {@code max(3 × 10 分, 25 分 + 10 分 +
+   * 2 × 1 分)} の 37 分である。
+   */
+  /* package */ static EventPublicationResubmissionConfig.Properties properties(
+      final Map<String, EventPublicationResubmissionConfig.Policy> policies) {
+    return new EventPublicationResubmissionConfig.Properties(
+        Duration.ofMinutes(5),
+        Duration.ofMinutes(25),
+        Duration.ofMinutes(1),
+        100,
+        Duration.ofMinutes(10),
+        policies);
   }
 
   /**
