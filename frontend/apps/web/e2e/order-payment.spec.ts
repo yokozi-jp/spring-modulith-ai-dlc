@@ -1,15 +1,13 @@
 import type { Page, TestInfo } from "@playwright/test";
 
+import type { Product } from "./fixture-server";
 import { expect, test } from "./fixtures";
 import {
   createOrder,
   expectPaymentText,
   listPayments,
-  listProducts,
-  onSaleProduct,
   paymentNotYetText,
   readJson,
-  seededOrderCodesByStatusLabel,
   uniqueCode,
 } from "./orders";
 import { chargeRequestCount, failChargesFor } from "./payment-gateway";
@@ -27,10 +25,9 @@ async function attachScreenshot(page: Page, testInfo: TestInfo, name: string): P
 // 販売中の商品で下書きを作り、確定して、注文 ID と合計金額を返す。確定の前に決済代行の応答を切り替えられる。
 async function createAndConfirm(
   page: Page,
-  prefix: string,
+  { product, prefix }: { product: Product; prefix: string },
   beforeConfirm?: (orderId: string) => Promise<void>,
 ): Promise<{ orderId: string; total: number }> {
-  const product = await onSaleProduct(page.request);
   const quantity = 2;
   const orderId = await createOrder(page, {
     code: uniqueCode(prefix),
@@ -45,8 +42,12 @@ async function createAndConfirm(
 
 test("注文を作成し確定すると、Listener が決済代行へ請求し、決済済みと金額を表示する", async ({
   page,
+  productFactory,
 }, testInfo) => {
-  const { orderId, total } = await createAndConfirm(page, "E2E-PAY");
+  const { orderId, total } = await createAndConfirm(page, {
+    product: await productFactory(),
+    prefix: "E2E-PAY",
+  });
 
   await expectPaymentText(page, "決済済み");
   const payments = await listPayments(page.request, orderId);
@@ -71,12 +72,12 @@ async function expectNotResubmitted(page: Page, orderId: string): Promise<void> 
 async function expectTransientFailure(
   page: Page,
   testInfo: TestInfo,
-  failure: ChargeFailure,
+  { product, failure }: { product: Product; failure: ChargeFailure },
 ): Promise<void> {
   // 決済の欄の読み直しの期間（15 秒）を、確定の後と読み直しのボタンの後の二度待つため、既定の 30 秒を超える。
   test.slow();
   const restores: (() => Promise<void>)[] = [];
-  const { orderId } = await createAndConfirm(page, "E2E-FAIL", async (id) => {
+  const { orderId } = await createAndConfirm(page, { product, prefix: "E2E-FAIL" }, async (id) => {
     restores.push(await failChargesFor(page.request, id, failure));
   });
   try {
@@ -94,20 +95,29 @@ async function expectTransientFailure(
 
 test("決済代行が 5xx を返すと、決済記録を作らず、成功に戻しても自動では再投入しない", async ({
   page,
+  productFactory,
 }, testInfo) => {
-  await expectTransientFailure(page, testInfo, { kind: "status", status: 503 });
+  await expectTransientFailure(page, testInfo, {
+    product: await productFactory(),
+    failure: { kind: "status", status: 503 },
+  });
 });
 
 test("決済代行の応答がタイムアウトすると、決済記録を作らず、成功に戻しても自動では再投入しない", async ({
   page,
+  productFactory,
 }, testInfo) => {
-  await expectTransientFailure(page, testInfo, { kind: "delay", milliseconds: 3000 });
+  await expectTransientFailure(page, testInfo, {
+    product: await productFactory(),
+    failure: { kind: "delay", milliseconds: 3000 },
+  });
 });
 
-test("決済代行が拒否すると、拒否を表示する", async ({ page }) => {
+test("決済代行が拒否すると、拒否を表示する", async ({ page, productFactory }) => {
+  const product = await productFactory();
   const restores: (() => Promise<void>)[] = [];
   try {
-    await createAndConfirm(page, "E2E-DECL", async (id) => {
+    await createAndConfirm(page, { product, prefix: "E2E-DECL" }, async (id) => {
       restores.push(await failChargesFor(page.request, id, { kind: "declined" }));
     });
 
@@ -119,8 +129,9 @@ test("決済代行が拒否すると、拒否を表示する", async ({ page }) 
 
 test("参照の要求は CSRF の token なしで成功し、更新の要求は token が無ければ 403 で拒まれる", async ({
   page,
+  productFactory,
 }) => {
-  const product = await onSaleProduct(page.request);
+  const product = await productFactory();
   const products = await page.request.get("/api/products");
   expect(products.status(), "GET /api/products").toBe(200);
 
@@ -137,8 +148,11 @@ test("参照の要求は CSRF の token なしで成功し、更新の要求は 
   expect(body.items.map((item) => item.customerOrderCode)).not.toContain(code);
 });
 
-test("画面の作成は、CSRF の Cookie の値を X-XSRF-TOKEN で送って成功する", async ({ page }) => {
-  const product = await onSaleProduct(page.request);
+test("画面の作成は、CSRF の Cookie の値を X-XSRF-TOKEN で送って成功する", async ({
+  page,
+  productFactory,
+}) => {
+  const product = await productFactory();
   const created = page.waitForResponse(
     (response) => response.url().endsWith("/api/orders") && response.request().method() === "POST",
   );
@@ -154,71 +168,78 @@ test("画面の作成は、CSRF の Cookie の値を X-XSRF-TOKEN で送って�
   expect(await response.request().headerValue("x-xsrf-token")).toBeTruthy();
 });
 
-async function expectDetail(page: Page, code: string, text: string): Promise<void> {
-  await page.goto("/orders");
-  await page.getByRole("link", { name: `${code} の詳細` }).click();
-  // SEED-C06 は記録が無いため、読み直しの期間が過ぎてから再投入待ちを出す。
-  await expectPaymentText(page, text);
+type StatusLabel = "下書き" | "確定済み" | "取消済み";
+
+// 商品 1 つの注文を作り、詳細の画面で状態のラベルの状態にして、客先注文番号を返す。
+async function createInStatus(page: Page, product: Product, label: StatusLabel): Promise<string> {
+  const code = uniqueCode("E2E-LIST");
+  await createOrder(page, { code, productName: product.productName, quantity: 1 });
+  if (label !== "下書き") {
+    const confirm = label === "確定済み";
+    await page.getByRole("button", { name: confirm ? "確定する" : "取り消す" }).click();
+    await expect(
+      page.getByText(confirm ? "注文を確定しました。" : "注文を取り消しました。"),
+    ).toBeVisible();
+  }
+  return code;
 }
 
-test.describe("シーダーの代表の状態を、一覧と詳細と作成の画面で表示する（読むだけ）", () => {
-  const allCodes = Object.values(seededOrderCodesByStatusLabel).flat();
-
-  async function expectBucket(
-    page: Page,
-    label: keyof typeof seededOrderCodesByStatusLabel,
-  ): Promise<void> {
-    const codes: readonly string[] = seededOrderCodesByStatusLabel[label];
-    await page
-      .getByRole("navigation", { name: "状態で絞り込む" })
-      .getByRole("link", { name: label })
-      .click();
-    await expect(page.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
-    await Promise.all(
-      allCodes.map((code) =>
-        expect(page.getByRole("cell", { name: code, exact: true })).toHaveCount(
-          codes.includes(code) ? 1 : 0,
-        ),
+// 一覧の状態の絞り込みのリンクを押し、状態ごとの注文（codes）のうちその状態の注文だけが並ぶことを確かめる。
+// 一覧には並列のテストの注文も並ぶので、このテストが作った注文だけを数える。
+async function expectBucket(
+  page: Page,
+  codes: Readonly<Record<StatusLabel, string>>,
+  label: StatusLabel,
+): Promise<void> {
+  await page
+    .getByRole("navigation", { name: "状態で絞り込む" })
+    .getByRole("link", { name: label })
+    .click();
+  await expect(page.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
+  await Promise.all(
+    Object.values(codes).map((code) =>
+      expect(page.getByRole("cell", { name: code, exact: true })).toHaveCount(
+        code === codes[label] ? 1 : 0,
       ),
-    );
-  }
+    ),
+  );
+}
 
-  test("一覧の状態の絞り込みは、代表の注文を状態ごとに分ける", async ({ page }) => {
+test.describe("一覧と詳細と作成の画面で、注文と商品の状態を表示する", () => {
+  test("一覧の状態の絞り込みは、注文を状態ごとに分ける", async ({ page, productFactory }) => {
+    const product = await productFactory();
+    const codes = {
+      下書き: await createInStatus(page, product, "下書き"),
+      確定済み: await createInStatus(page, product, "確定済み"),
+      取消済み: await createInStatus(page, product, "取消済み"),
+    };
+
     await page.goto("/orders");
-
-    await expectBucket(page, "下書き");
-    await expectBucket(page, "確定済み");
-    await expectBucket(page, "取消済み");
+    await expectBucket(page, codes, "下書き");
+    await expectBucket(page, codes, "確定済み");
+    await expectBucket(page, codes, "取消済み");
   });
 
-  test("SEED-C03 の詳細は決済済みを表示する", async ({ page }) => {
-    await expectDetail(page, "SEED-C03", "決済済み");
+  test("取消済みの注文の詳細は、決済の対象でないことを表示する", async ({
+    page,
+    productFactory,
+  }) => {
+    const code = await createInStatus(page, await productFactory(), "取消済み");
+
+    await page.goto("/orders");
+    await page.getByRole("link", { name: `${code} の詳細` }).click();
+
+    await expectPaymentText(page, "この注文は決済の対象ではありません。");
   });
 
-  test("SEED-C05 の詳細は決済代行の拒否を表示する", async ({ page }) => {
-    await expectDetail(page, "SEED-C05", "決済代行が決済を拒否しました。");
-  });
-
-  test("SEED-C06 の詳細は、決済記録の無い再投入待ちを表示する", async ({ page }) => {
-    await expectDetail(page, "SEED-C06", paymentNotYetText);
-  });
-
-  test("SEED-C04 の詳細は、決済の対象でないことを表示する", async ({ page }) => {
-    await expectDetail(page, "SEED-C04", "この注文は決済の対象ではありません。");
-  });
-
-  test("作成の画面の商品の選択肢に、販売終了の商品を出さない", async ({ page }) => {
-    const products = await listProducts(page.request);
-    const discontinued = products.filter((item) => item.salesStatus === "DISCONTINUED");
-    expect(discontinued, "シーダーの販売終了の商品").toHaveLength(1);
-    const onSale = await onSaleProduct(page.request);
+  test("作成の画面の商品の選択肢に、販売終了の商品を出さない", async ({ page, productFactory }) => {
+    const discontinued = await productFactory({ onSale: false });
+    const onSale = await productFactory();
 
     await page.goto("/orders/new");
 
     const select = page.getByLabel("商品");
-    await expect(
-      select.getByRole("option", { name: discontinued[0]?.productName ?? "" }),
-    ).toHaveCount(0);
+    await expect(select.getByRole("option", { name: discontinued.productName })).toHaveCount(0);
     await expect(select.getByRole("option", { name: onSale.productName })).toHaveCount(1);
   });
 });

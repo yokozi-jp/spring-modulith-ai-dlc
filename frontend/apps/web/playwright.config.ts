@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-import { authFile, isCI, webOrigin } from "./e2e/environment";
+import { authFile, fixtureOrigin, isCI, webOrigin } from "./e2e/environment";
 
 export default defineConfig({
   testDir: "e2e",
@@ -25,11 +25,21 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], storageState: authFile },
     },
   ],
-  // build 済みの dist を配信する。既に E2E_WEB_PORT（既定は 5173）で何かが応答していれば、別の server を検証しないよう失敗する。
-  webServer: {
-    command: "vp preview --mode test",
-    url: webOrigin,
-    reuseExistingServer: false,
-    timeout: 60_000,
-  },
+  // 既に port で何かが応答していれば、別の server を検証しないよう失敗する。
+  webServer: [
+    // build 済みの dist を E2E_WEB_PORT（既定は 5173）で配信する。
+    {
+      command: "vp preview --mode test",
+      url: webOrigin,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+    // 商品を作る fixture サーバー（ADR-129）。/health は起動時のテナントと所属の投入の後に応答する。
+    {
+      command: "bash ../../../tooling/e2e-fixture/serve.sh",
+      url: `${fixtureOrigin}/health`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+    },
+  ],
 });

@@ -151,12 +151,12 @@ tasks:
 
   # task e2e と .agents/skills/verify-demo/scripts/stack.sh が呼ぶ。
   e2e-up:
-    desc: frontendとbackendをビルドし、compose-testの依存とbackendを起動してmigrationと代表データを入れる（片付けない）
+    desc: frontendとbackendをビルドし、compose-testの依存とbackendを起動してmigrationを適用する（片付けない）
     silent: true
     deps: [_ensure-test-env]
     cmds:
       - |
-        # migration とシーダーはホストの Gradle で動く。JAVA_HOME があればそれを、なければ PATH の java を使う。
+        # migration と fixture サーバーはホストの JVM で動く。JAVA_HOME があればそれを、なければ PATH の java を使う。
         if ! command -v "${JAVA_HOME:+$JAVA_HOME/bin/}java" >/dev/null 2>&1; then
           echo "Java が見つかりません（JAVA_HOME か PATH）。docs/local-env-setup/setup.md の手順で Corretto 25 を入れてください。" >&2
           exit 1
@@ -182,8 +182,8 @@ tasks:
         compose build backend
         compose up -d --wait postgres keycloak wiremock
         task be-migrate COMPOSE_ENV_FILE="$TEST_ENV_FILE"
-        # spec が読む商品と代表の注文を入れる（ADR-073）。slot の env ファイルは test の目印と loopback の DB_HOST と slot の DB_PORT を持つ。
-        task be-seed COMPOSE_ENV_FILE="$TEST_ENV_FILE"
+        # 商品を作る fixture サーバーの起動の引数を書く。起動と停止は Playwright の webServer が行う（ADR-129）。
+        (cd backend && ./gradlew writeE2eFixtureArgs)
         compose up -d --wait backend
         # healthcheck はコンテナの中から確かめるため、preview の proxy と同じくホストから届くかを別に確かめる。
         if ! curl --fail --silent --show-error --max-time 5 "http://localhost:${TEST_BACKEND_PORT}/actuator/health/readiness" >/dev/null; then
@@ -649,7 +649,7 @@ tasks:
       # e2e の補助は、Playwright の外から Node が直接 import する（検証スキルの drive.mjs）。相対の import に拡張子がないと、ここでしか壊れない。
       - |
         E2E_USERNAME=check E2E_PASSWORD=check PAYMENT_GATEWAY_BASE_URL=http://127.0.0.1:1 \
-          node --input-type=module -e 'for (const file of ["environment", "fixtures", "orders", "payment-gateway"]) await import(`./apps/web/e2e/${file}.ts`)'
+          node --input-type=module -e 'for (const file of ["environment", "fixture-server", "fixtures", "orders", "payment-gateway"]) await import(`./apps/web/e2e/${file}.ts`)'
 
   fe-knip:
     desc: フロントエンドの未参照ファイル、未使用export、未使用依存をKnipで検査

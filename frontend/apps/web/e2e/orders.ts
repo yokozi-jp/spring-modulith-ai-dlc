@@ -2,8 +2,8 @@ import type { APIRequestContext, APIResponse, Locator, Page } from "@playwright/
 
 import { expect } from "./fixtures.ts";
 
-// 注文の画面を操作する補助。商品は task e2e のシーダーが入れ、spec は読むだけにする（ADR-073）。
-// 画面の文言と、シーダーの代表の注文は、spec と検証スキルの journey が同じ値を使うようここに置く。
+// 注文の画面を操作する補助。商品は各テストが fixture サーバーで作る（fixtures.ts の productFactory、ADR-129）。
+// 画面の文言は、spec と検証スキルの journey が同じ値を使うようここに置く。
 
 export const paymentNotYetText =
   "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。";
@@ -11,41 +11,10 @@ export const linesConflictText =
   "ほかの操作で注文が更新されました。上に最新の内容を表示しています。";
 export const linesChangedText = "明細を変更しました。";
 
-// 一覧の状態の絞り込みのリンクの名前ごとの、シーダーの代表の注文（SEED-C01 から SEED-C06）。
-export const seededOrderCodesByStatusLabel = {
-  下書き: ["SEED-C01", "SEED-C02"],
-  確定済み: ["SEED-C03", "SEED-C05", "SEED-C06"],
-  取消済み: ["SEED-C04"],
-} as const;
-
-interface Product {
-  productId: string;
-  productName: string;
-  salesStatus: string;
-  unitPrice: number;
-}
-
 // 公開 API の応答の本文。形は backend の契約テストが保証するため、ここでは検証しない（docs/frontend/api-client-orval.md）。
 export async function readJson<Body>(response: APIResponse): Promise<Body> {
   // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- Playwright の response.json() は any を返すため、型引数 Body へ断定する。
   return (await response.json()) as Body;
-}
-
-// シーダーの商品名は乱数の値なので、名前を固定で書かず GET /api/products（CSRF の token は要らない）から選ぶ。
-export async function listProducts(request: APIRequestContext): Promise<Product[]> {
-  const response = await request.get("/api/products");
-  expect(response.status(), "GET /api/products").toBe(200);
-  const body = await readJson<{ items: Product[] }>(response);
-  return body.items;
-}
-
-export async function onSaleProduct(request: APIRequestContext): Promise<Product> {
-  const products = await listProducts(request);
-  const product = products.find((item) => item.salesStatus === "ON_SALE");
-  if (product === undefined) {
-    throw new Error("販売中の商品がありません。task e2e がシーダーを実行したか確かめてください。");
-  }
-  return product;
 }
 
 // 詳細の画面の「明細の変更」のフォーム。

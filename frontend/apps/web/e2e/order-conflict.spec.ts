@@ -1,12 +1,12 @@
 import type { Page } from "@playwright/test";
 
+import type { Product } from "./fixture-server";
 import { expect, test } from "./fixtures";
 import {
   createOrder,
   firstLineQuantity,
   linesChangedText,
   linesConflictText,
-  onSaleProduct,
   orderLinesEditor,
   readJson,
   uniqueCode,
@@ -20,8 +20,7 @@ async function saveQuantity(page: Page, quantity: number): Promise<void> {
   await orderLinesEditor(page).getByRole("button", { name: "明細を保存する" }).click();
 }
 
-async function openTwoTabs(page: Page) {
-  const product = await onSaleProduct(page.request);
+async function openTwoTabs(page: Page, product: Product) {
   const orderId = await createOrder(page, {
     code: uniqueCode("E2E-LOCK"),
     productName: product.productName,
@@ -44,8 +43,9 @@ async function conflictOnLines(page: Page): Promise<void> {
 
 test("明細の競合で「変更を捨てて最新を表示する」を選ぶと、ほかのタブの明細に戻り、続けて保存できる", async ({
   page,
+  productFactory,
 }, testInfo) => {
-  await openTwoTabs(page);
+  await openTwoTabs(page, await productFactory());
   await conflictOnLines(page);
   await testInfo.attach("conflict-choices", {
     body: await page.screenshot(),
@@ -64,8 +64,9 @@ test("明細の競合で「変更を捨てて最新を表示する」を選ぶ�
 
 test("明細の競合で「最新の版に変更を適用し直す」を選ぶと、自分の入力で保存し、ほかのタブでも見える", async ({
   page,
+  productFactory,
 }) => {
-  const { other } = await openTwoTabs(page);
+  const { other } = await openTwoTabs(page, await productFactory());
   await conflictOnLines(page);
 
   await page.getByRole("button", { name: "最新の版に変更を適用し直す" }).click();
@@ -76,8 +77,8 @@ test("明細の競合で「最新の版に変更を適用し直す」を選ぶ�
   await expect(firstLineQuantity(other)).toHaveText("3");
 });
 
-test("確定の競合は、最新の内容を表示して下書きのまま残す", async ({ page }) => {
-  const { orderId } = await openTwoTabs(page);
+test("確定の競合は、最新の内容を表示して下書きのまま残す", async ({ page, productFactory }) => {
+  const { orderId } = await openTwoTabs(page, await productFactory());
 
   await page.getByRole("button", { name: "確定する" }).click();
 
