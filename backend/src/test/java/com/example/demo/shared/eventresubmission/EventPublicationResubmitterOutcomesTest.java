@@ -4,6 +4,8 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ResubmissionProbe;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -79,7 +81,7 @@ class EventPublicationResubmitterOutcomesTest {
   @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
 
   /** 差し替えられる時計。 */
-  @Autowired private EventPublicationResubmitterTest.MutableClock clock;
+  @Autowired private MutableClock clock;
 
   /** Spring Modulith の、古い出版を FAILED に戻す処理。時計は {@link #clock} である。 */
   @Autowired private EventPublicationRegistry registry;
@@ -169,7 +171,8 @@ class EventPublicationResubmitterOutcomesTest {
             properties,
             policies,
             meterRegistry,
-            abandon);
+            abandon,
+            ResubmissionTestSupport.noStaleCheck());
 
     resubmitter.resubmitOnce();
 
@@ -302,7 +305,8 @@ class EventPublicationResubmitterOutcomesTest {
             properties,
             policies,
             otherRegistry,
-            abandon);
+            abandon,
+            ResubmissionTestSupport.noStaleCheck());
     first.resubmitOnce();
     complete(id);
 
@@ -366,7 +370,8 @@ class EventPublicationResubmitterOutcomesTest {
         jobProperties,
         policies,
         meterRegistry,
-        abandon);
+        abandon,
+        ResubmissionTestSupport.noStaleCheck());
   }
 
   /** 古い出版を FAILED に戻す処理を Spring Modulith の本物にしたジョブ。 */
@@ -480,13 +485,7 @@ class EventPublicationResubmitterOutcomesTest {
   /** 古い出版を FAILED に戻す処理が読み戻せるよう、テストのイベントの型で FAILED の出版の行を作る。 */
   private UUID insertReadable() {
     return ResubmissionTestSupport.insertPublication(
-        dsl,
-        UUID.randomUUID(),
-        LISTENER_ID,
-        EventPublicationResubmitterTest.ResubmissionProbe.class.getName(),
-        T0,
-        FAILED,
-        0);
+        dsl, UUID.randomUUID(), LISTENER_ID, ResubmissionProbe.class.getName(), T0, FAILED, 0);
   }
 
   private UUID insert(final String status, final int completionAttempts) {

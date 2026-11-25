@@ -4,8 +4,9 @@ import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION_ARCHIVE;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.shared.eventresubmission.EventPublicationResubmitterTest.ProbeListener;
-import com.example.demo.shared.eventresubmission.EventPublicationResubmitterTest.ResubmissionProbe;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ProbeListener;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ResubmissionProbe;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -91,7 +92,7 @@ class ResubmissionOptionsLearningTest {
   @Autowired private EventPublicationRepository repository;
 
   /** 出版の時刻を決める時計。 */
-  @Autowired private EventPublicationResubmitterTest.MutableClock clock;
+  @Autowired private MutableClock clock;
 
   /** Spring Modulith が諦めの判断に渡す出版の回数。 */
   @Autowired private AbandonPolicyRecorder abandonPolicies;

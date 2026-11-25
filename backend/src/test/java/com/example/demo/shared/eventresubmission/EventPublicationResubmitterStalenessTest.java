@@ -1,9 +1,13 @@
 package com.example.demo.shared.eventresubmission;
 
 import static com.example.demo.jooq.modulith.Tables.EVENT_PUBLICATION;
+import static com.example.demo.shared.eventresubmission.ResubmissionProbes.PROBE_POLICY;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ProbeListener;
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.ResubmissionProbe;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
@@ -18,7 +22,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import net.javacrumbs.shedlock.core.DefaultLockingTaskExecutor;
 import net.javacrumbs.shedlock.core.LockProvider;
-import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
@@ -72,10 +75,10 @@ class EventPublicationResubmitterStalenessTest {
   @Autowired private ResubmissionPolicies policies;
 
   /** 差し替えられる時計。Spring Modulith のレジストリもこの時計で古さを測る。 */
-  @Autowired private EventPublicationResubmitterTest.MutableClock clock;
+  @Autowired private MutableClock clock;
 
   /** 失敗の回数を決められ、門で止められるテストのリスナー。 */
-  @Autowired private EventPublicationResubmitterTest.ProbeListener listener;
+  @Autowired private ProbeListener listener;
 
   /** 出版の行を作り、状態を読む。 */
   @Autowired private DSLContext dsl;
@@ -120,9 +123,9 @@ class EventPublicationResubmitterStalenessTest {
     clock.set(T0.plus(IN_FLIGHT_STALENESS).plus(Duration.ofMinutes(1)));
     final CountDownLatch gate = listener.close();
     final CompletableFuture<EventPublicationResubmitOnce.Outcome> future =
-        ResubmissionTestSupport.onVirtualThread(() ->
-            resubmitOnce.run(new Target.Policy(EventPublicationResubmitterTest.PROBE_POLICY)));
-    awaitListenerAtGate(publication);
+        ResubmissionTestSupport.onVirtualThread(
+            () -> resubmitOnce.run(new Target.Policy(PROBE_POLICY)));
+    ResubmissionTestSupport.awaitListenerAtGate(listener, "publication=" + publication);
 
     runJob();
 
@@ -190,17 +193,8 @@ class EventPublicationResubmitterStalenessTest {
         .isEqualTo(2);
   }
 
-  /** ロックの期限を過去にしてから、定期の再投入を呼ぶ。 */
   private void runJob() {
-    ResubmissionTestSupport.expireLock(dsl);
-    resubmitter.resubmitOnce();
-  }
-
-  /** 再投入したリスナーが門に着く（最初の配信と合わせて 2 回呼ばれる）まで待つ。 */
-  private void awaitListenerAtGate(final UUID publication) {
-    Awaitility.await("publication=" + publication + " の再投入したリスナーが門に着く")
-        .atMost(Duration.ofSeconds(JOIN_TIMEOUT_SECONDS))
-        .untilAsserted(() -> assertThat(listener.calls()).isEqualTo(2));
+    ResubmissionTestSupport.runJob(dsl, resubmitter);
   }
 
   /**
@@ -213,7 +207,7 @@ class EventPublicationResubmitterStalenessTest {
         dsl,
         UUID.randomUUID(),
         "staleness-test",
-        EventPublicationResubmitterTest.ResubmissionProbe.class.getName(),
+        ResubmissionProbe.class.getName(),
         T0,
         status.name(),
         3);
@@ -233,11 +227,7 @@ class EventPublicationResubmitterStalenessTest {
   }
 
   private double skippedRuns() {
-    return meterRegistry
-        .get("event.publication.resubmission.runs")
-        .tag("outcome", "skipped")
-        .counter()
-        .count();
+    return ResubmissionTestSupport.skippedRuns(meterRegistry);
   }
 
   /**

@@ -2,6 +2,7 @@ package com.example.demo.shared.eventresubmission;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.example.demo.shared.eventresubmission.ResubmissionProbes.MutableClock;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,7 +45,7 @@ class EventPublicationResubmitterBudgetTest {
   @Autowired private EventPublicationResubmissionConfig.AbandonProperties abandon;
 
   /** 差し替えられる時計。 */
-  @Autowired private EventPublicationResubmitterTest.MutableClock clock;
+  @Autowired private MutableClock clock;
 
   /** ロックの期限を動かす DB。 */
   @Autowired private DSLContext dsl;
@@ -77,7 +78,15 @@ class EventPublicationResubmitterBudgetTest {
     final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
     final EventPublicationResubmitter resubmitter =
         ResubmissionTestSupport.resubmitter(
-            dsl, failed, lockingTaskExecutor, clock, properties, policies, meterRegistry, abandon);
+            dsl,
+            failed,
+            lockingTaskExecutor,
+            clock,
+            properties,
+            policies,
+            meterRegistry,
+            abandon,
+            ResubmissionTestSupport.noStaleCheck());
 
     resubmitter.resubmitOnce();
 

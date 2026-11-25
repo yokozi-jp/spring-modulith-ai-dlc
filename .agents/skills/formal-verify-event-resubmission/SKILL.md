@@ -105,6 +105,8 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 `startup-check-too-weak` は起動時の検査を緩める退行なので、対照は `control_overrides` で検査が受け付ける `in-flight-staleness` を使う。
 この変異は、古い出版を `FAILED` に戻す処理をロックの中に移した後も、起動時の検査を 1 倍に緩めると処理中の出版を `FAILED` に戻すことを示す。
 `lock-ignores-expiry` は `OneLockedRun` に加えて `InFlightNeverMarkedStale` も破り、ロックが、古い出版を `FAILED` に戻す処理と別のインスタンスの再投入を並べていることを示す。
+古い出版を `FAILED` に戻す処理がロックの外へ戻る退行は、モデルでは回が一つの流れ（`RunStart` から `StaleFind`）で、ロックの取得と同じ段になるため、独立した変異にならない。
+`lock-ignores-expiry` が同じ害を捕まえ、Java では `EventPublicationResubmitterStalenessTest` の `otherInstanceCannotInterleaveWithStaleCheck` が捕まえる。
 
 ## 範囲と前提
 
@@ -168,7 +170,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 - Spring Modulith 2.1.1 では、古い出版を `FAILED` に戻す処理が `publication_date` から測るため、再投入が遅れた出版を処理中のまま `FAILED` に戻し、リスナーが同時に二つ動く経路があった。
   2.1.2 に上げ、起動時の検査を `in-flight-staleness` > 2 × `lock-at-most-for` に置き換えて直した（PR #497）。
   変異 `staleness-from-publication-date` がこの退行を捕まえる。
-- 組み込みの Staleness Monitor を全インスタンスでロックの外で動かしていたときは、回が長引かなくても、既知の発見 1 と 2 と同じ経路があった（`late-stale-mark.cfg` と `late-stale-mark-long-listener.cfg`）。
+- 組み込みの Staleness Monitor を全インスタンスでロックの外で動かしていたときは、回が長引かなくても、既知の発見 1 と 2 と同じ経路があった（#556 より前の `late-stale-mark` の設定と、`late-stale-mark-long-listener`）。
   古い出版を `FAILED` に戻す処理を再投入のロックの中に移して直した（#556）。
 
 ## 同期の記録

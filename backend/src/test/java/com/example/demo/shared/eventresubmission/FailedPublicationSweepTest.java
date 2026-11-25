@@ -107,7 +107,7 @@ class FailedPublicationSweepTest {
             })
         .when(failed)
         .resubmit(Mockito.any(ResubmissionOptions.class));
-    return ResubmissionTestSupport.sweep(
+    return new FailedPublicationSweep(
         dsl,
         failed,
         lockingTaskExecutor,
@@ -118,7 +118,8 @@ class FailedPublicationSweepTest {
             properties.interval(),
             maxPerRun,
             properties.lockAtMostFor(),
-            properties.policies()));
+            properties.policies()),
+        ResubmissionTestSupport.noStaleCheck());
   }
 
   /** completion_attempts が 1 の FAILED の行を DB に作る。 */

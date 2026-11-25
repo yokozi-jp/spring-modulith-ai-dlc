@@ -164,7 +164,10 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 
 ## 同期の記録
 
-同期コミット：`91119568e0d323a37290e4474028c0c9c3a9b77a`（main。#562 の Pull Request の土台）
+同期コミット：`34e927baf0ba528776da46f805d9f0d1e129f51f`（main。#556 の Pull Request の土台）
 
 #562 の Pull Request のコード（回数の上限を `abandon-after-attempts` に任せた後）で、「変更がこの検証に関わるか」のファイルと対応表がモデルと一致することを確かめた。
 読んだライブラリは、Spring Modulith 2.2.0 の `DefaultEventPublicationRegistry`（`PublicationsInProgress`、`markFailedOrAbandoned`）、`AbandonPolicies`、`ResubmissionProperties`、`JdbcEventPublicationRepositoryV2`（`markAbandoned`）、`CompletionRegisteringAdvisor`（`CompletionRegisteringMethodInterceptor`、`spring.modulith.events.completion: in-interceptor`）、`PersistentApplicationEventMulticaster`、`DefaultFailedEventPublications` である。
+
+#556 の Pull Request のコード（古い出版を `FAILED` に戻す処理を再投入のロックの中に移した後）で、`FailedPublicationSweep` と `EventPublicationResubmitter` の変更を読んだ。
+`Stale` はモデルに時間もロックもなく、既存の `FAILED` でない行ならいつでも `FAILED` にするため、呼び出しの場所が変わってもモデルは変わらない。

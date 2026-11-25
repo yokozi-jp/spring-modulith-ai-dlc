@@ -153,11 +153,10 @@ final class FailedPublicationSweep {
         (Runnable)
             () -> {
               locked.set(true);
-              // ponytail: markStalePublicationsFailed は、読んだ出版の状態を確かめずに FAILED にする。
+              // markStalePublicationsFailed は、読んだ出版の状態を確かめずに FAILED にする。
               // 読んでから FAILED にするまでに回が lock-at-most-for を超えて止まるとロックが切れ、
               // 別のインスタンスが再投入した処理中の出版も FAILED に戻しうる（ADR-079）。
-              // 正しく動くのは、この間が lock-at-most-for より短い間である。
-              // 超えるなら、状態と last_resubmission_date を確かめて FAILED にする更新に替える。
+              // 状態と last_resubmission_date を確かめる更新に替えるのは #740 で扱う。
               registry.markStalePublicationsFailed(properties.staleness());
               failedEventPublications.resubmit(
                   ResubmissionOptions.defaults()
@@ -175,6 +174,7 @@ final class FailedPublicationSweep {
   private Map<UUID, Integer> advancedAmong(final Map<UUID, Integer> candidates) {
     final Map<UUID, EventPublicationStates.State> states =
         EventPublicationStates.read(dsl, candidates.keySet());
+    // markResubmitted は completion_attempts をちょうど 1 増やすため、進んだ後の値は候補の値 + 1 になる。
     return candidates.entrySet().stream()
         .filter(candidate -> {
           final EventPublicationStates.@Nullable State state = states.get(candidate.getKey());

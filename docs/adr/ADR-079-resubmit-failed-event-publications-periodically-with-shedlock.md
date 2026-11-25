@@ -404,6 +404,12 @@ Resilience4j は再投入と補完関係にあり、ADR-019 のとおり client 
 - **Pros**：手での 1 回の再投入が、対象（`target`）の外の出版の状態を変えない。
 - **Cons**：定期の実行を無効にした環境では、落ちたまま残った出版を戻す手段が SQL の手作業だけになる。`FailedPublicationSweep` に、どちらの入口かを渡す引数が要る。定期のジョブを動かす環境では、次の回が同じ出版を `FAILED` に戻すため、対象の外の出版の状態を変えないという利点は残らない。
 
+### 選択肢15: 古い出版を `FAILED` に戻す更新を、状態と `last_resubmission_date` を確かめる 1 文にする
+
+- **Description**：`markStalePublicationsFailed` を呼ばず、`completion_date IS NULL` と、状態ごとの `last_resubmission_date < now - 閾値` を 1 文の UPDATE で確かめて `FAILED` にする。
+- **Pros**：更新の時点で状態と時刻を確かめるため、回が `lock-at-most-for` を超えて止まっても、再投入した直後の出版を `FAILED` に戻さない。既知の発見 1 と 2 が消える。
+- **Cons**：Spring Modulith が持つ表への書き込みが、Runbook の SQL に加えてコードにも入り、上流の表の定義の変更に追従する責任が増える。この PR は組み込みの呼び出しを残し、窓を回が 10 分止まる場合に限り、残りをリスナーの冪等性に頼る。置き換えは [#740](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/740) で扱う。
+
 ## References
 
 - [ADR-001: Spring Modulith によるモジュラーモノリス](ADR-001-adopt-spring-modulith-modular-monolith.md)
