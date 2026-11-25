@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：Listener
-description: 受信する側のモジュールの application に置き、他モジュールのイベントか、外部システムを呼ぶための自モジュールのイベントを受ける Listener の定義、置き場所と命名、必須の記述（on と @ApplicationModuleListener）、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。他モジュールのイベントを受けて自モジュールの状態を変えるとき、外部システムの呼び出しをイベントで始めるときに読む。
+description: 受信する側のモジュールの application に置き、他モジュールのイベントか、外部システムを呼ぶための自モジュールのイベントを受ける Listener の定義、置き場所と命名、必須の記述（on と @ApplicationModuleListener）、依存、例、テスト、冪等性の入力例の足し方、アンチパターン、作成時のチェックリストを定める。他モジュールのイベントを受けて自モジュールの状態を変えるとき、外部システムの呼び出しをイベントで始めるときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -52,7 +52,8 @@ Listener は Infrastructure の Adapter でもない。
   フィールド名は CommandHandler の動詞にする（`reserveStock`）。
 - `on` は短い名前であり、package-private のクラスの public メソッドでもあるため、クラスに `@SuppressWarnings({"PMD.ShortMethodName", "PMD.PublicMemberInNonPublicType"})` を理由のコメントと一緒に付ける。
 - 同じイベントを二回以上受けても結果が変わらないよう、呼ぶ CommandHandler を冪等にする。
-  冪等にする方法は[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)に従う。
+  冪等にする方法と重複の判定の書き方は[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)に従う。
+- Listener を足したら、同じ変更で冪等性の入力例を足す（[冪等性の入力例](#冪等性の入力例)）。
 - 受信に失敗したイベント出版はレジストリに `FAILED` で残り、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
   定期のジョブが、リスナーの方針の待ち時間を過ぎた出版を回数の上限まで自動で再投入する（[ADR-079](../../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - 方針を `default` から変えるときは、`on` に `@ResubmissionPolicy("<名前>")`（`shared.events`）を付け、`application.yaml` の `event-publication.resubmission.policies` に同じ名前の方針を置く。
@@ -162,18 +163,33 @@ class OrderPlacedListenerTest {
 }
 ```
 
+### 冪等性の入力例
+
+全件の結合テスト `ListenerIdempotencyTest` は、すべての Listener に同じイベントを順に 2 回と同時に 2 回届け、入力例のない Listener があると失敗する（[非同期処理のテスト](../../integration/async-testing.md)の「冪等性のテスト」）。
+Listener を足したら、次の手順で入力例を足す。
+
+1. 受信する側のモジュールのテストのパッケージに、`testkit.idempotency` の `ListenerExample` を実装するクラスを置き、テストの Bean にする。
+2. `listener()` で、足した Listener のリスナーの ID を返す。
+3. `prepare(TenantId tenant)` で、引数のテナントに前提の状態を呼ぶたびに新しく作り、そのテナントのイベントを返す。
+   前提は、Listener が業務の本筋の処理を通る状態にする（`OrderConfirmedListener` なら、確定した注文）。
+4. `cd backend && ./gradlew test --tests '*ListenerIdempotencyTest'` を実行し、足した Listener の ID を挙げた失敗が出ないことを確かめる。
+
+脇の道を通る前提（取り消した注文など）を選ぶと、1 回目の配信が行を変えずにテストが失敗するか、1 行だけ変えて本筋の重複を確かめずに通る。
+
 ## 冪等の書き方の例
 
 同じイベントは、定期の再投入と手での再投入で二回以上届き、同時に二つ届くこともある。
 次の二つは決済の実コードからの抜粋である。
 
 一つ目は、CommandHandler が結果の行を先に読み、あれば外部システムを呼ばずに返す例である（`ChargeOrderCommandHandler`）。
-並行に届いた二つ目の配信は先読みをすり抜けるため、決済記録の INSERT の一意制約が `ConflictException` にして止める。
+先読みは外部システムの二度目の呼び出しを省く最適化であり、重複の判定は決済記録の `INSERT ... ON CONFLICT DO NOTHING` が行う。
+同時に届いた二つ目の配信は、先読みをすり抜けて決済記録の INSERT で一つ目の行ロックを待つ。
+一つ目がコミットすると INSERT は 0 件になり、二つ目は一つ目の決済記録を返して正常に終える。
 
 ```java
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final OrderId orderId = new OrderId(UUID.fromString(command.orderId()));
-  // 二度目の請求を避けるための先読み。並行の配信は INSERT の一意制約が ConflictException にする。
+  // 二度目の請求を省く先読みであり、重複の判定ではない。判定は add の ON CONFLICT DO NOTHING が行う。
   final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
   if (existing.isPresent()) {
     return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
@@ -181,13 +197,17 @@ public ChargeOrderResult handle(final ChargeOrderCommand command) {
   // ...
   final ChargeOutcome outcome = paymentGateway.charge(orderId, amount);
   final Payment payment = Payment.record(orderId, amount, outcome, Instant.now(clock));
-  paymentRepository.add(payment);
+  if (!paymentRepository.add(payment)) {
+    // 同時に届いた一つ目の配信が先に決済記録を入れた。
+    final Payment recorded = paymentRepository.findByOrderId(orderId).orElseThrow();
+    return new ChargeOrderResult.AlreadyRecorded(recorded.id().value().toString());
+  }
   return new ChargeOrderResult.Charged(payment.id().value().toString());
 }
 ```
 
 二つ目は、外部システムの Client が注文 ID を冪等性キーとして `Idempotency-Key` のヘッダーで送る例である（`PaymentGatewayClient`）。
-先読みをすり抜けた二つ目の配信は、一意制約で止まる前に請求を呼ぶが、決済代行は同じキーの請求を二重にしない。
+先読みをすり抜けた二つ目の配信は、決済記録の INSERT の前に同じ引数で請求を呼ぶが、決済代行は同じキーの請求を二重にしない。
 
 ```java
 public ChargeOutcome charge(final OrderId orderId, final Money amount) {
@@ -242,8 +262,10 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 - [ ] 発行側のモジュールのルートのイベントだけを使い、内部パッケージの型を使わない。［Spring Modulith で検査：ApplicationModuleArchitectureTest］
 - [ ] 名前をイベントの名前に `Listener` を付けた形にし、イベントごとに一つ作る。［自分で点検］
 - [ ] 他のクラスから呼ばず、interface も実装しない。［ArchUnit で検査：ClassRoleArchTest.listenersAreNotCalled、ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces］
-- [ ] 呼ぶ CommandHandler を冪等にする。［自分で点検］
-- [ ] 同じイベントを二回処理しても結果が変わらないことを確かめるテストがある。［自分で点検］
+- [ ] 呼ぶ CommandHandler は、重複を DB が直列にする操作（`INSERT ... ON CONFLICT DO NOTHING`、`lock_no` を WHERE に書く `TableWriter.update`、`SELECT ... FOR UPDATE` の後の判定）で判定し、衝突と 0 件の更新を処理済みとして正常に終える。［結合テストで検査：ListenerIdempotencyTest］
+- [ ] 同じイベントの 2 回目の配信は、外部システムを呼ばないか、1 回目と同じ引数で呼ぶ。［結合テストで検査：ListenerIdempotencyTest］
+- [ ] Listener の入力例を足す。［結合テストで検査：ListenerIdempotencyTest］
+- [ ] 入力例の前提が、Listener の業務の本筋の処理を通る（脇の道で 1 行だけ変えて通していない）。［自分で点検］
 - [ ] PMD の抑止を理由のコメントと一緒に付ける。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、`on` に Javadoc を書く。［自分で点検］
 - [ ] `Scenario` の `publish` で受信を確かめるテストを書く。［自分で点検］
