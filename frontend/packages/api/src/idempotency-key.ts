@@ -1,7 +1,9 @@
+import type { IdempotencyKeyParameter } from "./generated/models";
+
 /**
- * 利用者の操作 1 回分の Idempotency-Key ヘッダー（ADR-126）。値は Structured Field の String で、中身は UUID にする。
- * 操作のたびに呼んで新しいキーを採り、mutation の変数に入れる。同じキーを送るのは、同じ変数で呼ばれる自動の再試行だけにする。
+ * 利用者の操作 1 回分の新しい Idempotency-Key ヘッダーを、契約の形（引用符で囲んだ UUID）で作る（ADR-126）。
+ * 呼び方は docs/frontend/file-roles/feature-hook.md に従う。
  */
-export function idempotencyKeyHeaders() {
+export function idempotencyKeyHeaders(): { "Idempotency-Key": IdempotencyKeyParameter } {
   return { "Idempotency-Key": `"${crypto.randomUUID()}"` };
 }

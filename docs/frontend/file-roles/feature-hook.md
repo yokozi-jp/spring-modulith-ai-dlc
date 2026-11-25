@@ -38,7 +38,8 @@ React の state を使わない処理は Hook にせず、[feature の module](f
 - `export function use<用途>(...)` の関数宣言にし、ファイルに一つだけ export する。
 - mutation は `@frontend/api/endpoints/<tag>/<tag>` の生成の `use<Operation>()` で送る。
 - `Idempotency-Key` を求める mutation は、利用者が操作するたびに `idempotencyKeyHeaders()` を呼び、`mutate` の変数の `headers` に入れる（[ADR-126](../../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
-  同じ値を送るのは、同じ変数で呼ばれる自動の再試行だけである。
+  同じ値を送るのは、同じ変数で呼ばれる自動の再試行だけにする。
+  自動の再試行は [#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540) の再試行の実装で入り、今の既定では mutation を再試行しない。
 - 画面遷移と通知は、`mutate` に渡す callback（`onSuccess`、`onError`）に置き、`useMutation` の options に置かない（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
 - 失敗の通知は、`@/lib/notice` の `failureNotice` か、feature の module の関数（`formFailure`）で作る。
   見出しは backend の `title` を使い、説明は操作ごとの catalog の文言にする（[更新の競合（409）の画面の扱い](../update-conflicts.md)）。

@@ -34,6 +34,9 @@ Proposed
 `agent-software-factory` は対象を PATCH に限るが、このリポジトリは更新を PUT で行い、DELETE も `lock_no` を運ぶので、PUT と DELETE も対象にする。
 キーの表は、テナントとモジュールのロールを分けた構成（[#363](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/363)）の上に作る。
 
+Proposed の間に Decision を書き直した。
+契約を #540 で実装したとき、除外を `operationId` の一覧から operation の印に変え、キーを `apiFetch` で付けない理由を足したためである。
+
 ## Decision
 
 ### 対象
@@ -136,11 +139,14 @@ Proposed
 
 - OpenAPI の共通の components に、必須のヘッダーのパラメータと、上の 4 つのエラー応答を置く。
 - Spectral に、GET と HEAD 以外の業務の operation が `Idempotency-Key` の必須のヘッダーを参照する規則を足し、違反の例を fixture に足す。
-  テナントの選択（`operationId` の許可リスト）は、規則の中で除外する。
+  キーを求めない operation（テナントの選択）には印の拡張（`x-idempotency-key: none`）を付け、OpenAPI の customizer と規則はその印で除外する。
+  除く操作を Controller の 1 か所で示し、customizer と規則に `operationId` の一覧を持たせないためである。
 
 ### クライアント
 
 - フロントエンドの mutation は、利用者の操作ごとにキーを採番して送る。
+  キーは `apiFetch` で付けず、mutation の変数に入れる。
+  `apiFetch` で付けると、TanStack Query の再試行で `mutationFn` が呼ばれるたびに新しいキーになり、同じ操作の再送と見なされないためである。
 - ネットワークの失敗、5xx、408、429、処理中の 409 では、同じキーで自動で再試行する。
   RFC 9110 9.2.2 は、冪等と分かっている要求だけを自動で再試行してよいとしており、キーがその根拠になる。
 - 処理中の 409 の通知を `failureNotice` に足す。

@@ -22,7 +22,7 @@ ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yam
    契約に足す応答のstatusごとにMockMvcの契約テストを書き、`@ContractCase`で組を宣言する（[Controllerの対応するテスト](../backend/class-roles/controller.md#対応するテスト)）。
    `/error`が返すstatusのうち、titleを持つものは`messages.properties`の`problem.title.<3桁>`から検査が導く。
    `HttpStatus`に定義のないstatusを新しく扱わせたときだけ、`ApiContractCoverageTest`の`ERROR_ENDPOINT_STATUSES`に足す。
-2. `OpenApiConfig.CONTRACT_VERSION`を[OpenAPI文書の版](versioning.md#openapi文書の版)に従って上げる（互換な追加はMINOR、破壊的変更はMAJOR）。
+2. `OpenApiConfig.CONTRACT_VERSION`を[OpenAPI文書の版](versioning.md#openapi文書の版)に従って上げる。
 3. 契約と生成物を再生成する。
 
    ```bash
@@ -58,7 +58,7 @@ ControllerやDTOを変えたら`task api-gen`を実行し、`openapi/openapi.yam
 
 9. 意図した破壊的変更では、次の作業をすべて行う。
 
-   - 手順2に従い、`OpenApiConfig.CONTRACT_VERSION`のMAJORを上げる。
+   - 手順2に従い、`OpenApiConfig.CONTRACT_VERSION`を上げる。
    - Pull Requestにラベル`api-breaking-approved`を付ける。
    - Pull Request本文に変更の理由、影響、移行方法を書く。
    - Pull Requestタイトルまたはsquash commitに`!`を付けるか、commit footerに`BREAKING CHANGE:`を書く。

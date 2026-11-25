@@ -6,7 +6,7 @@ import type { IdempotencyKeyParameter } from '../idempotencyKeyParameter.ts';
 
 export type ChangeOrderLinesHeaders = {
 /**
- * 利用者の操作ごとにクライアントが採番する冪等性キー。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）。自動の再試行は同じキーで送り、利用者が操作し直したときは新しいキーを採る
+ * 利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）
  * @pattern ^"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"$
  */
 'Idempotency-Key': IdempotencyKeyParameter;

@@ -147,7 +147,7 @@ paths:
           description: サンプル注文を出荷済みにした
         "4XX":
           $ref: "#/components/responses/BadRequestProblem"
-  # idempotency-key-required はテナントを選ぶ前の selectTenant を除く
+  # idempotency-key-required は x-idempotency-key が none の operation を除く
   /api/current-tenant:
     put:
       tags:
@@ -155,6 +155,7 @@ paths:
       summary: テナントを選ぶ。
       description: テナントを選ぶ。<p>選んだテナントをセッションに保存する。
       operationId: selectTenant
+      x-idempotency-key: none
       responses:
         "204":
           description: テナントを選んだ

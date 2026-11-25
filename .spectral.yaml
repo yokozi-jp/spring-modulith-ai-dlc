@@ -303,10 +303,10 @@ rules:
 
   # ponytail: operation 直下の parameters の $ref だけを見る。パス直下の parameters と、同じ内容を inline で書いたヘッダーは違反にする。
   idempotency-key-required:
-    description: POST、PUT、PATCH、DELETE の operation は、必須の Idempotency-Key ヘッダー（#/components/parameters/IdempotencyKey）を参照する。テナントを選ぶ前の selectTenant は除く（ADR-126）。
+    description: operation は必須の Idempotency-Key ヘッダー（#/components/parameters/IdempotencyKey）を参照する。対象の範囲は docs/web-api/openapi-annotations.md の「作成時のチェックリスト」に示す。
     severity: error
     resolved: false
-    given: "$.paths[*][?(@property.match(/^(post|put|patch|delete)$/) && @.operationId !== 'selectTenant')]"
+    given: "$.paths[*][?(@property.match(/^(post|put|patch|delete)$/) && @['x-idempotency-key'] !== 'none')]"
     then:
       function: schema
       functionOptions:

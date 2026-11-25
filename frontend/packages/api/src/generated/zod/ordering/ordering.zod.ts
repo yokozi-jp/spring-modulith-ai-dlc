@@ -35,7 +35,7 @@ export const draftOrderHeaderIdempotencyKeyRegExp = new RegExp('^"[0-9a-fA-F]{8}
 
 
 export const DraftOrderHeader = zod.object({
-  "Idempotency-Key": zod.string().regex(draftOrderHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）。自動の再試行は同じキーで送り、利用者が操作し直したときは新しいキーを採る')
+  "Idempotency-Key": zod.string().regex(draftOrderHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）')
 })
 
 export const draftOrderBodyCustomerOrderCodeMax = 30;
@@ -92,7 +92,7 @@ export const cancelOrderHeaderIdempotencyKeyRegExp = new RegExp('^"[0-9a-fA-F]{8
 
 
 export const CancelOrderHeader = zod.object({
-  "Idempotency-Key": zod.string().regex(cancelOrderHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）。自動の再試行は同じキーで送り、利用者が操作し直したときは新しいキーを採る')
+  "Idempotency-Key": zod.string().regex(cancelOrderHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）')
 })
 
 
@@ -116,7 +116,7 @@ export const confirmOrderHeaderIdempotencyKeyRegExp = new RegExp('^"[0-9a-fA-F]{
 
 
 export const ConfirmOrderHeader = zod.object({
-  "Idempotency-Key": zod.string().regex(confirmOrderHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）。自動の再試行は同じキーで送り、利用者が操作し直したときは新しいキーを採る')
+  "Idempotency-Key": zod.string().regex(confirmOrderHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）')
 })
 
 
@@ -140,7 +140,7 @@ export const changeOrderLinesHeaderIdempotencyKeyRegExp = new RegExp('^"[0-9a-fA
 
 
 export const ChangeOrderLinesHeader = zod.object({
-  "Idempotency-Key": zod.string().regex(changeOrderLinesHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）。自動の再試行は同じキーで送り、利用者が操作し直したときは新しいキーを採る')
+  "Idempotency-Key": zod.string().regex(changeOrderLinesHeaderIdempotencyKeyRegExp).describe('利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。値は Structured Field の String（引用符付き）で、中身は UUID に限る（draft-ietf-httpapi-idempotency-key-header-08）')
 })
 
 export const changeOrderLinesBodyLinesItemQuantityMax = 9999;

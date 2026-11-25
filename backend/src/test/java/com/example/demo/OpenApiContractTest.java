@@ -1,5 +1,9 @@
 package com.example.demo;
 
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -8,10 +12,21 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.testkit.SharedTestConfiguration;
+import io.swagger.v3.core.util.Json31;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.Operation;
+import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.parameters.Parameter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.hamcrest.Matcher;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -24,7 +39,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultMatcher;
 
 /**
- * 生成された OpenAPI 文書の版と共通 RFC 9457 components を検証する。
+ * 生成された OpenAPI 文書の版、共通 components、Idempotency-Key を求める operation を検証する。
  *
  * <p>{@code openapi.output} が指定されたときは、springdoc の YAML endpoint の出力をそのパスへ書き出す。
  *
@@ -83,13 +98,46 @@ class OpenApiContractTest {
   }
 
   @Test
-  @DisplayName("テナントを選ぶ操作はキーの表に書けないので、Idempotency-Key を求めない（ADR-126）")
-  void selectTenantDoesNotRequireIdempotencyKey() throws Exception {
-    mockMvc
-        .perform(get("/v3/api-docs"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.paths['/api/current-tenant'].put.operationId").value("selectTenant"))
-        .andExpect(jsonPath("$.paths['/api/current-tenant'].put.parameters").doesNotExist());
+  @DisplayName("GET と HEAD 以外の operation は Idempotency-Key を参照し、印で除くのは selectTenant だけである")
+  void unsafeOperationsRequireIdempotencyKey() throws Exception {
+    final String json =
+        mockMvc
+            .perform(get("/v3/api-docs"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString(StandardCharsets.UTF_8);
+    final Set<PathItem.HttpMethod> unsafe =
+        EnumSet.of(
+            PathItem.HttpMethod.POST,
+            PathItem.HttpMethod.PUT,
+            PathItem.HttpMethod.PATCH,
+            PathItem.HttpMethod.DELETE);
+    final List<String> exempt = new ArrayList<>();
+    for (final Map.Entry<String, PathItem> path :
+        Json31.mapper().readValue(json, OpenAPI.class).getPaths().entrySet()) {
+      for (final Map.Entry<PathItem.HttpMethod, Operation> entry :
+          path.getValue().readOperationsMap().entrySet()) {
+        final Operation operation = entry.getValue();
+        final boolean marked =
+            operation.getExtensions() != null
+                && "none".equals(operation.getExtensions().get("x-idempotency-key"));
+        if (marked) {
+          exempt.add(operation.getOperationId());
+        }
+        final List<String> refs =
+            operation.getParameters() == null
+                ? List.of()
+                : operation.getParameters().stream().map(Parameter::get$ref).toList();
+        final Matcher<Iterable<? super String>> referencesKey =
+            hasItem("#/components/parameters/IdempotencyKey");
+        assertThat(
+            entry.getKey() + " " + path.getKey(),
+            refs,
+            unsafe.contains(entry.getKey()) && !marked ? referencesKey : not(referencesKey));
+      }
+    }
+    assertThat("x-idempotency-key: none の operation", exempt, contains("selectTenant"));
   }
 
   private static ResultMatcher problemResponseExists(final String name) {

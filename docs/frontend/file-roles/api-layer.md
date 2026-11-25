@@ -21,7 +21,7 @@ API 層は、画面とバックエンドの HTTP API のあいだに置くファ
 - **`packages/api/src/api-fetch.ts`**：生成した関数が呼ぶ custom mutator の `apiFetch`。
 - **`packages/api/src/api-error.ts`**：非 2xx を表す `ApiProblemError`、エラーの判定、401 の遷移、再試行の判定。
 - **`packages/api/src/csrf.ts`**：CSRF の Cookie の値を読む `csrfToken` と、form に入れる値を作る `maskedCsrfToken`。
-- **`packages/api/src/idempotency-key.ts`**：利用者の操作ごとに新しい `Idempotency-Key` の header を作る `idempotencyKeyHeaders`。
+- **`packages/api/src/idempotency-key.ts`**：利用者の操作ごとに新しい `Idempotency-Key` のヘッダーを作る `idempotencyKeyHeaders`。
 - **`packages/api/src/testing/`**：この package のテストが共有する MSW の server と setup。
 - **`apps/web/src/api/query-client.ts`**：本番とテストが同じ設定で使う `QueryClient` を作る `createQueryClient`。
 - **`apps/web/src/api/preload-query.ts`**：loader で生成 query options の data を cache に入れる `preloadQuery`。

@@ -6,6 +6,8 @@ import com.example.demo.shared.security.TenantNotSelectedException;
 import com.example.demo.tenancy.MembershipSummary;
 import com.example.demo.tenancy.TenancyQueries;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.extensions.Extension;
+import io.swagger.v3.oas.annotations.extensions.ExtensionProperty;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -74,7 +76,11 @@ class CurrentTenantController {
    * @param response セッションの Cookie を返す応答
    * @return 本文のない 204 の応答
    */
-  @Operation(operationId = "selectTenant")
+  // テナントを選ぶ前の操作なので、Idempotency-Key を求めない（ADR-126）。
+  @Operation(
+      operationId = "selectTenant",
+      extensions =
+          @Extension(properties = @ExtensionProperty(name = "x-idempotency-key", value = "none")))
   @ApiResponse(responseCode = "204")
   @ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
   @PutMapping

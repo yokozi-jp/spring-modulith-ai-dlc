@@ -19,10 +19,11 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import java.math.BigDecimal;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Consumer;
-import java.util.stream.Stream;
+import java.util.Set;
+import java.util.function.BiConsumer;
 import org.springdoc.core.customizers.OpenApiCustomizer;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -39,7 +40,7 @@ public class OpenApiConfig {
   /**
    * 契約の版を手で管理する。
    *
-   * <p>互換な追加で MINOR、破壊的変更で MAJOR を上げ、アプリのリリース版と連動させない（docs/web-api/versioning.md）。
+   * <p>上げ方は docs/web-api/versioning.md に従い、アプリのリリース版と連動させない。
    */
   /* package */ static final String CONTRACT_VERSION = "0.10.0";
 
@@ -52,8 +53,19 @@ public class OpenApiConfig {
   /** 必須の Idempotency-Key ヘッダーを表す parameter の名前（ADR-126）。 */
   private static final String IDEMPOTENCY_KEY = "IdempotencyKey";
 
-  /** テナントを選ぶ前の操作なので Idempotency-Key を求めない operation（ADR-126）。 */
-  private static final String SELECT_TENANT = "selectTenant";
+  /** Idempotency-Key のヘッダーの名前。 */
+  private static final String IDEMPOTENCY_KEY_HEADER = "Idempotency-Key";
+
+  /** 値が none の operation には Idempotency-Key を求めない、operation の拡張の名前。 */
+  private static final String IDEMPOTENCY_KEY_EXTENSION = "x-idempotency-key";
+
+  /** Idempotency-Key を求める HTTP メソッド。 */
+  private static final Set<PathItem.HttpMethod> UNSAFE_METHODS =
+      EnumSet.of(
+          PathItem.HttpMethod.POST,
+          PathItem.HttpMethod.PUT,
+          PathItem.HttpMethod.PATCH,
+          PathItem.HttpMethod.DELETE);
 
   /** 認証の Cookie セッションを表す securityScheme の名前。 */
   private static final String SESSION_COOKIE_SCHEME = "sessionCookie";
@@ -133,38 +145,20 @@ public class OpenApiConfig {
   }
 
   /**
-   * 全 operation に 401、403、500 の共通 response を付け、入力のある operation にだけ 400 を付ける。
+   * Idempotency-Key を求める operation に必須のキーと 409 を付け、全 operation に共通の Problem response を付ける。
    *
-   * <p>operation ごとに書いた同じ status の response は上書きしない。
+   * <p>キーを求める operation の範囲は docs/web-api/openapi-annotations.md の「作成時のチェックリスト」に示す。
+   * キーを先に付けるので、キーを求める operation には入力の 400 も付く。operation ごとに書いた同じ status の response は上書きしない。
    */
   @Bean
-  public OpenApiCustomizer commonProblemResponses() {
-    return openApi -> forEachOperation(openApi, OpenApiConfig::addCommonProblemResponses);
-  }
-
-  /**
-   * POST、PUT、PATCH、DELETE の operation に、必須の Idempotency-Key と、キーの誤りの 400 を付ける。
-   *
-   * <p>キーの表はテナントごとなので、テナントを選ぶ操作には付けない（ADR-126）。
-   */
-  @Bean
-  public OpenApiCustomizer requireIdempotencyKey() {
-    return openApi -> {
-      final Map<String, PathItem> paths = openApi.getPaths();
-      if (paths == null) {
-        return;
-      }
-      paths.values().stream()
-          .flatMap(
-              item -> Stream.of(item.getPost(), item.getPut(), item.getPatch(), item.getDelete()))
-          .filter(
-              operation -> operation != null && !SELECT_TENANT.equals(operation.getOperationId()))
-          .forEach(operation -> {
-            operation.addParametersItem(
-                new Parameter().$ref("#/components/parameters/" + IDEMPOTENCY_KEY));
-            operation.getResponses().putIfAbsent("400", problemRef("BadRequestProblem"));
-          });
-    };
+  public OpenApiCustomizer commonParametersAndResponses() {
+    return openApi ->
+        forEachOperation(
+            openApi,
+            (method, operation) -> {
+              requireIdempotencyKey(method, operation);
+              addCommonProblemResponses(operation);
+            });
   }
 
   /**
@@ -174,17 +168,18 @@ public class OpenApiConfig {
    */
   @Bean
   public OpenApiCustomizer trimJavadocSummaries() {
-    return openApi -> forEachOperation(openApi, OpenApiConfig::trimJavadoc);
+    return openApi -> forEachOperation(openApi, (method, operation) -> trimJavadoc(operation));
   }
 
-  /** 文書の全 operation に処理を適用する。paths がなければ何もしない。 */
-  private static void forEachOperation(final OpenAPI openApi, final Consumer<Operation> action) {
+  /** 文書の全 operation に、HTTP メソッドと一緒に処理を適用する。paths がなければ何もしない。 */
+  private static void forEachOperation(
+      final OpenAPI openApi, final BiConsumer<PathItem.HttpMethod, Operation> action) {
     final Map<String, PathItem> paths = openApi.getPaths();
     if (paths == null) {
       return;
     }
     for (final PathItem pathItem : paths.values()) {
-      pathItem.readOperations().forEach(action);
+      pathItem.readOperationsMap().forEach(action);
     }
   }
 
@@ -206,6 +201,32 @@ public class OpenApiConfig {
       details = details.substring(3).stripLeading();
     }
     operation.setDescription(details);
+  }
+
+  /**
+   * Idempotency-Key を求める operation に、必須のキーと処理中の 409 を足す。
+   *
+   * <p>同じ名前のヘッダーを Controller が書いていたら、parameter を重ねて足さない。
+   */
+  private static void requireIdempotencyKey(
+      final PathItem.HttpMethod method, final Operation operation) {
+    final Map<String, Object> extensions = operation.getExtensions();
+    if (!UNSAFE_METHODS.contains(method)
+        || extensions != null && "none".equals(extensions.get(IDEMPOTENCY_KEY_EXTENSION))) {
+      return;
+    }
+    final List<Parameter> parameters = operation.getParameters();
+    final boolean declared =
+        parameters != null
+            && parameters.stream()
+                .anyMatch(parameter ->
+                    "header".equals(parameter.getIn())
+                        && IDEMPOTENCY_KEY_HEADER.equalsIgnoreCase(parameter.getName()));
+    if (!declared) {
+      operation.addParametersItem(
+          new Parameter().$ref("#/components/parameters/" + IDEMPOTENCY_KEY));
+    }
+    operation.getResponses().putIfAbsent("409", problemRef("ConflictProblem"));
   }
 
   /** 1 つの operation へ共通の Problem response を足す。 */
@@ -230,13 +251,12 @@ public class OpenApiConfig {
   /** 利用者の操作ごとにクライアントが採番する Idempotency-Key の parameter を作る（ADR-126）。 */
   private static Parameter idempotencyKeyParameter() {
     return new HeaderParameter()
-        .name("Idempotency-Key")
+        .name(IDEMPOTENCY_KEY_HEADER)
         .required(true)
         .description(
-            "利用者の操作ごとにクライアントが採番する冪等性キー。"
+            "利用者の操作ごとにクライアントが採番する冪等性キー（ADR-126）。"
                 + "値は Structured Field の String（引用符付き）で、中身は UUID に限る"
-                + "（draft-ietf-httpapi-idempotency-key-header-08）。"
-                + "自動の再試行は同じキーで送り、利用者が操作し直したときは新しいキーを採る")
+                + "（draft-ietf-httpapi-idempotency-key-header-08）")
         .schema(
             new StringSchema()
                 .pattern(
