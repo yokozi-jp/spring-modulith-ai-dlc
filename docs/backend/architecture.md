@@ -202,9 +202,9 @@ infrastructure.client ───────────────────�
 - `batch` は `application` の Command、Result、CommandHandler、自分のモジュールのルート、`tenancy` のルート、`shared.batch` に依存し、Domain と Infrastructure に依存しない。
   `batch` の依存方向はまだ ArchUnit で検査していない（[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)、[バックエンドのアーキテクチャテスト](architecture-tests.md)）。
 - `infrastructure.persistence` と `infrastructure.client` は `domain.model` のインタフェースを実装し、`application`、`domain.service`、モジュールルートに依存しない。
-- `infrastructure.persistence` は `shared.persistence` と `shared.eventresubmission` に依存してよい。
-  ほかの層は、この 2 つに依存しない。
-- どの層も、上の 2 つ以外の `shared` のパッケージ（[共有モジュール shared](shared-module.md)）に依存してよい。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
+- `infrastructure.persistence` は `shared.persistence` に依存してよい。
+  ほかの層は `shared.persistence` に依存しない。
+- 使う場所を限る `shared` のパッケージ以外は、どの層も依存してよい（[共有モジュール shared](shared-module.md)）。`error` の `presentation.web` も、4 つの例外を 403、404、409、422 にするために依存する。
 - モジュールルートの型は、標準型と同じルートの型のほかに、イベントが運ぶテナントの `shared.tenancy.TenantId` と `shared.tenancy.TenantScoped` だけに依存してよい。`TenantContext` には依存できない。
 - `domain.model` と `domain.service` が使える `shared` の型は、`shared.concurrency`、`shared.failure`、`shared.tenancy.TenantId` に限る（`domain.service` は `shared.failure` と `TenantId`）。
 - Domain と Application は、Presentation、Batch、Infrastructure に依存しない。

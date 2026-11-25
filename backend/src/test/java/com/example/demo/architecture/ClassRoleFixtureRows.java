@@ -41,6 +41,11 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.application.OrderAuditColumns"),
         row(
+            "sharedModuleIsUsedOnlyByPersistenceAdapters: eventresubmission",
+            PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
+                VIOLATING),
+            "ordering.application.OrderResubmission"),
+        row(
             "httpTypesAreNotUsedByInnerLayers: shared",
             PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(VIOLATING),
             "shared.persistence.ChildRowWriter"),

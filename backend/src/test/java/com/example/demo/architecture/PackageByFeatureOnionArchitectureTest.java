@@ -456,10 +456,10 @@ class PackageByFeatureOnionArchitectureTest {
         .dependOnClassesThat()
         .resideInAnyPackage(sharedAdapterPackages(basePackage))
         .because(
-            "shared の永続化の共通処理は技術的な処理であり、"
+            "shared の永続化と再投入の共通処理は技術的な処理であり、"
                 + "使う場所を他のモジュールの infrastructure.persistence に限って、"
                 + "業務の処理が共通処理と共通カラムに依存しないようにするため。"
-                + "直し方：shared の永続化の型を使う処理を <モジュール>.infrastructure.persistence の "
+                + "直し方：shared の永続化と再投入の型を使う処理を <モジュール>.infrastructure.persistence の "
                 + "Jooq<Aggregate>Repository へ移し、Application と Domain からは Repository を通して使う。"
                 + "規約：docs/backend/shared-module.md、"
                 + ADR_048);
