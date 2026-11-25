@@ -58,7 +58,7 @@ ASCII 以外のローカルパートと IDN のドメインは、サーバーも
 ### Neutral
 
 - `@Email` の検査も働くので、`a@x-.com` のようにクライアントが通してサーバーが断る形が少しある。
-- `product` など、`allowedDependencies` が `shared :: validation` を含まないモジュールは、使う前に依存を足す。
+- `product` など、`allowedDependencies` が `shared` を含まないモジュールは、使う前に依存を足す。
 
 ## Alternatives Considered
 

@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-129: 誰が要求したかを application で確かめ、操作と操作する人の組ごとの認可の表で確かめる'
-description: 誰が要求したかを application で確かめ、見える範囲は SQL で絞って 404、役割は @PreAuthorize で 403 にし、確かめ忘れは役割の判断の宣言と認可の表のテストで止める決定。
+description: 誰が要求したかを application で確かめ、見える範囲は SQL で絞って 404、役割は @PreAuthorize で 403 にし、確かめ忘れは認可の表のテストで止める決定。
 tags: [adr, backend, security, authorization, testing]
 ---
 
@@ -66,7 +66,7 @@ application は `SecurityContextHolder` を読まず、利用者を引数で受�
 Spring Security のリファレンスも、複雑な SpEL より権限を与える形を勧める（Favor Granting Authorities Over Complicated SpEL Expressions）。
 
 所属の管理の API の役割も、`TenantSecurityCustomizer` の URL の規則をやめ、`ChangeMemberRoleCommandHandler`、`RemoveMemberCommandHandler`、`TenancyQueryService.findMembers` の `@PreAuthorize("hasRole('ADMIN')")` で確かめる。
-役割の判断を URL の規則と application の 2 か所に分けず、application の宣言だけを見れば分かるようにするためである。
+役割の判断を URL の規則と application の 2 か所に分けず、application の `@PreAuthorize` だけを見れば分かるようにするためである。
 
 method security のアノテーションは `@PreAuthorize` だけを使う。
 `@PostAuthorize` と `@PostFilter` は読んだ後に判断し、`@PreFilter` は受け取った値をメモリで絞るため使わない（選択肢3）。
@@ -78,28 +78,6 @@ application が依存してよい method security の型は、パッケージ `o
 
 Listener とバッチから呼ぶメソッドに `@PreAuthorize` を付けないことは、検査せずレビューで見る。
 Listener、ItemWriter、Tasklet は CommandHandler を 1 つ呼ぶだけなので、呼び出しの経路が 1 段で、差分から読めるためである。
-
-### 役割の判断の宣言
-
-CommandHandler と QueryService の public メソッドは、どれも役割の判断を宣言する（対象の範囲は [バックエンドの層の責務](../backend/layers.md#認可)）。
-役割で許すメソッドには `@PreAuthorize` を付ける。
-役割を問わないメソッドには `shared.security` の `@NoRoleRequired` を付け、役割を問わない根拠を enum の `NoRoleRequired.Basis` で渡す。
-`@NoRoleRequired` は実行時に何もしない。
-
-宣言を求めるのは、認可の表のテストの行が増えないメソッドでは、`@PreAuthorize` の付け忘れが残りうるためである。
-行が増えないのは、operation を通らずに呼ぶメソッド（Listener から呼ぶ `ChargeOrderCommandHandler`）と、既存の operation の後ろに足したメソッドである。
-宣言を求めれば、判断していないメソッドは ArchUnit で止まる。
-
-根拠は、自由な文の `reason` ではなく `Basis` の定数で表す。
-初めの実装の `reason` は空でないことしか検査できず、同じ文を 11 か所に写し、docs の抜粋とコードで文が食い違った。
-定数なら、根拠の種類が 4 つに決まり、同じ根拠のメソッドを定数の参照で探せる。
-持ち主で絞る #188 の未対応は根拠に書かず、認可の表のテストの例外の一覧で追う。
-
-`@NoRoleRequired` はメソッドにだけ付けられる。
-クラスに付ける形を許すと、後からクラスに足したメソッドも、判断しないまま役割を問わないことになるためである。
-1 つのメソッドに両方を付けると、どちらが判断かを読めないため、ArchUnit で拒否する。
-`@PreAuthorize` を付けたクラスのメソッドの `@NoRoleRequired` も拒否する。クラスの `@PreAuthorize` がそのメソッドにも当たり、役割を問わない宣言は効かないためである。
-宣言を役割を問わないメソッドの一覧のファイルに集める形は選ばない（選択肢7）。
 
 ### 応答
 
@@ -133,6 +111,14 @@ Spring Security の method security だけを使う。
 役割は `ROLE_ADMIN` と `ROLE_MEMBER` の 2 つ、関係は注文の持ち主の 1 種類だけで、設定と運用の費用に見合わないためである。
 部署の階層のように役割が入れ子になるとき、または代理や共有のように行ごとに見える人が変わる関係が増えたときは、ライブラリと方針エンジンを入れないこの判断を見直す。
 
+### 見送ったこと
+
+CommandHandler と QueryService のメソッドごとに役割の判断の宣言を求める規則は、この ADR では入れない。
+`@PreAuthorize` の付け忘れは、認可の表のテストが operation 単位で止める。
+Listener から呼ぶメソッドと、既存の operation の後ろに足したメソッドは、表の行が増えないため、役割の判断の誤りが止まらない。
+入れるなら、通常の操作に `hasAnyRole('MEMBER', 'ADMIN')` を付け、付けられない少数のメソッドを ArchUnit の規則に名前で書く形を、別の Issue で決める。
+付けられないのは、Listener から呼ぶ `ChargeOrderCommandHandler`、ログインの途中で呼ぶ `SignInUserCommandHandler`、テナントを選ぶ前に呼ぶ `TenancyQueryService` の `membership` と `memberships` である。
+
 ## Consequences
 
 ### Positive
@@ -140,7 +126,6 @@ Spring Security の method security だけを使う。
 - 見えない行を SQL で読まないため、一覧の件数とページングが見える行だけで決まり、他人の行がアプリのメモリに載らない。
 - 操作を足したときの期待の書き忘れはコンパイルで、他人の id で読めて書ける漏れは Pull Request の CI で止まる。
 - 認可の判断は SQL の WHERE と method security のアノテーションにだけあり、自作の方針の関数と二重にならない。
-- 役割を判断していない CommandHandler と QueryService のメソッドは、operation の後ろにあるかを問わず ArchUnit で止まる。
 - domain が認証の型に依存しないため、domain の単体テストで認証を作らなくてよい。
 
 ### Negative
@@ -148,9 +133,8 @@ Spring Security の method security だけを使う。
 - 認可の表のテストは Spring と DB を起動し、operation の数と 5 種類の操作する人の積だけ要求を送るため、テストの時間が増える。
 - 見える範囲の条件は Repository と `<Feature>Queries` ごとに書く。条件の書き忘れは型では止まらず、認可の表のテストでだけ止まる。
 - `@PreAuthorize` を付けたメソッドは、認証のない呼び出し（Listener、バッチ）から呼ぶと拒否される。役割で許す操作を Listener からも呼ぶ必要が出たら、CommandHandler を分ける。
-- 所属の管理の API は、既定で拒否する形から、既定で許す形に変わる。前の URL の規則は、`/api/current-tenant/members/**` の配下を、足した endpoint も含めて ADMIN に限っていた。今は、足した endpoint が守られるのは、呼ぶ application のメソッドが `@PreAuthorize` を宣言したときだけである。ArchUnit の規則は宣言があることだけを確かめ、`@NoRoleRequired` を誤って選んだ宣言は通す。宣言の中身を確かめるのは、認可の表のテストの期待の表である。
+- 所属の管理の API は、既定で拒否する形から、既定で許す形に変わる。前の URL の規則は、`/api/current-tenant/members/**` の配下を、足した endpoint も含めて ADMIN に限っていた。今は、足した endpoint を守るのは、呼ぶ application のメソッドの `@PreAuthorize` と、認可の表のテストの期待の表だけである。`@PreAuthorize` があることを確かめる検査はない。
 - 所属の管理の API の役割の確かめが、Controller の引数の検証より後に動く method security に移る。そのため、管理者でない利用者にも、形の誤りは 403 より先に 400 で返る（[HTTPステータスコードの選択](../web-api/status-codes.md#判断に迷うユースケース)）。
-- CommandHandler と QueryService を足すたびに、`@PreAuthorize` か `@NoRoleRequired` を書く手間が増える。
 
 ### Neutral
 
@@ -195,19 +179,6 @@ Spring Security の method security だけを使う。
 - **Description**：向こうの網羅のテストのように、方針の関数と domain の遷移を単体テストで網羅し、BOLA は別の結合テストで確かめる。
 - **Pros**：Spring と DB を起動しないため、テストが速い。
 - **Cons**：こちらの判断は SQL の WHERE とアノテーションにあり、単体テストでは動かない。API の結合テスト 1 つ（認可の表のテスト）にまとめる。
-
-### 選択肢7: 役割を問わないメソッドを 1 つのファイルの一覧に持つ
-
-- **Description**：役割を問わないメソッドの名前を、ArchUnit のテストの側か設定のファイルの許可の一覧に並べる。一覧にも `@PreAuthorize` もないメソッドを失敗にする。
-- **Pros**：アノテーションの型を足さずに済み、役割を問わないメソッドを 1 か所で見渡せる。
-- **Cons**：一覧が CommandHandler から離れ、メソッドの差分を読んでも判断が見えない。メソッドを改名、削除しても一覧の行が残るため、残った行を消す検査も要る。`@NoRoleRequired` なら、判断と根拠がメソッドの宣言と同じ差分に載る。
-
-### 選択肢8: 役割を問わない宣言に @PreAuthorize("permitAll()") を使う
-
-- **Description**：新しいアノテーションを足さず、役割を問わないメソッドに `@PreAuthorize("permitAll()")` を付ける。
-- **Pros**：アノテーションの型を足さずに済み、宣言を `@PreAuthorize` の有無だけで検査できる。
-- **Cons**：`permitAll()` は役割を問わない根拠を持てず、`TENANT_SCOPED` と `CALLED_WITHOUT_AUTHENTICATION` を区別できない。`preAuthorizeUsesOnlyRoleOrAuthorityNames` にも `permitAll()` の例外が要る。
-Spring Security 7.2.0 で確かめると、Authentication のない呼び出しでも `permitAll()` は拒否されない（`hasRole('ADMIN')` は `AuthenticationCredentialsNotFoundException` で拒否される）。Listener から呼べないことは、この案を採らない理由にならない。
 
 ## References
 

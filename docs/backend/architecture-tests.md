@@ -324,16 +324,12 @@ Class <archfixture.violating.ordering.application.ShipOrderCommandHandler> is me
 
 ## 認可
 
-`AuthorizationArchTest`は、method securityのアノテーションの置き場所と値、役割の判断の宣言を検査する。
-守らせる規約と、宣言の検査の対象の範囲は、[バックエンドの層の責務](layers.md#認可)に示す。
+`AuthorizationArchTest`は、method securityのアノテーションの置き場所と値を検査する。
+守らせる規約は、[バックエンドの層の責務](layers.md#認可)に示す。
 
 - `methodSecurityAnnotationsAreOnlyOnApplicationClasses`：`@PreAuthorize`、`@PostAuthorize`、`@PreFilter`、`@PostFilter`、`@Secured`を、クラスか宣言したメソッドに、直接かメタアノテーションとして持つクラスは、階層に`application`を含むパッケージ（`..application..`）に置く。
   違反フィクスチャの`ordering.presentation.web.OrderPurgeController`（Controllerに`@PreAuthorize`を付けた）で確かめる。
 - `preAuthorizeUsesOnlyRoleOrAuthorityNames`：`@PreAuthorize`の値を、`hasRole`、`hasAnyRole`、`hasAuthority`、`hasAnyAuthority`に文字列のリテラルを渡す式に限る。
-- `applicationHandlersDeclareAuthorization`：役割の判断の宣言（`@PreAuthorize`か`@NoRoleRequired`）がないCommandHandlerとQueryServiceのpublicメソッドを拒否する。
-  違反フィクスチャの`ordering.application.UndeclaredRoleCommandHandler`と`UndeclaredRoleQueryService`で確かめる。
-- `authorizationIsDeclaredOnlyOnce`：`@PreAuthorize`と`@NoRoleRequired`を両方付けたメソッドと、`@PreAuthorize`を付けたクラスの`@NoRoleRequired`のメソッドを拒否する。
-  違反フィクスチャの`ordering.application.DoublyAuthorizedCommandHandler`（同じメソッドに両方）と`AdminExemptingCommandHandler`（`@PreAuthorize`のクラスのメソッドに`@NoRoleRequired`）で確かめる。
 
 ## 日時
 

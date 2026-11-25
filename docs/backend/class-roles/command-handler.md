@@ -40,7 +40,7 @@ CommandHandler は他モジュールから呼ばれない。
   呼び出し側が interface だけに依存すると、外部システムに依存する CommandHandler を Listener だけが呼ぶ規則を迂回できる（ArchUnit で検査：ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces）。
 - public メソッドは `public <UseCase>Result handle(final <UseCase>Command command)` の一つだけにする。
   `handle` に `@Transactional` を付け、クラスには付けない。
-- `handle` に、役割の判断として `@PreAuthorize` か `@NoRoleRequired` を付ける（[認可](../layers.md#認可)）。
+- 役割で許す操作は、`handle` に `@PreAuthorize` を付ける（[認可](../layers.md#認可)）。
 - 依存は public のコンストラクタで受け取り、`private final` フィールドに持つ。
 - `handle` の中で、Command の標準型の値を値オブジェクトに変換する（`new OrderId(UUID.fromString(command.orderId()))`）。
 - 集約が見つからないときは、`.orElseThrow(() -> new NotFoundException("order not found: orderId=" + command.orderId()))` で `shared.failure` の `NotFoundException` を投げる。
@@ -83,7 +83,7 @@ Command の形式は、Controller の `@Valid` で検証済みである。
 
 ## 依存してよい型、してはいけない型
 
-- **依存してよい型**：`java..` の標準型（`Clock` を含む）、`org.jspecify..`、`shared.failure` と `shared.concurrency` の例外、同じ `application` の Command と Result、同じモジュールの `domain.model`（集約、値オブジェクト、Repository、外部システムのインタフェース（Listener から呼ばれる CommandHandler だけ））と `domain.service`、モジュールルートの型、他モジュールの `<Feature>Queries` とルートの record、`@Service`、`@Transactional`、役割を確かめる `@PreAuthorize` と役割を問わない `shared.security` の `@NoRoleRequired`（[認可](../layers.md#認可)）、`ApplicationEventPublisher`、ログの `org.slf4j..`（`@Slf4j`）、Listener の `@ApplicationModuleListener`。
+- **依存してよい型**：`java..` の標準型（`Clock` を含む）、`org.jspecify..`、`shared.failure` と `shared.concurrency` の例外、同じ `application` の Command と Result、同じモジュールの `domain.model`（集約、値オブジェクト、Repository、外部システムのインタフェース（Listener から呼ばれる CommandHandler だけ））と `domain.service`、モジュールルートの型、他モジュールの `<Feature>Queries` とルートの record、`@Service`、`@Transactional`、役割を確かめる `@PreAuthorize`（[認可](../layers.md#認可)）、`ApplicationEventPublisher`、ログの `org.slf4j..`（`@Slf4j`）、Listener の `@ApplicationModuleListener`。
 - **依存してはいけない型**：別の CommandHandler、Presentation の型（Request、Response）、Infrastructure の型（`JooqOrderRepository`、`PaymentGatewayClient`）、jOOQ の API と生成型、他モジュールの内部パッケージの型。
 
 ## 最小の例と典型的な例
@@ -117,7 +117,6 @@ public class CancelOrderCommandHandler {
   }
 
   /** ロック番号を確かめて注文を取り消して保存し、取消のイベントを発行する。 */
-  @NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
   @Transactional
   public CancelOrderResult handle(final CancelOrderCommand command) {
     final Order order =
@@ -140,7 +139,6 @@ public class CancelOrderCommandHandler {
 
 ```java
 /** 上限を確かめて注文を受け付け、会員ランクの割引を適用して保存し、受付のイベントを発行する。 */
-@NoRoleRequired(NoRoleRequired.Basis.TENANT_SCOPED)
 @Transactional
 public PlaceOrderResult handle(final PlaceOrderCommand command) {
   final CustomerId customerId = new CustomerId(command.customerId());
@@ -208,7 +206,6 @@ return new ConfirmOrderResult(order.id().value().toString());
 ```java
 // com.example.demo.ordering.application.ChargeOrderCommandHandler（抜粋）
 /** 支払い済みでない注文の代金を、注文 ID を冪等性キーにして請求し、支払い済みにして保存する。 */
-@NoRoleRequired(NoRoleRequired.Basis.CALLED_WITHOUT_AUTHENTICATION)
 @Transactional
 public ChargeOrderResult handle(final ChargeOrderCommand command) {
   final Order order =
@@ -300,7 +297,6 @@ class CancelOrderCommandHandlerTest {
 - [ ] `@Service` を付けた型は `application` か `domain.service` にだけ置く。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService］
 - [ ] public メソッドは `@Transactional` を付けた `handle` 一つにし、Command を受け取って Result を返す。［ArchUnit で検査：ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle］
 - [ ] クラスに `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel］
-- [ ] `handle` に `@PreAuthorize` か、根拠の `Basis` を渡した `@NoRoleRequired` を付ける。［ArchUnit で検査：AuthorizationArchTest.applicationHandlersDeclareAuthorization］
 - [ ] 別の CommandHandler に依存しない。［ArchUnit で検査：ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers］
 - [ ] 他モジュールの CommandHandler と内部パッケージの型を使わない。［Spring Modulith で検査：ApplicationModuleArchitectureTest］
 - [ ] Presentation と Infrastructure に依存しない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
