@@ -346,6 +346,12 @@ server:
 # Actuator: 監視・ヘルスチェック用エンドポイント
 # ローカル・本番（ECS）共通。ECS/ALB のヘルスチェックは /actuator/health/readiness を使う。
 management:
+  observations:
+    conventions: open-telemetry
+  metrics:
+    distribution:
+      slo:
+        "[http.server.request.duration]": 5ms,10ms,25ms,50ms,75ms,100ms,250ms,500ms,750ms,1s,2500ms,5s,7500ms,10s
   endpoints:
     web:
       exposure:
@@ -366,6 +372,7 @@ management:
     metrics:
       export:
         url: ${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics
+        base-time-unit: seconds
   opentelemetry:
     resource-attributes:
       "[service.name]": ${OTEL_SERVICE_NAME}
@@ -375,6 +382,7 @@ management:
       # 既定値は環境変数ではなく jar の版なので、環境変数に既定値を置かない方針の対象外である。
       "[service.version]": ${spring.application.version:unknown}
       "[deployment.environment.name]": ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME}
+      "[service.instance.id]": ${random.uuid}
     tracing:
       export:
         otlp:
