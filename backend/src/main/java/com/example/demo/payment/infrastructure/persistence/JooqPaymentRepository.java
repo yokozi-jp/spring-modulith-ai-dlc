@@ -54,7 +54,6 @@ class JooqPaymentRepository implements PaymentRepository {
 
   @Override
   public boolean add(final Payment payment) {
-    // 衝突を許すのは uk_2_t_payment（注文ごとに 1 件）だけ。public_id の衝突は ConflictException のまま投げる。
     return tableWriter.insertIfAbsent(
         PAYMENT,
         payment,

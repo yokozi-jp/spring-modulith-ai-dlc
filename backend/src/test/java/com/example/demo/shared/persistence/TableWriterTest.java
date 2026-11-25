@@ -441,7 +441,6 @@ class TableWriterTest {
                 set -> set.set(FIXTURE_ITEM.ITEM_NAME, "second"),
                 detailRows(List.of(detail(1, "one")))));
 
-    // 例外にならないので、トランザクションは中断されず、続けて読める。
     assertThat(inserted).isFalse();
     final Record row = item(1L);
     assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("first");

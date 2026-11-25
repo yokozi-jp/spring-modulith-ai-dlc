@@ -69,7 +69,6 @@ public class ChargeOrderCommandHandler {
   @Transactional
   public ChargeOrderResult handle(final ChargeOrderCommand command) {
     final OrderId orderId = new OrderId(UUID.fromString(command.orderId()));
-    // 決済代行の呼び出しを省く先読みで、重複の判定ではない。判定は add の ON CONFLICT が行う。
     final Optional<Payment> existing = paymentRepository.findByOrderId(orderId);
     if (existing.isPresent()) {
       return new ChargeOrderResult.AlreadyRecorded(existing.get().id().value().toString());
