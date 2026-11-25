@@ -1,13 +1,11 @@
 package com.example.demo.error.presentation.web;
 
-import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.FailureReason;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.ElementKind;
 import java.net.URI;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -29,29 +27,11 @@ import org.springframework.validation.method.ParameterErrors;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 
 /** RFC 9457 Problem Details の共通フィールドを生成する。 */
-// problem type ごとの生成と検証の誤りの組み立てを 1 つの MessageSource に集めるため、メソッドの数の上限を外す。
-// type と title の対応は typedProblem の 1 か所に閉じている。型ごとに分けると MessageSource の受け渡しが増える。
+// Problem Details と検証の誤りの組み立てを 1 つの MessageSource に集めるため、メソッドの数の上限を外す。
+// type と title のキーは ProblemTypes が作る。
 @SuppressWarnings("PMD.TooManyMethods")
 @Component
 final class ApiProblemDetails {
-
-  /** RFC 9457 が一般的な HTTP エラーに定義する problem type。 */
-  private static final URI ABOUT_BLANK = URI.create("about:blank");
-
-  /** 業務固有の problem type の接頭辞。パスを全部書いた相対 URI にする（ADR-058、RFC 9457 §3.1.1）。 */
-  private static final String PROBLEM_TYPE_PREFIX = "/problems/";
-
-  /** problem の title の MessageSource のキーの接頭辞。 */
-  private static final String TITLE_PREFIX = "problem.title.";
-
-  /** 入力検証エラーの problem type の名前。 */
-  private static final String VALIDATION_ERROR = "validation-error";
-
-  /** CSRF トークンの検証失敗の problem type の名前。 */
-  private static final String CSRF_TOKEN_INVALID = "csrf-token-invalid";
-
-  /** テナントを選ぶ前の 403 の problem type の名前。 */
-  private static final String TENANT_NOT_SELECTED = "tenant-not-selected";
 
   /** 入力検証エラー（/problems/validation-error）の拡張メンバーで、入力検証の誤りを入れる（ADR-058）。 */
   /* package */ static final String ERRORS = "errors";
@@ -89,9 +69,9 @@ final class ApiProblemDetails {
    */
   /* package */ void normalize(
       final ProblemDetail problem, final HttpStatusCode status, final Locale locale) {
-    final URI type = Objects.requireNonNullElse(problem.getType(), ABOUT_BLANK);
+    final URI type = Objects.requireNonNullElse(problem.getType(), ProblemTypes.ABOUT_BLANK);
     problem.setType(type);
-    if (ABOUT_BLANK.equals(type)) {
+    if (ProblemTypes.ABOUT_BLANK.equals(type)) {
       problem.setDetail(null);
       final HttpStatus titleStatus =
           status instanceof HttpStatus httpStatus
@@ -103,111 +83,37 @@ final class ApiProblemDetails {
     }
   }
 
-  /**
-   * 入力検証エラーの 400 を作る。title は problem.title.validation-error を解決し、detail は付けない。
-   *
-   * <p>normalize は about:blank 以外の title と detail を変えないため、ここで title を決める。
-   */
+  /** 入力検証エラーの 400 を作る。title は {@link CommonProblem#VALIDATION_ERROR} の title を解決し、detail は付けない。 */
   /* package */ ProblemDetail validationProblem(
       final List<ValidationError> errors, final Locale locale) {
-    final ProblemDetail problem =
-        businessProblem(
-            HttpStatus.BAD_REQUEST, VALIDATION_ERROR, "Invalid request content", locale);
+    final ProblemDetail problem = problem(CommonProblem.VALIDATION_ERROR, locale);
     problem.setProperty(ERRORS, errors);
     return problem;
   }
 
-  /** CSRF トークンの検証失敗の 403 を作る。title は problem.title.csrf-token-invalid を解決し、detail は付けない。 */
-  /* package */ ProblemDetail csrfTokenProblem(final Locale locale) {
-    return businessProblem(
-        HttpStatus.FORBIDDEN, CSRF_TOKEN_INVALID, "Invalid or missing CSRF token", locale);
+  /** モジュールによらない problem を作る。detail は付けない（ADR-125）。 */
+  /* package */ ProblemDetail problem(final CommonProblem common, final Locale locale) {
+    return typedProblem(common.status(), ProblemTypes.path(common), locale);
   }
 
-  /** テナントを選ぶ前の 403 を作る。title は problem.title.tenant-not-selected を解決し、detail は付けない。 */
-  /* package */ ProblemDetail tenantNotSelectedProblem(final Locale locale) {
-    return businessProblem(HttpStatus.FORBIDDEN, TENANT_NOT_SELECTED, "No tenant selected", locale);
-  }
-
-  /**
-   * 業務規則の違反の 422 を作る。type は理由の {@link FailureReason#type()}、title は {@link
-   * FailureReason#titleKey()} を解決し、detail は付けない（ADR-125）。
-   */
+  /** 業務規則の違反の 422 を作る。type と title は理由から決まり、detail は付けない（ADR-125）。 */
   /* package */ ProblemDetail businessRuleViolationProblem(
       final FailureReason reason, final Locale locale) {
-    final HttpStatus status = HttpStatus.UNPROCESSABLE_CONTENT;
-    return typedProblem(
-        status, reason.type(), reason.titleKey(), statusTitle(status, locale), locale);
+    return typedProblem(HttpStatus.UNPROCESSABLE_CONTENT, ProblemTypes.path(reason), locale);
   }
 
   /**
-   * 競合の 409 を作る。type は {@code /problems/<種類の名前>}、title は {@code problem.title.<種類の名前>} を解決し、detail
-   * は付けない（ADR-125）。
-   */
-  /* package */ ProblemDetail conflictProblem(
-      final ConflictException.Kind kind, final Locale locale) {
-    final HttpStatus status = HttpStatus.CONFLICT;
-    final String name = conflictProblemName(kind);
-    return typedProblem(
-        status,
-        PROBLEM_TYPE_PREFIX + name,
-        TITLE_PREFIX + name,
-        statusTitle(status, locale),
-        locale);
-  }
-
-  /** 競合の種類ごとの problem type の名前を返す。モジュールによらず共通にする（ADR-125）。 */
-  /* package */ static String conflictProblemName(final ConflictException.Kind kind) {
-    return switch (kind) {
-      case VERSION -> "version-conflict";
-      case LOCK -> "lock-timeout";
-      case UNIQUE -> "unique-violation";
-    };
-  }
-
-  /**
-   * 応答が返しうる problem type を、about:blank、モジュールによらない type、業務規則の違反の type の順に返す。 OpenAPI の {@code
-   * ProblemDetail.type} に載せる。
+   * パスの type と、パスの title のキーを解決した title を持つ Problem Details を作る。キーがなければ status の title にする。
    *
-   * @param reasons 業務規則の違反の理由のすべて
+   * <p>normalize は about:blank 以外の title と detail を変えないため、ここで title を決め、detail は付けない。
    */
-  /* package */ static List<String> problemTypes(final List<FailureReason> reasons) {
-    final Stream<String> named =
-        Stream.concat(
-                Stream.of(VALIDATION_ERROR, CSRF_TOKEN_INVALID, TENANT_NOT_SELECTED),
-                Arrays.stream(ConflictException.Kind.values())
-                    .map(ApiProblemDetails::conflictProblemName))
-            .map(name -> PROBLEM_TYPE_PREFIX + name);
-    return Stream.concat(
-            Stream.concat(Stream.of(ABOUT_BLANK.toString()), named),
-            reasons.stream().map(FailureReason::type).sorted())
-        .toList();
-  }
-
-  /**
-   * 業務固有の problem type の Problem Details を作る。
-   *
-   * <p>type は {@code /problems/<kebab-case>}、title は {@code problem.title.<kebab-case>} を解決する。
-   * normalize は about:blank 以外の title と detail を変えないため、ここで title を決め、detail は付けない。
-   */
-  private ProblemDetail businessProblem(
-      final HttpStatus status,
-      final String kebabName,
-      final String defaultTitle,
-      final Locale locale) {
-    return typedProblem(
-        status, PROBLEM_TYPE_PREFIX + kebabName, TITLE_PREFIX + kebabName, defaultTitle, locale);
-  }
-
-  /** type と、title のキーを解決した title を持つ Problem Details を作る。キーがなければ defaultTitle にする。 */
   private ProblemDetail typedProblem(
-      final HttpStatus status,
-      final String type,
-      final String titleKey,
-      final String defaultTitle,
-      final Locale locale) {
+      final HttpStatus status, final String path, final Locale locale) {
     final ProblemDetail problem = ProblemDetail.forStatus(status);
-    problem.setType(URI.create(type));
-    problem.setTitle(messageSource.getMessage(titleKey, null, defaultTitle, locale));
+    problem.setType(ProblemTypes.type(path));
+    problem.setTitle(
+        messageSource.getMessage(
+            ProblemTypes.titleKey(path), null, statusTitle(status, locale), locale));
     return problem;
   }
 
@@ -215,7 +121,8 @@ final class ApiProblemDetails {
   private String statusTitle(final HttpStatus status, final Locale locale) {
     final String reasonPhrase = status.getReasonPhrase();
     return Objects.requireNonNullElse(
-        messageSource.getMessage(TITLE_PREFIX + status.value(), null, reasonPhrase, locale),
+        messageSource.getMessage(
+            ProblemTypes.TITLE_PREFIX + status.value(), null, reasonPhrase, locale),
         reasonPhrase);
   }
 

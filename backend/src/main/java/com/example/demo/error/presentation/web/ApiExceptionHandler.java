@@ -65,17 +65,16 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
     final Locale locale = resolveLocale(request);
-    final ProblemDetail body;
     // Invalid と Missing の親にあたる CsrfException で受け、subtype が増えても専用の type にする。
     if (exception instanceof CsrfException) {
-      body = problemDetails.csrfTokenProblem(locale);
-    } else if (exception instanceof TenantNotSelectedException) {
-      body = problemDetails.tenantNotSelectedProblem(locale);
-    } else {
-      body = ProblemDetail.forStatus(HttpStatus.FORBIDDEN);
+      return problem(
+          exception, problemDetails.problem(CommonProblem.CSRF_TOKEN_INVALID, locale), request);
     }
-    return handleExceptionInternal(
-        exception, body, new HttpHeaders(), HttpStatus.FORBIDDEN, request);
+    if (exception instanceof TenantNotSelectedException) {
+      return problem(
+          exception, problemDetails.problem(CommonProblem.TENANT_NOT_SELECTED, locale), request);
+    }
+    return problem(exception, HttpStatus.FORBIDDEN, request);
   }
 
   /** メソッド検証の違反を 400 にする。戻り値の違反は実装の不備なので 500 にする。 */
@@ -85,21 +84,21 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     if (ApiProblemDetails.hasReturnValueViolation(exception)) {
       return problem(exception, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
-    final ProblemDetail body =
+    return problem(
+        exception,
         problemDetails.validationProblem(
-            ApiProblemDetails.validationErrors(exception), resolveLocale(request));
-    return handleExceptionInternal(
-        exception, body, new HttpHeaders(), HttpStatus.BAD_REQUEST, request);
+            ApiProblemDetails.validationErrors(exception), resolveLocale(request)),
+        request);
   }
 
   /** 競合を、種類ごとの type の 409 Problem Details へ変換する。例外のメッセージは応答に入れない。 */
   @ExceptionHandler(ConflictException.class)
   /* package */ @Nullable ResponseEntity<Object> handleConflictException(
       final ConflictException exception, final WebRequest request) {
-    final ProblemDetail body =
-        problemDetails.conflictProblem(exception.kind(), resolveLocale(request));
-    return handleExceptionInternal(
-        exception, body, new HttpHeaders(), HttpStatus.CONFLICT, request);
+    return problem(
+        exception,
+        problemDetails.problem(CommonProblem.forConflict(exception.kind()), resolveLocale(request)),
+        request);
   }
 
   /** 見つからない集約や行を 404 Problem Details へ変換する。例外の内容は応答に入れない。 */
@@ -113,10 +112,10 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   @ExceptionHandler(BusinessRuleViolationException.class)
   /* package */ @Nullable ResponseEntity<Object> handleBusinessRuleViolationException(
       final BusinessRuleViolationException exception, final WebRequest request) {
-    final ProblemDetail body =
-        problemDetails.businessRuleViolationProblem(exception.reason(), resolveLocale(request));
-    return handleExceptionInternal(
-        exception, body, new HttpHeaders(), HttpStatus.UNPROCESSABLE_CONTENT, request);
+    return problem(
+        exception,
+        problemDetails.businessRuleViolationProblem(exception.reason(), resolveLocale(request)),
+        request);
   }
 
   /** MVC 内の未処理例外を、実装詳細を含まない 500 Problem Details へ変換する。 */
@@ -200,8 +199,14 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
 
   private @Nullable ResponseEntity<Object> problem(
       final Exception exception, final HttpStatus status, final WebRequest request) {
+    return problem(exception, ProblemDetail.forStatus(status), request);
+  }
+
+  /** 本文の status で応答する。 */
+  private @Nullable ResponseEntity<Object> problem(
+      final Exception exception, final ProblemDetail body, final WebRequest request) {
     return handleExceptionInternal(
-        exception, ProblemDetail.forStatus(status), new HttpHeaders(), status, request);
+        exception, body, new HttpHeaders(), HttpStatusCode.valueOf(body.getStatus()), request);
   }
 
   private static void logFailure(final Exception ex, final HttpStatusCode status) {

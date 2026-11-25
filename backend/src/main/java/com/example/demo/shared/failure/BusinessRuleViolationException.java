@@ -15,8 +15,15 @@ public final class BusinessRuleViolationException extends RuntimeException {
   /** 違反の理由。 */
   private final FailureReason failureReason;
 
-  /** 理由とログ用のメッセージから業務規則の違反の例外を作る。原因は持たない。 */
-  public BusinessRuleViolationException(final FailureReason reason, final String message) {
+  /**
+   * 理由とログ用のメッセージから業務規則の違反の例外を作る。原因は持たない。
+   *
+   * <p>理由を enum の定数に限る。type は定数の名前から作るため、enum でない実装は名前を保てない（ADR-125）。
+   *
+   * @param <E> 理由の enum
+   */
+  public <E extends Enum<E> & FailureReason> BusinessRuleViolationException(
+      final E reason, final String message) {
     // 原因を持たせない。原因の例外のメッセージが SQL や入力値をログに出さないようにするため（ADR-062）。
     super(message, null);
     this.failureReason = reason;

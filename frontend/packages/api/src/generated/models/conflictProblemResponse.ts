@@ -5,6 +5,6 @@
 import type { ProblemDetail } from './problemDetail.ts';
 
 /**
- * ほかの要求と競合した。版が一致しないときの type は /problems/version-conflict、行ロックを待ち切れなかったときは /problems/lock-timeout、一意制約に違反したときは /problems/unique-violation
+ * ほかの要求と競合した。type は競合の種類ごとに異なり、ProblemDetail.type の x-extensible-enum に載る
  */
 export type ConflictProblemResponse = ProblemDetail;

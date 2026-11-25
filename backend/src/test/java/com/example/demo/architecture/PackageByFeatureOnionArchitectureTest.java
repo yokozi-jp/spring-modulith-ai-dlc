@@ -166,6 +166,11 @@ class PackageByFeatureOnionArchitectureTest {
   /* package */ static final ArchRule httpErrorsAreMappedOnlyInErrorPresentationWeb =
       httpErrorsAreMappedOnlyInErrorPresentationWebRule(BASE_PACKAGE);
 
+  /** 422 の理由を、ベースパッケージの下のモジュールに置いた enum に限る。 */
+  @ArchTest
+  /* package */ static final ArchRule failureReasonsAreModuleEnums =
+      failureReasonsAreModuleEnumsRule(BASE_PACKAGE);
+
   /** 機能ルートの公開契約は、標準型、JSpecify、同じルートパッケージの型だけに依存させる。 */
   @ArchTest
   /* package */ static final ArchRule moduleApiDoesNotExposeInternalTypes =
@@ -538,6 +543,28 @@ class PackageByFeatureOnionArchitectureTest {
                 + "例外の変換と Problem Details の組み立ては error.presentation.web の ApiExceptionHandler と "
                 + "ApiProblemDetails に置く。"
                 + "規約：docs/backend/class-roles/business-exception.md、docs/web-api/status-codes.md");
+  }
+
+  /**
+   * {@code shared.failure.FailureReason} を実装する型を、ベースパッケージの下のモジュールに置いた enum に限る規則を組み立てる。
+   *
+   * <p>フィクスチャは自分の {@code shared.failure} に同じ名前の interface を持つため、型を名前で指す。
+   */
+  /* package */ static ArchRule failureReasonsAreModuleEnumsRule(final String basePackage) {
+    return classes()
+        .that()
+        .implement(basePackage + ".shared.failure.FailureReason")
+        .should()
+        .beEnums()
+        .andShould()
+        .resideInAPackage(basePackage + ".*..")
+        .allowEmptyShould(true)
+        .because(
+            "problem type は理由を置いたモジュールの名前と enum の定数の名前から作り、"
+                + "enum でない型やモジュールの外の型では type が定まらないため。"
+                + "直し方：理由を enum にし、com.example.demo.<module> の下の、理由を投げる層のパッケージに置く。"
+                + "規約：docs/backend/class-roles/business-exception.md、"
+                + "docs/adr/ADR-125-derive-problem-types-from-failure-reasons.md");
   }
 
   /**

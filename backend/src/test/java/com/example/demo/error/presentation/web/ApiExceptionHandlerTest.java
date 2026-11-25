@@ -11,10 +11,10 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.example.demo.ordering.domain.model.OrderFailure;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
+import errorfixture.presentation.web.ErrorFixtureFailure;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
@@ -29,9 +29,11 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.catalina.connector.ClientAbortException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -58,8 +60,13 @@ import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.server.ResponseStatusException;
 
 /** 例外を Problem Details へ変換し、ログを 1 か所で出し、切断とコミット済みの応答、楽観的ロックの競合の 409、子の行がない更新の 422 を扱うことを検証する。 */
-// 例外の種類ごとの変換をテストに分けるため、メソッドの数の上限を外す。
-@SuppressWarnings({"PMD.AvoidDuplicateLiterals", "PMD.TooManyStaticImports", "PMD.TooManyMethods"})
+// 例外の種類ごとの変換とログを 1 つのクラスのテストに分けるため、メソッドの数と結合の上限を外す。
+@SuppressWarnings({
+  "PMD.AvoidDuplicateLiterals",
+  "PMD.CouplingBetweenObjects",
+  "PMD.TooManyStaticImports",
+  "PMD.TooManyMethods"
+})
 @ExtendWith(OutputCaptureExtension.class)
 class ApiExceptionHandlerTest {
 
@@ -137,46 +144,62 @@ class ApiExceptionHandlerTest {
 
   private static Stream<Arguments> conflictKinds() {
     return Stream.of(
-        Arguments.of(ConflictException.Kind.VERSION, "version"),
-        Arguments.of(ConflictException.Kind.LOCK, "lock"),
-        Arguments.of(ConflictException.Kind.UNIQUE, "unique"));
+        Arguments.of(ConflictException.Kind.VERSION, "version", "/problems/version-conflict"),
+        Arguments.of(ConflictException.Kind.LOCK, "lock", "/problems/lock-timeout"),
+        Arguments.of(ConflictException.Kind.UNIQUE, "unique", "/problems/unique-violation"));
   }
 
-  @ParameterizedTest
-  @MethodSource("conflictKinds")
-  @DisplayName("ConflictException は 409 を返し、INFO で例外の型と conflict.kind を残す")
+  /** handler の応答と、その間の ApiExceptionHandler の記録。 */
+  private record Handled(@Nullable ResponseEntity<Object> response, List<ILoggingEvent> events) {}
+
+  /** 検証対象の logger に appender を付けて handler を呼び、応答と記録を返す。 */
   // 記録を書くのではなく、検証対象の logger に appender を付けて読むため、LoggerFactory を使う。
   @SuppressWarnings("PMD.UseLombokSlf4j")
-  void conflictExceptionIsLoggedAtInfo(final ConflictException.Kind kind, final String value) {
+  private static Handled handle(
+      final Function<ApiExceptionHandler, @Nullable ResponseEntity<Object>> call) {
     // key-value はコンソールの書式によって出ないため、Logback の記録そのものを読む。
     final Logger logger = (Logger) LoggerFactory.getLogger(ApiExceptionHandler.class);
     final ListAppender<ILoggingEvent> appender = new ListAppender<>();
     appender.start();
     logger.addAppender(appender);
-    final ResponseEntity<Object> response;
     try {
-      response =
-          handler()
-              .handleConflictException(
-                  new ConflictException(kind, "order was updated by another request"),
-                  new ServletWebRequest(new MockHttpServletRequest()));
+      return new Handled(call.apply(handler()), appender.list);
     } finally {
       logger.detachAppender(appender);
     }
+  }
 
+  private static Map<String, Object> keyValues(final ILoggingEvent event) {
+    return event.getKeyValuePairs().stream()
+        .collect(Collectors.toMap(pair -> pair.key, pair -> pair.value));
+  }
+
+  @ParameterizedTest
+  @MethodSource("conflictKinds")
+  @DisplayName("ConflictException は種類ごとの type の 409 を返し、INFO で例外の型と conflict.kind を残す")
+  void conflictExceptionIsLoggedAtInfo(
+      final ConflictException.Kind kind, final String value, final String type) {
+    final Handled handled =
+        handle(handler ->
+            handler.handleConflictException(
+                new ConflictException(kind, "order was updated by another request"),
+                new ServletWebRequest(new MockHttpServletRequest())));
+
+    final ResponseEntity<Object> response = handled.response();
     assertNotNull(response, "応答");
     assertEquals(HttpStatus.CONFLICT, response.getStatusCode(), "HTTP status");
-    assertEquals(1, appender.list.size(), "記録の件数");
-    final ILoggingEvent event = appender.list.getFirst();
+    final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    assertEquals(URI.create(type), body.getType(), "type");
+    assertNull(body.getDetail(), "detail");
+    assertEquals(1, handled.events().size(), "記録の件数");
+    final ILoggingEvent event = handled.events().getFirst();
     assertEquals("API conflict", event.getMessage(), "event 名");
     assertEquals(Level.INFO, event.getLevel(), "レベル");
     assertNotNull(event.getThrowableProxy(), "例外");
     assertEquals(
         ConflictException.class.getName(), event.getThrowableProxy().getClassName(), "例外の型");
-    final Map<String, Object> keyValues =
-        event.getKeyValuePairs().stream()
-            .collect(Collectors.toMap(pair -> pair.key, pair -> pair.value));
-    assertEquals(Map.of("http.response.status_code", 409, "conflict.kind", value), keyValues, "属性");
+    assertEquals(
+        Map.of("http.response.status_code", 409, "conflict.kind", value), keyValues(event), "属性");
   }
 
   @Test
@@ -194,18 +217,24 @@ class ApiExceptionHandlerTest {
   }
 
   @Test
-  @DisplayName("BusinessRuleViolationException は 422 を返し、ERROR と WARN ではなく INFO で例外の型を残す")
+  @DisplayName("BusinessRuleViolationException は理由の type の 422 を返し、ERROR と WARN ではなく INFO で例外の型を残す")
   void businessRuleViolationExceptionIsLoggedAtInfo(final CapturedOutput output) {
-    final ResponseEntity<Object> response =
-        handler()
-            .handleBusinessRuleViolationException(
+    final Handled handled =
+        handle(handler ->
+            handler.handleBusinessRuleViolationException(
                 new BusinessRuleViolationException(
-                    OrderFailure.NOT_DRAFT, "order is not draft: orderId=1"),
-                new ServletWebRequest(new MockHttpServletRequest()));
+                    ErrorFixtureFailure.REJECTED, "order is not draft: orderId=1"),
+                new ServletWebRequest(new MockHttpServletRequest())));
 
+    final ResponseEntity<Object> response = handled.response();
     assertNotNull(response, "応答");
     assertEquals(HttpStatus.UNPROCESSABLE_CONTENT, response.getStatusCode(), "HTTP status");
+    final ProblemDetail body = assertInstanceOf(ProblemDetail.class, response.getBody(), "本文");
+    assertEquals(URI.create("/problems/error-fixture/rejected"), body.getType(), "type");
+    assertNull(body.getDetail(), "detail");
     assertBusinessFailureLoggedAtInfo(output.getAll(), BusinessRuleViolationException.class);
+    assertEquals(
+        Map.of("http.response.status_code", 422), keyValues(handled.events().getFirst()), "属性");
   }
 
   @Test

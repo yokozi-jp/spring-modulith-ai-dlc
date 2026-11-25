@@ -58,6 +58,8 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `httpErrorsAreMappedOnlyInErrorPresentationWeb`：`error.presentation.web`の外のクラスは、`ProblemDetail`、`ErrorResponse`（入れ子の`Builder`と`Interceptor`を含む）、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus`に依存せず、`HttpStatus.CONFLICT`と`HttpStatus.UNPROCESSABLE_CONTENT`を読まない（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   注釈を付けることも依存に数え、成功の応答の`@ResponseStatus(HttpStatus.CREATED)`も拒否する。
   整数で書いたstatus（`sendError(422)`、`ResponseEntity.status(409)`、`HttpStatusCode.valueOf(422)`）は検出しない。
+- `failureReasonsAreModuleEnums`：`shared.failure.FailureReason`を実装する型は、enumにし、ベースパッケージの下のモジュールのパッケージに置く（[ADR-125](../adr/ADR-125-derive-problem-types-from-failure-reasons.md)）。
+  フィクスチャは自分の`shared.failure`に同じ名前のinterfaceを持つため、規則は型を名前で指す。
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenancy.TenantId`と`shared.tenancy.TenantScoped`だけに依存する。
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
@@ -214,6 +216,7 @@ H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を�
 `allowedUsagesAreNotDetected`の別の一行は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
 `httpTypesAreNotUsedByInnerLayers`は、違反フィクスチャの`shared.persistence`の`ChildRowWriter`と`application`の`HttpStatusCommandHandler`が`ResponseStatusException`を投げること、`infrastructure.persistence`の`HttpStatusOrderReader`が`HttpStatus`を使うことを検出する。
 `httpErrorsAreMappedOnlyInErrorPresentationWeb`は、違反フィクスチャの`presentation.web`の`OrderErrorAdvice`（`@RestControllerAdvice`、`@ExceptionHandler`、`@ResponseStatus`、`ProblemDetail`の戻り値）、`OrderStatusAdvice`（`@ControllerAdvice`）、`OrderRejectedException`（`ErrorResponseException`の継承）、`OrderResponseStatuses`（`ErrorResponse.builder`、`HttpStatus.UNPROCESSABLE_CONTENT`と`HttpStatus.CONFLICT`の読み出し、`@ResponseStatus(HttpStatus.CREATED)`、値を省いた`@ResponseStatus`）と、`HttpStatusCommandHandler`（`ResponseStatusException`の生成）を、型、注釈、定数ごとに1行ずつ検出する。
+`failureReasonsAreModuleEnums`は、違反フィクスチャの`ordering.domain.model`の`OrderRejectionReason`（enumでないrecord）とベースパッケージの直下の`RootFailure`を検出し、規約どおりのフィクスチャの`OrderFailure`（定数の本体を持つ定数を含む）を誤検出しないことを確かめる。
 `domainModelDependsOnlyOnAllowedTypes`は、違反フィクスチャの`LoggingOrder`（SLF4Jの`Logger`）、`RemoteOrderLookup`（`java.net.http.HttpClient`）、`TenantReadingOrder`（`TenantContext`）を検出する。規約どおりの`OrderTenantPolicy`（Domain Serviceが`TenantId`を使う）は`domainServicesDependOnlyOnDomainAndJava`が通す。
 MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`mappingLibrariesAreNotUsed`のフィクスチャは`DefaultRecordMapper`と`DefaultRecordUnmapper`への依存だけで確かめる。
 

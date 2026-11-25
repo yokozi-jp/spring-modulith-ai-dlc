@@ -1,6 +1,6 @@
 package com.example.demo;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -8,14 +8,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.example.demo.shared.failure.FailureReason;
-import com.example.demo.testkit.FailureReasons;
 import com.example.demo.testkit.SharedTestConfiguration;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.stream.Stream;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,28 +79,17 @@ class OpenApiContractTest {
   }
 
   @Test
-  @DisplayName("ProblemDetail の type の x-extensible-enum は、応答が返すすべての problem type を持つ")
-  void problemDetailTypeListsEveryProblemType() throws Exception {
-    final Object[] types =
-        Stream.concat(
-                Stream.of(
-                    "about:blank",
-                    "/problems/validation-error",
-                    "/problems/csrf-token-invalid",
-                    "/problems/tenant-not-selected",
-                    "/problems/version-conflict",
-                    "/problems/lock-timeout",
-                    "/problems/unique-violation"),
-                FailureReasons.constants().stream().map(FailureReason::type))
-            .toArray();
-
+  @DisplayName("ProblemDetail の type の x-extensible-enum は、about:blank、競合の種類、理由の problem type を持つ")
+  void problemDetailTypeListsProblemTypes() throws Exception {
+    // 一覧の全体は ProblemTypesTest が固定する。ここでは OpenAPI の文書に載ることを確かめる。
     mockMvc
         .perform(get("/v3/api-docs"))
         .andExpect(status().isOk())
         .andExpect(
             jsonPath(
                 "$.components.schemas.ProblemDetail.properties.type['x-extensible-enum']",
-                containsInAnyOrder(types)));
+                hasItems(
+                    "about:blank", "/problems/version-conflict", "/problems/ordering/not-draft")));
   }
 
   private static ResultMatcher problemResponseExists(final String name) {

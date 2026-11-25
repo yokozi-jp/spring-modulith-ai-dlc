@@ -465,8 +465,8 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
-      description: ほかの要求と競合した。版が一致しないときの type は /problems/version-conflict、行ロックを待ち切れなかったときは
-        /problems/lock-timeout、一意制約に違反したときは /problems/unique-violation
+      description: ほかの要求と競合した。type は競合の種類ごとに異なり、ProblemDetail.type の x-extensible-enum
+        に載る
     ForbiddenProblem:
       content:
         application/problem+json:
@@ -504,7 +504,8 @@ components:
         application/problem+json:
           schema:
             $ref: "#/components/schemas/ProblemDetail"
-      description: 業務規則に反するため処理できない。type は /problems/<module>/<理由> で、理由ごとに異なる
+      description: 業務規則に反するため処理できない。type は理由ごとに異なり、ProblemDetail.type の x-extensible-enum
+        に載る
   schemas:
     CancelOrderRequest:
       type: object

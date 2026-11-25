@@ -1,45 +1,39 @@
 package com.example.demo.shared.failure;
 
-import java.util.Locale;
+import java.io.Serializable;
 
 /**
  * 422 になる業務規則の違反の理由。モジュールごとの enum が実装し、{@link BusinessRuleViolationException} に渡す。
  *
- * <p>problem type と title のキーは、enum のパッケージから取るモジュールの名前と、定数の名前の kebab-case から作る（ADR-125）。 たとえば
- * {@code com.example.demo.ordering.domain.model} の {@code NOT_DRAFT} は、type が {@code
- * /problems/ordering/not-draft}、title のキーが {@code problem.title.ordering.not-draft} になる。
+ * <p>理由は、enum を置いたモジュールの名前と定数の名前で識別する。problem type と title のキーは {@code error} モジュールがこの 2
+ * つから作る（ADR-125）。
  *
- * <p>sealed にしない。名前のないモジュールでは、sealed の型の permits が同じパッケージに限られるためである。
+ * <p>例外とともに直列化されるため {@link Serializable} を継承する。enum は直列化できる。
  */
-public interface FailureReason {
+// enum が実装する interface で、ラムダで作らない。
+@SuppressWarnings("PMD.ImplicitFunctionalInterface")
+public interface FailureReason extends Serializable {
+
+  /**
+   * アプリケーションのベースパッケージ。
+   *
+   * <p>{@code shared} はルートパッケージの {@code DemoApplication} に依存できないため、文字列で持つ。 {@code
+   * FailureReasonTest} が {@code DemoApplication} のパッケージと一致することを確かめる。
+   */
+  String BASE_PACKAGE = "com.example.demo";
 
   /** 理由の定数の名前を返す。enum の {@link Enum#name()} が実装する。 */
   String name();
 
-  /** {@code /problems/<module>/<kebab-case>} の problem type を返す。 */
-  default String type() {
-    return "/problems/" + module() + "/" + kebabName();
-  }
-
-  /** {@code problem.title.<module>.<kebab-case>} の title のキーを返す。 */
-  default String titleKey() {
-    return "problem.title." + module() + "." + kebabName();
-  }
-
-  /** {@code com.example.demo.<module>} の下のパッケージから、モジュールの名前を取る。 */
-  private String module() {
-    final String basePackage = "com.example.demo.";
-    final String packageName = getClass().getPackageName();
-    if (!packageName.startsWith(basePackage)) {
-      throw new IllegalStateException(
-          "failure reason must reside in a module under " + basePackage + ": " + getClass());
-    }
+  /**
+   * 理由を置いたモジュールの名前を返す。{@code com.example.demo.<module>} の下のパッケージの {@code <module>} である。
+   *
+   * <p>この名前は Spring Modulith がパッケージから決めるモジュールの名前と同じになる。 実装をベースパッケージの下の enum に限ることは、ArchUnit の
+   * {@code failureReasonsAreModuleEnums} が確かめる。
+   */
+  default String module() {
     // 末尾に . を足し、モジュールのルートのパッケージ（下のパッケージがない）でも最初の . で切れるようにする。
-    final String relative = packageName.substring(basePackage.length()) + ".";
+    final String relative = getClass().getPackageName().substring(BASE_PACKAGE.length() + 1) + ".";
     return relative.substring(0, relative.indexOf('.'));
-  }
-
-  private String kebabName() {
-    return name().toLowerCase(Locale.ROOT).replace('_', '-');
   }
 }

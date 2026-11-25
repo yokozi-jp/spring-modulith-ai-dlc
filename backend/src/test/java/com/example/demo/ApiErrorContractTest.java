@@ -160,8 +160,8 @@ class ApiErrorContractTest {
             "422",
             get("/api/error-fixture/unprocessable"),
             422,
-            "/problems/ordering/product-not-found",
-            "商品が見つかりません"),
+            "/problems/error-fixture/rejected",
+            "処理できない内容です"),
         Arguments.of(
             "405",
             delete("/api/error-fixture/items").with(csrf()),
@@ -270,7 +270,7 @@ class ApiErrorContractTest {
   private static Stream<Arguments> businessFailureTitleCases() {
     return Stream.of(
         Arguments.of("/api/error-fixture/not-found?id=a", 404, "Not Found"),
-        Arguments.of("/api/error-fixture/unprocessable", 422, "Product not found"));
+        Arguments.of("/api/error-fixture/unprocessable", 422, "Unprocessable Content"));
   }
 
   @ParameterizedTest(name = "{0}")

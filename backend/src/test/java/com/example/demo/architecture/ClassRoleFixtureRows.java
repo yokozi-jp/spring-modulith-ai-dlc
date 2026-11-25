@@ -104,6 +104,14 @@ final class ClassRoleFixtureRows {
                 + ".unspecified()> is annotated with "
                 + "<org.springframework.web.bind.annotation.ResponseStatus>"),
         row(
+            "failureReasonsAreModuleEnums: not an enum",
+            PackageByFeatureOnionArchitectureTest.failureReasonsAreModuleEnumsRule(VIOLATING),
+            "ordering.domain.model.OrderRejectionReason> is no enum"),
+        row(
+            "failureReasonsAreModuleEnums: outside a module",
+            PackageByFeatureOnionArchitectureTest.failureReasonsAreModuleEnumsRule(VIOLATING),
+            "RootFailure> does not reside in a package"),
+        row(
             "noSuchElementExceptionIsNotThrown",
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
             "ordering.application.LegacyOrderFinder.notFound("),
