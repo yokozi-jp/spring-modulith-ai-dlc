@@ -127,6 +127,37 @@ class LocalDataSeederTest {
   }
 
   @Test
+  @DisplayName("tenancy は、業務データを入れず、テナントと所属を何度入れても同じ内容にする")
+  void tenancySeedsOnlyTenantsAndMemberships() {
+    for (final TenantId tenant : TENANTS) {
+      LocalDataSeeder.BUSINESS_TABLES.forEach(table ->
+          inModule(tenant, AsModule.moduleOf(table), tx -> tx.deleteFrom(table).execute()));
+    }
+
+    assertThat(SEEDER.seed(dsl, Mode.TENANCY)).isEqualTo(Outcome.TENANCY_SEEDED);
+    final Map<String, List<String>> first = memberships();
+    assertThat(SEEDER.seed(dsl, Mode.TENANCY)).isEqualTo(Outcome.TENANCY_SEEDED);
+
+    assertThat(first)
+        .isEqualTo(
+            Map.of(
+                TenancySeeds.TEST_USER_SUBJECT,
+                List.of("サンプル商事:MEMBER", "サンプル物産:MEMBER"),
+                TenancySeeds.TEST_ADMIN_SUBJECT,
+                List.of("サンプル商事:ADMIN")));
+    assertThat(memberships()).as("2 回目の tenancy の後の所属").isEqualTo(first);
+    for (final TenantId tenant : TENANTS) {
+      for (final Table<?> table : LocalDataSeeder.BUSINESS_TABLES) {
+        assertThat(
+                this.<Boolean>inModule(
+                    tenant, AsModule.moduleOf(table), tx -> tx.fetchExists(table)))
+            .as("テナント %s の %s の行", tenant, table)
+            .isFalse();
+      }
+    }
+  }
+
+  @Test
   @DisplayName("reset は業務データだけを消して同じ代表データを入れ直し、出版の行を残す")
   void resetReplacesOnlyBusinessDataWithSameValues() {
     final UUID publication = UUID.fromString("11111111-1111-4111-8111-111111111111");

@@ -26,7 +26,7 @@ Spring Modulith は、その一部として選んだ道具です。
 言語、フレームワーク、ツールは、同じ基準で「変更を機械的に検査できるか」を見て選んでいます。
 
 `product`、`ordering`、`payment` の 3 つのモジュールは、AI harness を継続して検証する**参照業務機能**です。
-商品の閲覧、注文の作成と確定、イベントの Listener と外部の HTTP の Client を通した決済を持つ、通常の機能モジュールです。
+商品の登録と閲覧、注文の作成と確定、イベントの Listener と外部の HTTP の Client を通した決済を持つ、通常の機能モジュールです。
 harness を変えるたびに、`task verify`、`task fe-verify`、`task e2e` が実際の業務の流れで変更を確かめられるよう、恒久的に保守します。
 新しいモジュールも同じ規約に従います。
 
@@ -209,9 +209,10 @@ task <タスク名>
 
 初めて起動するときと、`frontend/`の下の`package.json`か`frontend/pnpm-lock.yaml`が変わったときは、`task fe-dev`の前に`task fe-install`でフロントエンドの依存をインストールします。
 
-開発用の代表データは次の二つで入れます。
+開発用の代表データとテナントは次の三つで入れます。
 
 - **`task be-seed`**：ローカルの業務データが空のときだけ代表データを入れる。
+- **`task be-seed-tenancy`**：テナントと所属だけを入れる（[DB操作コマンドのリファレンス](docs/database/commands.md)）。
 - **`task be-seed-reset CONFIRM_RESET=yes`**：ローカルの業務データを消して代表データを入れ直す。
 
 エージェントは commit と push を `task agent-commit`、`task agent-push` でバックグラウンドで始め、`task agent-wait` で終わりを待ちます（[開発ワークフロー](docs/tooling/dev-workflow.md) の「エージェントがcommitとpushをするとき」）。
@@ -248,12 +249,14 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 
 ### E2E
 
-- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration と代表データを入れ、Vite preview に対して Playwright を実行してから、backend のログを `frontend/apps/web/test-results/backend.log` に残して後片付けします。
+- `task e2e` は frontend と backend イメージをビルドし、compose-test で依存サービスと backend を起動して migration を適用してテナントと所属を入れ、Vite preview に対して Playwright を実行してから、backend のログを `frontend/apps/web/test-results/backend.log` に残して後片付けします。
 - 実行ごとに空いている slot を取り、slot ごとの Compose project とポートで動くので、複数の worktree で同時に実行できます（[compose-test の slot](docs/tooling/test-slots.md)）。
   失敗した環境を調べるときは `E2E_KEEP_ENV=1 task e2e` で残せます（CI では常に片付けます）。
 - 起動だけを行う `task e2e-up` と、backend のログを書いて秘密の混入を検査する `task e2e-collect-logs LOG=<パス>` も、単独で実行できます。
   `task e2e-up` は片付けないので、実行したら自分で片付けます。
 - CI の `E2E tests 🎭` は対象パスの変更でだけ起動し、必須チェックにはしていません。
+- `task lint-e2e-seed` は、E2E のコード（`frontend/apps/web/e2e/`）が開発用のシーダーの代表データ（`SEED-`）を名指しする箇所を検出します。
+  `task fe-check`、`task fe-verify`、Frontend CI で実行します（[ADR-130](docs/adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
 - 書き方と前提は [E2E テストの方針と書き方](docs/e2e/testing-strategy.md) を参照してください。
 
 ### API 契約

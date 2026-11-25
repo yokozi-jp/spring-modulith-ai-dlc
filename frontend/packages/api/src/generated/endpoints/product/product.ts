@@ -4,6 +4,7 @@
  */
 import {
   queryOptions as queryOptionsBuilder,
+  useMutation,
   useQuery,
   useSuspenseQuery
 } from '@tanstack/react-query';
@@ -11,10 +12,13 @@ import type {
   DataTag,
   DefinedInitialDataOptions,
   DefinedUseQueryResult,
+  MutationFunction,
   QueryClient,
   QueryFunction,
   QueryKey,
   UndefinedInitialDataOptions,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
   UseSuspenseQueryOptions,
@@ -22,9 +26,15 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
+  BadRequestProblemResponse,
+  ConflictProblemResponse,
   ForbiddenProblemResponse,
   InternalServerErrorProblemResponse,
+  NotFoundProblemResponse,
   ProductSummaryListResponse,
+  ProductSummaryResponse,
+  RegisterProductHeaders,
+  RegisterProductRequest,
   UnauthorizedProblemResponse
 } from '../../models';
 
@@ -223,6 +233,325 @@ export function useListProductsSuspense<TData = Awaited<ReturnType<typeof listPr
  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
 
   const queryOptions = getListProductsSuspenseQueryOptions(options)
+
+  const query = useSuspenseQuery(queryOptions, queryClient) as  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export type registerProductResponse201 = {
+  data: void
+  status: 201
+}
+
+export type registerProductResponse400 = {
+  data: BadRequestProblemResponse
+  status: 400
+}
+
+export type registerProductResponse401 = {
+  data: UnauthorizedProblemResponse
+  status: 401
+}
+
+export type registerProductResponse403 = {
+  data: ForbiddenProblemResponse
+  status: 403
+}
+
+export type registerProductResponse409 = {
+  data: ConflictProblemResponse
+  status: 409
+}
+
+export type registerProductResponse500 = {
+  data: InternalServerErrorProblemResponse
+  status: 500
+}
+
+export type registerProductResponseSuccess = (registerProductResponse201) & {
+  headers: Headers;
+};
+export type registerProductResponseError = (registerProductResponse400 | registerProductResponse401 | registerProductResponse403 | registerProductResponse409 | registerProductResponse500) & {
+  headers: Headers;
+};
+
+export const getRegisterProductUrl = () => {
+
+
+
+
+  return `/api/products`
+}
+
+/**
+ * 登録した商品の URI を Location に入れて返す。商品コードが既にあれば 409 を返す。
+ * @summary 商品を登録する。
+ */
+export const registerProduct = async (registerProductRequest: RegisterProductRequest,
+    headers: RegisterProductHeaders, options?: Parameters<typeof apiFetch>[1]): Promise<registerProductResponseSuccess> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return apiFetch<registerProductResponseSuccess>(getRegisterProductUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json',...headers, ...getHeaders(options?.headers) },
+    body: JSON.stringify(registerProductRequest)
+  }
+);}
+
+
+
+
+
+export const getRegisterProductMutationKey = () => ['registerProduct'] as const;
+
+export const getRegisterProductMutationOptions = <TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | ConflictProblemResponse | InternalServerErrorProblemResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerProduct>>, TError,RegisterProductMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof registerProduct>>, TError,RegisterProductMutationVariables, TContext> => {
+
+const mutationKey = getRegisterProductMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof registerProduct>>, RegisterProductMutationVariables> = (props) => {
+          const {data,headers} = props ?? {};
+
+          return  registerProduct(data,headers,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RegisterProductMutationResult = NonNullable<Awaited<ReturnType<typeof registerProduct>>>
+    export type RegisterProductMutationBody = RegisterProductRequest
+    export type RegisterProductMutationError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | ConflictProblemResponse | InternalServerErrorProblemResponse>
+    export type RegisterProductMutationVariables = {data: RegisterProductRequest;headers: RegisterProductHeaders}
+
+    /**
+ * @summary 商品を登録する。
+ */
+export const useRegisterProduct = <TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | ConflictProblemResponse | InternalServerErrorProblemResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof registerProduct>>, TError,RegisterProductMutationVariables, TContext>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient): UseMutationResult<
+        Awaited<ReturnType<typeof registerProduct>>,
+        TError,
+        RegisterProductMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRegisterProductMutationOptions(options), queryClient);
+    }
+    export type findProductByIdResponse200 = {
+  data: ProductSummaryResponse
+  status: 200
+}
+
+export type findProductByIdResponse400 = {
+  data: BadRequestProblemResponse
+  status: 400
+}
+
+export type findProductByIdResponse401 = {
+  data: UnauthorizedProblemResponse
+  status: 401
+}
+
+export type findProductByIdResponse403 = {
+  data: ForbiddenProblemResponse
+  status: 403
+}
+
+export type findProductByIdResponse404 = {
+  data: NotFoundProblemResponse
+  status: 404
+}
+
+export type findProductByIdResponse500 = {
+  data: InternalServerErrorProblemResponse
+  status: 500
+}
+
+export type findProductByIdResponseSuccess = (findProductByIdResponse200) & {
+  headers: Headers;
+};
+export type findProductByIdResponseError = (findProductByIdResponse400 | findProductByIdResponse401 | findProductByIdResponse403 | findProductByIdResponse404 | findProductByIdResponse500) & {
+  headers: Headers;
+};
+
+export const getFindProductByIdUrl = (productId: string,) => {
+
+
+
+
+  return `/api/products/${productId}`
+}
+
+/**
+ * 商品がなければ 404 を返す。
+ * @summary 商品を返す。
+ */
+export const findProductById = async (productId: string, options?: Parameters<typeof apiFetch>[1]): Promise<findProductByIdResponseSuccess> => {
+
+  return apiFetch<findProductByIdResponseSuccess>(getFindProductByIdUrl(productId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getFindProductByIdQueryKey = (productId: string,) => {
+    return [
+    `/api/products/${productId}`
+    ] as const;
+    }
+
+
+export const getFindProductByIdQueryOptions = <TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getFindProductByIdQueryKey(productId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof findProductById>>> = ({ signal }) => findProductById(productId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: productId !== null && productId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> }
+}
+
+export type FindProductByIdQueryResult = NonNullable<Awaited<ReturnType<typeof findProductById>>>
+export type FindProductByIdQueryError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useFindProductById<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options: { query:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>> & Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof findProductById>>,
+          TError,
+          Awaited<ReturnType<typeof findProductById>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindProductById<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>> & Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof findProductById>>,
+          TError,
+          Awaited<ReturnType<typeof findProductById>>
+        > , 'initialData'
+      >, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindProductById<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 商品を返す。
+ */
+
+export function useFindProductById<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getFindProductByIdQueryOptions(productId,options)
+
+  const query = useQuery(queryOptions, queryClient) as  UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+export const getFindProductByIdSuspenseQueryOptions = <TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(productId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getFindProductByIdQueryKey(productId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof findProductById>>> = ({ signal }) => findProductById(productId, { signal, ...requestOptions });
+
+
+
+
+
+   return  queryOptionsBuilder({ queryKey, ...queryOptions, queryFn: queryOptions?.queryFn ?? queryFn}) as UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData> & { queryKey: DataTag<QueryKey, TData, TError> } & { throwOnError?: ((this: never, error: TError) => boolean) & { readonly __inferenceOnly: never } }
+}
+
+export type FindProductByIdSuspenseQueryResult = NonNullable<Awaited<ReturnType<typeof findProductById>>>
+export type FindProductByIdSuspenseQueryError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>
+
+
+export function useFindProductByIdSuspense<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options: { query:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindProductByIdSuspense<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+export function useFindProductByIdSuspense<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+  ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> }
+/**
+ * @summary 商品を返す。
+ */
+
+export function useFindProductByIdSuspense<TData = Awaited<ReturnType<typeof findProductById>>, TError = ErrorType<BadRequestProblemResponse | UnauthorizedProblemResponse | ForbiddenProblemResponse | NotFoundProblemResponse | InternalServerErrorProblemResponse>>(
+ productId: string, options?: { query?:Partial<UseSuspenseQueryOptions<Awaited<ReturnType<typeof findProductById>>, TError, TData>>, request?: SecondParameter<typeof apiFetch>}
+ , queryClient?: QueryClient
+ ):  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+
+  const queryOptions = getFindProductByIdSuspenseQueryOptions(productId,options)
 
   const query = useSuspenseQuery(queryOptions, queryClient) as  UseSuspenseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

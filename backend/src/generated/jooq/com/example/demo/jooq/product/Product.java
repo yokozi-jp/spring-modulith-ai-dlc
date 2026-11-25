@@ -6,6 +6,7 @@ package com.example.demo.jooq.product;
 
 import com.example.demo.jooq.DefaultCatalog;
 import com.example.demo.jooq.product.tables.MProduct;
+import com.example.demo.jooq.product.tables.TIdempotencyKey;
 
 import java.util.Arrays;
 import java.util.List;
@@ -45,6 +46,11 @@ public class Product extends SchemaImpl {
     public final MProduct M_PRODUCT = MProduct.M_PRODUCT;
 
     /**
+     * 冪等性キー
+     */
+    public final TIdempotencyKey T_IDEMPOTENCY_KEY = TIdempotencyKey.T_IDEMPOTENCY_KEY;
+
+    /**
      * No further instances allowed
      */
     private Product() {
@@ -62,7 +68,8 @@ public class Product extends SchemaImpl {
     @NonNull
     public final List<Table<?>> getTables() {
         return Arrays.asList(
-            MProduct.M_PRODUCT
+            MProduct.M_PRODUCT,
+            TIdempotencyKey.T_IDEMPOTENCY_KEY
         );
     }
 }
