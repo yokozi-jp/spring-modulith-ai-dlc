@@ -56,6 +56,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ExtendWith(FixtureTablesExtension.class)
 class TableWriterTest {
 
+  /** 子を持ち、item_id の重複を許す集約。 */
+  private static final AggregateTable<Record, Long, Item> ITEM_DUPLICATE_KEY =
+      ITEM.duplicateKey(FIXTURE_ITEM.ITEM_ID);
+
   /** lock_no を持たないテーブル。 */
   private static final Table<Record> NO_LOCK_TABLE = DSL.table(DSL.name("t_no_lock"));
 
@@ -408,14 +412,13 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("insertIfAbsent は衝突がなければ、ルートと子を insert と同じく書いて true を返す")
-  void insertIfAbsentWritesRootAndChildren() {
+  @DisplayName("insert は重複を許す列を宣言した集約でも、衝突がなければルートと子を書いて true を返す")
+  void insertWithDuplicateKeyWritesRootAndChildren() {
     final boolean inserted =
         callInUseCase(() ->
-            writer.insertIfAbsent(
-                ITEM,
+            writer.insert(
+                ITEM_DUPLICATE_KEY,
                 itemRoot(1L, 1L),
-                List.of(FIXTURE_ITEM.ITEM_ID),
                 set -> set.set(FIXTURE_ITEM.ITEM_NAME, "new"),
                 detailRows(List.of(detail(1, "one")))));
 
@@ -428,16 +431,15 @@ class TableWriterTest {
   }
 
   @Test
-  @DisplayName("insertIfAbsent は衝突の対象の列に同じ値の行があれば、例外にせず false を返し、ルートも子も書かない")
-  void insertIfAbsentSkipsConflictingRootAndChildren() {
+  @DisplayName("insert は重複を許すと宣言した列に同じ値の行があれば、例外にせず false を返し、ルートも子も書かない")
+  void insertWithDuplicateKeySkipsConflictingRootAndChildren() {
     insertItem(1L, "first");
 
     final boolean inserted =
         callInUseCase(() ->
-            writer.insertIfAbsent(
-                ITEM,
+            writer.insert(
+                ITEM_DUPLICATE_KEY,
                 itemRoot(1L, 1L),
-                List.of(FIXTURE_ITEM.ITEM_ID),
                 set -> set.set(FIXTURE_ITEM.ITEM_NAME, "second"),
                 detailRows(List.of(detail(1, "one")))));
 
@@ -446,6 +448,14 @@ class TableWriterTest {
     assertThat(row.get(FIXTURE_ITEM.ITEM_NAME)).isEqualTo("first");
     assertThat(row.get(FIXTURE_ITEM.CREATED_PGM_CD)).isEqualTo(SEED_PGM_CD);
     assertThat(details(1L)).as("入れなかったルートの子").isEmpty();
+  }
+
+  @Test
+  @DisplayName("重複を許す列には、集約ルートのテーブルの列だけを宣言できる")
+  void duplicateKeyRejectsColumnOfAnotherTable() {
+    assertThatThrownBy(() -> ITEM.duplicateKey(FIXTURE_ITEM_DETAIL.ITEM_ID))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("duplicate key column must belong to the aggregate root table");
   }
 
   @Test

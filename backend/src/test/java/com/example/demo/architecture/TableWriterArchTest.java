@@ -285,7 +285,7 @@ class TableWriterArchTest {
         .because(
             "版の条件、版の設定、件数の判定を書き忘れた UPDATE は成功して、他の人の更新を黙って上書きし、"
                 + "TableWriter を通さない INSERT は一意制約の違反（23505）を ConflictException に変えず 500 を返すため。"
-                + "直し方：業務テーブルの INSERT と UPDATE は shared の TableWriter の insert、insertIfAbsent、update で書く。"
+                + "直し方：業務テーブルの INSERT と UPDATE は shared の TableWriter の insert と update で書く。"
                 + "集約の形は AggregateTable と ChildTable で宣言し、子の行は ChildRows で渡す。"
                 + "規約："
                 + DOCS);

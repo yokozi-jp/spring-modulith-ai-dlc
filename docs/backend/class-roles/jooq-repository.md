@@ -85,8 +85,10 @@ jOOQ の Repository は業務規則を持たない。
   内部の主キーは `TableWriter` が `RETURNING` で受けて子の外部キーに書くため、読み直さない。
   一意制約の違反（`23505`）は `Kind.UNIQUE` の、`lock_timeout` までに行のロックを取れないこと（`55P03`）は `Kind.LOCK` の `ConflictException` に、`TableWriter` が変える。
   値オブジェクトと enum は、アクセサ（`value()`、`amount()`、`name()`）で列の値に直す。
-- 同じ集約の 2 回目の保存を処理済みとして正常に終える `add` は、`boolean` を返し、`tableWriter.insertIfAbsent(PAYMENT, payment, 衝突を許す一意索引の列, ルートの列の値, 子の全行)` を呼ぶ（`JooqPaymentRepository`）。
-  衝突を許す一意索引の列は、索引の列とちょうど同じ組にする（テナントの列を含む）。衝突したら何も書かずに `false` を返し、ほかの一意制約の違反は `insert` と同じく `ConflictException` になる。
+- 同じ集約の 2 回目の保存を処理済みとして正常に終える集約は、宣言に重複を許す一意索引の列を `AggregateTable.of(...).duplicateKey(T_PAYMENT.TENANT_PUBLIC_ID, T_PAYMENT.ORDER_PUBLIC_ID)` で足す（`JooqPaymentRepository`）。
+  列は、索引の列とちょうど同じ組にする（テナントの列を含む）。`duplicateKey` を続けると `of` の型引数が推論されないため、`keyOf` のラムダの引数に `(Payment payment) -> ...` と型を書く。
+  その `add` は `boolean` を返し、`tableWriter.insert(...)` の戻り値をそのまま返す。衝突したら何も書かずに `false` が返り、ほかの一意制約の違反は `ConflictException` になる。
+  `duplicateKey` のない集約の `insert` は常に `true` を返すため、戻り値を使わない。
 - `update` は、`tableWriter.update(ORDER, order, ルートの列の値, 子の全行)` を呼ぶ。
   `order` は `Versioned` を実装する集約ルートで、`TableWriter` がその `lockNo()` を期待する版にする。
   ルートの列の値と子の全行は、`add` と同じラムダと変換を共有する。
@@ -403,7 +405,7 @@ Repository のテストは列と集約の往復と子の行の差分だけを確
 - [ ] 集約ルートの `LOCK_NO` を選び、`restore` の `lockNo` に渡す。［自分で点検］
 - [ ] 集約の形を `AggregateTable` と `ChildTable` のクラスの定数として一度だけ宣言し、子の外部キーの列に親の内部の主キーを指す列を渡す。同じ子のテーブルを別の集約で宣言しない。［テストで検査：AggregateDeclarationsTest（宣言の重複）、AggregateDeclarationInspectionTest（外部キーとの突き合わせ）］
 - [ ] Spring の例外（`CannotAcquireLockException`、`DuplicateKeyException`）を catch して `ConflictException` に変えない。［自分で点検］
-- [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。同じ集約の 2 回目を処理済みとする `add` は `tableWriter.insertIfAbsent(...)` を呼び、入れたかを `boolean` で返す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
+- [ ] `add` は `tableWriter.insert(...)` を呼び、ルートの列と子の全行を `ColumnValues` で渡す。同じ集約の 2 回目を処理済みとする `add` は、宣言に `duplicateKey` を足し、`insert` の戻り値を `boolean` で返す。`insertInto` を呼ばない。［ArchUnit で検査：TableWriterArchTest.tableWritesGoThroughTableWriter］
 - [ ] 集約ルートを受け取る `add` 以外の public メソッドは、`update` という名前で、`TableWriter.update` を、そのメソッドの中で直接呼ぶ。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］
 - [ ] 集約ルートを `Versioned` にし、`AggregateTable` の第 3 型引数にそのクラスを指定して、`update` はその集約ルートを `TableWriter.update` に渡す（テーブルから読み直した版は渡せない）。［型で検査 + 自分で点検（`Versioned` そのものを指定しない。読み直した版で集約ルートを作り直して渡さない）］
 - [ ] 集約ルートを受け取る public メソッドは、`add` と `update` だけにする（`save` や `delete` のような名前は、`TableWriter.update` を呼んでも H3 が検出する）。［ArchUnit で検査：TableWriterArchTest.repositoryUpdateCallsVersionedEntryPoint］
