@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from "vite-plus/test";
 import { stubCsrfCookie } from "@/testing/csrf-cookie";
 import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
-import { firstLineRow, notice, saveQuantity } from "@/testing/order-detail-screen";
+import { getFirstLineRow, getNotice, saveQuantity } from "@/testing/order-detail-screen";
 import {
   draftOrder,
   eraserId,
@@ -38,7 +38,7 @@ describe("注文の詳細の画面", () => {
     await expect(
       screen.findByRole("heading", { level: 1, name: "注文 C-001" }),
     ).resolves.toBeTruthy();
-    expect(firstLineRow()?.textContent).toContain("ボールペン");
+    expect(getFirstLineRow()?.textContent).toContain("ボールペン");
     expect(screen.getByLabelText("数量")).toHaveProperty("value", "2");
     expect(screen.getByRole("button", { name: "確定する" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "取り消す" })).toBeTruthy();
@@ -105,7 +105,7 @@ describe("注文の詳細の画面", () => {
     const { user } = await renderRoute(detailPath);
 
     await saveQuantity(user, "3");
-    await expect(within(notice()).findByText("明細を変更しました。")).resolves.toBeTruthy();
+    await expect(within(getNotice()).findByText("明細を変更しました。")).resolves.toBeTruthy();
     await saveQuantity(user, "4");
 
     await waitFor(() => {
@@ -124,8 +124,8 @@ describe("注文の詳細の画面", () => {
 
     await saveQuantity(user, "3");
 
-    await expect(within(notice()).findByText("明細を変更しました。")).resolves.toBeTruthy();
-    expect(notice().textContent).toContain("最新の内容を読み込めませんでした。");
+    await expect(within(getNotice()).findByText("明細を変更しました。")).resolves.toBeTruthy();
+    expect(getNotice().textContent).toContain("最新の内容を読み込めませんでした。");
   });
 
   it.each([
@@ -143,7 +143,7 @@ describe("注文の詳細の画面", () => {
 
       await user.click(await screen.findByRole("button", { name }));
 
-      await expect(within(notice()).findByText(message)).resolves.toBeTruthy();
+      await expect(within(getNotice()).findByText(message)).resolves.toBeTruthy();
       expect(bodies).toStrictEqual([{ lockNo: 7 }]);
       expect(screen.queryByRole("button", { name })).toBeNull();
     },
@@ -163,7 +163,7 @@ describe("注文の詳細の画面", () => {
     await user.click(screen.getByRole("button", { name }));
     update.release();
 
-    await expect(within(notice()).findByText(message)).resolves.toBeTruthy();
+    await expect(within(getNotice()).findByText(message)).resolves.toBeTruthy();
     expect(bodies).toHaveLength(1);
   });
 });

@@ -8,7 +8,7 @@ async function changeQuantity(user: UserEvent, value: string) {
 }
 
 /** 決済の欄の外の status（ProblemNotice の output）。 */
-export function notice() {
+export function getNotice() {
   const payment = screen.queryByRole("region", { name: "決済" });
   const inPayment = payment === null ? [] : within(payment).queryAllByRole("status");
   const element = screen.getAllByRole("status").find((el) => !inPayment.includes(el));
@@ -25,7 +25,7 @@ export async function saveQuantity(user: UserEvent, value: string): Promise<void
 }
 
 /** 詳細の明細の表の最初の行（見出しの行の次）。 */
-export function firstLineRow(): HTMLElement | undefined {
+export function getFirstLineRow(): HTMLElement | undefined {
   const [table] = screen.getAllByRole("table");
   return table === undefined ? undefined : within(table).getAllByRole("row")[1];
 }
