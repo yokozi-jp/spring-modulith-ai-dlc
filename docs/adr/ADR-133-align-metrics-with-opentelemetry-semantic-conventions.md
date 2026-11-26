@@ -73,7 +73,7 @@ histogram は explicit bucket にし、指数の histogram と `percentiles-hist
 全シグナルの resource に、`management.opentelemetry.resource-attributes` で `service.instance.id` を `${random.uuid}` から付ける。
 値は JVM の起動ごとに変わる。
 ログ、トレース、OTLP の指標のアダプターは、一度だけ束縛される同じ `OpenTelemetryProperties` の Bean を読むため、`${random.uuid}` は一度だけ解決され、3 つのシグナルは同じ値を持つ。
-指標の resource の `service.instance.id` はテストせず、この作りで正しいとする。
+指標の resource の `service.instance.id` が、ログとトレースの resource と同じ値であることは、`MetricsResourceContractTest` で確かめる。
 
 テナントと利用者の ID（`tenant.id`、`user.id`）は、指標の tag にしない（ADR-110 のまま）。
 
@@ -165,3 +165,4 @@ histogram は explicit bucket にし、指数の histogram と `percentiles-hist
 - `backend/src/main/resources/application.yaml`
 - `backend/src/test/java/com/example/demo/ObservabilityContractTest.java`
 - `backend/src/test/java/com/example/demo/HttpServerMetricsContractTest.java`
+- `backend/src/test/java/com/example/demo/MetricsResourceContractTest.java`

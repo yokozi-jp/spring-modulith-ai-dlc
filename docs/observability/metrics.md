@@ -45,7 +45,8 @@ tags: [convention, observability, opentelemetry, metrics]
   bucket の境界が semantic conventions の推奨の境界であることと、`management.otlp.metrics.export.base-time-unit` が秒に束縛されることも確かめる。
   OTLP のレジストリはテストのコンテキストにないため、単位は設定の束縛で確かめる。
 - **`ObservabilityContractTest`**：ログとトレースの resource が同じ `service.instance.id` を持つことを確かめる。
-  指標の resource の `service.instance.id` は検査しない（理由は ADR-133）。
+- **`MetricsResourceContractTest`**：OTLP の指標のレジストリを有効にしたコンテキストで、Spring Boot が指標の送信に使う `OtlpConfig` の resource の `service.instance.id` が、ログとトレースの resource と同じ値であることを確かめる。
+  送信先は閉じたポート、送信の間隔は 1 時間にして、テストの間は送らない。
 - **`/verify-grafana`**：ローカルの Grafana で、指標が Prometheus に届き、同梱のダッシュボードのパネルに値が出るかを確かめる。
   空のままと分かっているパネルは、`check.sh` の `KNOWN_EMPTY` に理由とともに載る。
   指標の名前、属性、Micrometer の OTLP の設定を変えたら実行する。
