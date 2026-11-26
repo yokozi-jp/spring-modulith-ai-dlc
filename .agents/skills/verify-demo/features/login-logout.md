@@ -10,6 +10,7 @@
 - `auth-logout`：「ログアウト」で「ログアウトしました」の画面に着き、古い `__Host-APP_SESSION` で `/api/**` を呼ぶと 401 になる。
 - `auth-login-again`：ログアウト後の「もう一度ログイン」から、再び Keycloak の画面へ移る。
 - `auth-login-failed`：ログインのコールバックが失敗すると、`/login-failed` の「ログインできませんでした」の画面に着く。URL に失敗の種類が載らず、英語の「Please sign in」が出ない。「もう一度ログイン」から Keycloak の画面へ移る。backend のログに `OAuth2 login failed` と `error.type` が残り、IdP が書いた説明が残らない。
+- `auth-session-expired`：同じ文書で API が成功した後にセッションが切れ、次の API が 401 を返すと、Keycloak の画面ではなく `/session-expired` の「ログインの有効期限が切れました」の画面に着く。「もう一度ログイン」から Keycloak の画面へ移る。
 
 ## How to get to it (user POV)
 

@@ -53,7 +53,7 @@ API 層は業務の処理を持たない。
 アプリの `src/api/` は次を守る。
 
 - `main.tsx` は `createQueryClient()` で `QueryClient` を作り、テストの `createTestQueryClient()`（`src/testing/query-client.ts`）も同じ関数から作る。
-- `createQueryClient()` は、`QueryCache` と `MutationCache` の `onError` に `redirectToLoginOnUnauthorized` を、`defaultOptions.queries.retry` に `retryUnlessClientError` を、`defaultOptions.mutations.retry` に `retryIdempotentMutation` を渡し、`MutationCache` の `onSettled` で全 query を無効化する（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
+- `createQueryClient()` は、`createUnauthorizedRedirect()` を1回呼び、`QueryCache` と `MutationCache` の `onSuccess` に `recordSuccess` を、`onError` に `redirectToLoginOnUnauthorized` を、`defaultOptions.queries.retry` に `retryUnlessClientError` を、`defaultOptions.mutations.retry` に `retryIdempotentMutation` を渡し、`MutationCache` の `onSettled` で全 query を無効化する（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
 - `preloadQuery` は `queryClient.query()` を呼び、無効化された query だけを取得し直す（[状態表示の分担](../routing-and-state.md#状態表示の分担)）。
 
 ## 生成物の扱い
@@ -101,7 +101,7 @@ component は同じ生成 query options を `useSuspenseQuery` で読む（`fron
 
 ```ts
 import {
-  redirectToLoginOnUnauthorized,
+  createUnauthorizedRedirect,
   retryIdempotentMutation,
   retryUnlessClientError,
 } from "@frontend/api/api-error";
@@ -109,9 +109,11 @@ import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 /** 本番とテストが同じ設定で使う QueryClient を作る。 */
 export function createQueryClient(): QueryClient {
+  const { recordSuccess, redirectToLoginOnUnauthorized } = createUnauthorizedRedirect();
   const queryClient: QueryClient = new QueryClient({
-    queryCache: new QueryCache({ onError: redirectToLoginOnUnauthorized }),
+    queryCache: new QueryCache({ onSuccess: recordSuccess, onError: redirectToLoginOnUnauthorized }),
     mutationCache: new MutationCache({
+      onSuccess: recordSuccess,
       onError: redirectToLoginOnUnauthorized,
       // ponytail: 成功でも失敗（409 を含む）でも、描画中の関係のない query まで全部取り直す。
       // 再取得が性能の問題になったら、mutationKey か meta で絞るか、Orval の mutationInvalidates へ移る（docs/frontend/routing-and-state.md）。

@@ -21,7 +21,7 @@ tags: [convention, frontend, build, delivery, cache, future-arch-guidelines]
 
 - 配信点は、バックエンドへ振り分けるpath（`/api/**` など）を除く未知のpathに `index.html` を返す。
   バックエンドへ振り分けるpathは、pathのsegmentの境界で一致させる（`/login` と `/login/**` であり、`/login*` ではない）。
-  `/login-failed` はSPAの画面なので、`index.html` を返す。
+  `/login-failed` と `/session-expired` はSPAの画面なので、`index.html` を返す。
 - バックエンドのpathの404を `index.html` で置き換えない。
 - 配信点は、ADR-014が定めるsecurity headerを付けられる方式にする。
 - SPAのHTMLに`Cross-Origin-Opener-Policy: same-origin`を付ける（[ADR-132](../adr/ADR-132-add-corp-and-coop-to-delivered-security-headers.md)）。
