@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: メッセージングの設計
-description: 非同期処理の用語、実行基盤の選び方、キューとコンシューマーの分割単位、配信保証、DB 更新とメッセージ発行の整合を定める。非同期のイベントやリスナーを追加するとき、外部メッセージブローカーの導入を検討するときに読む。
+description: 非同期処理の用語、実行基盤の選び方、リスナーの動く場所と分け直すきっかけ、キューとコンシューマーの分割単位、配信保証、DB 更新とメッセージ発行の整合を定める。非同期のイベントやリスナーを追加するとき、外部メッセージブローカーの導入やリスナーを別のプロセスに分けることを検討するときに読む。
 tags: [convention, integration, async, spring-modulith, future-arch-guidelines]
 ---
 
@@ -35,6 +35,33 @@ PostgreSQL の `LISTEN` と `NOTIFY`、Redis の Pub/Sub を、業務処理の�
 どちらもメッセージを永続化しないため、コンシューマーの停止中に発行されたメッセージを失う。
 これらを内部で使い、配信の品質を保証するフレームワークを介する場合は対象外とする。
 Redis Streams のように永続化するデータ構造を使う場合は、外部ブローカーと同じく ADR で選定する。
+
+### リスナーの動く場所
+
+リスナーは、イベントを出版したプロセスの中で動く。
+出版の行（`event_publication`）は、出版した JVM に登録されたリスナーの分だけ作られる。
+リスナーの bean がない JVM から出版すると行は 0 件で、別の JVM が後から配信する対象も残らない（Spring Modulith 2.2.0 と 2.1.2 で確かめた）。
+
+リスナーを別のプロセスに分けるには、次のどちらかが要る。
+
+- **外部ブローカー**：導入は ADR で決める（前節）。
+- **Web でリスナーを登録して実行しない executor と、行を読んで配信する自前の処理**：採らない。
+  行を `PUBLISHED` で残せば別の JVM が配信できるが、受け取る公開の操作は `IncompleteEventPublications`（2.2 で `forRemoval`）だけである。
+  `FailedEventPublications.resubmit` は `FAILED` の行しか読まない。
+  2.2.0 で定期に動く処理は Staleness Monitor だけで、行を継続して読んで配信するコンシューマーはない。
+
+分け直すきっかけは、[設計の作り込みの程度と段階的な再構築](../principles/right-sizing.md#段階的な再構築)の再構築ポイントとして次の 3 つにする。
+
+- 外部ブローカーを入れる ADR を起こすとき。
+- リスナーの負荷が Web の応答を遅らせることを負荷試験で測り、同じプロセスの手段で収まらないとき。
+  同じプロセスの手段は、executor の分離と、トランザクションの外での外部呼び出し（[#557](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/557)）である。
+- Web と独立して、リスナーだけをスケールまたはデプロイする要件が生じたとき。
+
+分けるときは、次を作り直すか見直す。
+
+- 失敗した出版の再投入の形式検証（[formal-verify-event-resubmission](../../.agents/skills/formal-verify-event-resubmission/SKILL.md)）の前提。モデルは、どの台も配信と再投入と古い出版を `FAILED` に戻す処理を持つとしている。
+- DB 接続の予算。[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md) の式は「最大アプリケーションタスク数」を掛ける。
+- トレース。行にトレースの列がないので、別の JVM の配信は発行元のトレースを引き継げない（再投入と同じ。上流の [spring-modulith#555](https://github.com/spring-projects/spring-modulith/issues/555) は open）。
 
 ## キューとコンシューマーの分割
 
