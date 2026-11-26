@@ -382,19 +382,25 @@ class TenantSelectionTest {
   }
 
   /**
-   * セッションの最長の期間（作ってから 8 時間）と無操作の期間（30 分）。
+   * セッションの最長の期間と無操作の期間。
    *
    * <p>Spring Session は作成の時刻をアプリの Clock でなく自分の時計で決めるため、DB の行の作成の時刻を過去に書き換えて期間を過ぎさせる。
    */
   /* package */ @Nested
   class SessionLifetimeTest {
 
+    /** 最長の期間（8 時間）を過ぎた、作ってからの経過時間。 */
+    private static final Duration PAST_MAX_LIFETIME = Duration.ofHours(9);
+
+    /** 最長の期間（8 時間）に満たない、作ってからの経過時間。 */
+    private static final Duration WITHIN_MAX_LIFETIME = Duration.ofHours(7);
+
     @Test
-    @DisplayName("作ってから 9 時間たったセッションは、直前に操作していても 401 になり、DB の行が消える")
+    @DisplayName("最長の期間を過ぎたセッションは、直前に操作していても 401 になり、DB の行が消える")
     void sessionOlderThanMaxLifetimeIsInvalidated() throws Exception {
       login(newSubject());
       final String expired = sessionId();
-      createdAgo(expired, Duration.ofHours(9));
+      createdAgo(expired, PAST_MAX_LIFETIME);
 
       perform(get("/api/memberships")).andExpect(status().isUnauthorized());
 
@@ -402,10 +408,10 @@ class TenantSelectionTest {
     }
 
     @Test
-    @DisplayName("作ってから 7 時間のセッションは、無操作の期間の中なら API を使える")
+    @DisplayName("最長の期間に満たないセッションは、無操作の期間の中なら API を使える")
     void sessionWithinMaxLifetimeIsAccepted() throws Exception {
       login(newSubject());
-      createdAgo(sessionId(), Duration.ofHours(7));
+      createdAgo(sessionId(), WITHIN_MAX_LIFETIME);
 
       perform(get("/api/memberships")).andExpect(status().isOk());
     }
@@ -422,7 +428,7 @@ class TenantSelectionTest {
       assertThat(creationTime(selected))
           .as("テナントを選んだ後のセッションの作成の時刻: sessionId=%s", selected)
           .isEqualTo(createdAt);
-      createdAgo(selected, Duration.ofHours(9));
+      createdAgo(selected, PAST_MAX_LIFETIME);
       perform(get(PRODUCTS)).andExpect(status().isUnauthorized());
     }
 
@@ -432,7 +438,7 @@ class TenantSelectionTest {
       final String subject = newSubject();
       login(subject);
       final String expired = sessionId();
-      createdAgo(expired, Duration.ofHours(9));
+      createdAgo(expired, PAST_MAX_LIFETIME);
       perform(get("/api/memberships")).andExpect(status().isUnauthorized());
       final Instant beforeLogin = Instant.now(clock).truncatedTo(ChronoUnit.MILLIS);
 
