@@ -1,7 +1,6 @@
 package com.example.demo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,9 +9,6 @@ import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CapturedSpans;
 import com.example.demo.testkit.SharedTestConfiguration;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Timer;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
@@ -22,10 +18,8 @@ import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import io.opentelemetry.sdk.trace.data.SpanData;
-import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,11 +43,13 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * 構造化ログ、トレース相関、OTLP 属性、HTTP の受信の指標、テナントと利用者の文脈の運用契約を検証する。
+ * 構造化ログ、トレース相関、OTLP 属性、テナントと利用者の文脈の運用契約を検証する。
+ *
+ * <p>HTTP の受信の指標は {@link HttpServerMetricsContractTest} が検証する。
  *
  * <p>契約ごとに分けると、同じ Bean の注入と appender の準備を重ねるので、1 つの class にまとめる。
  */
-@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
+@SuppressWarnings("PMD.TooManyMethods")
 @Slf4j
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -73,12 +69,6 @@ class ObservabilityContractTest {
   /** HTTP の受信の span の、要求のパスの属性（OpenTelemetry の semantic conventions）。 */
   private static final String URL_PATH = "url.path";
 
-  /** HTTP の受信の時間の Timer（OpenTelemetry の semantic conventions）。 */
-  private static final String HTTP_SERVER_DURATION = "http.server.request.duration";
-
-  /** 注文を 1 件読む API の route。 */
-  private static final String ORDER_ROUTE = "/api/orders/{orderId}";
-
   /** HTTP などと同じ tracing handler が登録された observation registry。 */
   @Autowired private ObservationRegistry observationRegistry;
 
@@ -93,9 +83,6 @@ class ObservabilityContractTest {
 
   /** 終えた span。 */
   @Autowired private CapturedSpans capturedSpans;
-
-  /** HTTP の observation が記録するメトリクス。 */
-  @Autowired private MeterRegistry meterRegistry;
 
   @BeforeEach
   void installAppender() {
@@ -217,9 +204,8 @@ class ObservabilityContractTest {
   }
 
   @Test
-  @DisplayName(
-      "テナントを選んだ利用者の要求の受信の span は tenant.id と user.id を属性に持ち、http.server.request.duration の tag には持たない")
-  void serverSpanCarriesTenantAndUserButMetricsDoNot() throws Exception {
+  @DisplayName("テナントを選んだ利用者の要求の受信の span は tenant.id と user.id を属性に持つ")
+  void serverSpanCarriesTenantAndUser() throws Exception {
     final String orderId = UUID.randomUUID().toString();
 
     mockMvc
@@ -235,29 +221,6 @@ class ObservabilityContractTest {
     final Attributes attributes = spans.getFirst().getAttributes();
     assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
     assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
-    final List<String> tagKeys =
-        orderNotFoundTimer().getId().getTags().stream().map(Tag::getKey).toList();
-    assertFalse(tagKeys.contains(TENANT_ID.getKey()), tagKeys::toString);
-    assertFalse(tagKeys.contains(USER_ID.getKey()), tagKeys::toString);
-  }
-
-  @Test
-  @DisplayName("HTTP の受信の時間は、秒で semantic conventions の推奨の境界の bucket を持つ")
-  void serverDurationHasSemanticConventionBuckets() throws Exception {
-    mockMvc
-        .perform(
-            MockMvcRequestBuilders.get(ORDER_ROUTE, UUID.randomUUID()).with(AppUsers.oidcLogin()))
-        .andExpect(MockMvcResultMatchers.status().isNotFound());
-
-    // bucket が無いと OTLP は +Inf だけを送り、Grafana の histogram_quantile が値を返さない（ADR-133）。
-    final List<Double> bounds =
-        Arrays.stream(orderNotFoundTimer().takeSnapshot().histogramCounts())
-            .map(bucket -> bucket.bucket(TimeUnit.SECONDS))
-            .toList();
-    assertEquals(
-        List.of(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0),
-        bounds,
-        "http.server.request.duration の bucket の境界（秒）");
   }
 
   @Test
@@ -362,17 +325,6 @@ class ObservabilityContractTest {
   }
 
   /** {@code GET /api/orders/{orderId}} が 404 を返した要求の {@code http.server.request.duration}。 */
-  private Timer orderNotFoundTimer() {
-    final Timer timer =
-        meterRegistry
-            .find(HTTP_SERVER_DURATION)
-            .tag("http.route", ORDER_ROUTE)
-            .tag("http.response.status_code", "404")
-            .timer();
-    assertNotNull(timer, "GET " + ORDER_ROUTE + " の 404 の " + HTTP_SERVER_DURATION);
-    return timer;
-  }
-
   private Attributes singleRecordAttributes(final String event) {
     final List<LogRecordData> records = capturedLogRecords.withBody(event);
     assertEquals(1, records.size(), () -> "body=" + event + " の LogRecord 件数");

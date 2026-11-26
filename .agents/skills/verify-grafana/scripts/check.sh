@@ -66,10 +66,13 @@ B, JOB = sys.argv[1], sys.argv[2]
 get = lambda u: json.load(urllib.request.urlopen(u, timeout=20))
 prom = B + "/api/datasources/proxy/uid/prometheus/api/v1/query?query="
 bad = 0
-# 空のままにすると決めたパネル（panel が None ならダッシュボード全体）。理由は ADR-133。
+# 値を出さないと決めたダッシュボード（理由は ADR-133）。走査しない。
+SKIP_DASHBOARDS = {
+    "RED Metrics (native histogram)": "explicit bucket の histogram を送るので、native histogram の系列が無い",
+}
+# 空のままにすると決めたパネル（ダッシュボード、パネル）。理由は ADR-133。
 KNOWN_EMPTY = {
     ("JVM Overview (OpenTelemetry)", "Classes"): "Micrometer が jvm.class.count の単位を classes で送り、名前が jvm_class_count_classes になる",
-    ("RED Metrics (native histogram)", None): "explicit bucket の histogram を送っており、native histogram の系列が無い",
 }
 def walk(ps):
     for p in ps:
@@ -77,6 +80,9 @@ def walk(ps):
         yield from walk(p.get("panels", []))
 for d in get(B + "/api/search?type=dash-db"):
     dash = get(B + "/api/dashboards/uid/" + d["uid"])["dashboard"]
+    if dash["title"] in SKIP_DASHBOARDS:
+        print(f"SKIP {dash['title']}  {SKIP_DASHBOARDS[dash['title']]}")
+        continue
     for p in walk(dash.get("panels", [])):
         for t in p.get("targets", []):
             e = t.get("expr")
@@ -88,11 +94,11 @@ for d in get(B + "/api/search?type=dash-db"):
             e = re.sub(r"\$\{?\w+\}?", ".+", e)
             try:
                 r = get(prom + urllib.parse.quote(e))["data"]["result"]
-                n = sum(1 for x in r if "histogram" in x or x["value"][1] not in ("NaN", "+Inf", "-Inf"))
+                n = sum(1 for x in r if x["value"][1] not in ("NaN", "+Inf", "-Inf"))
             except Exception as ex:
                 n = "ERR " + str(ex)[:40]
             ok = isinstance(n, int) and n > 0
-            why = KNOWN_EMPTY.get((dash["title"], p.get("title"))) or KNOWN_EMPTY.get((dash["title"], None))
+            why = KNOWN_EMPTY.get((dash["title"], p.get("title")))
             label = f"{dash['title']} / {p.get('title')}  series={n}"
             if why and not ok:
                 print(f"GAP  {label}  既知: {why}")
