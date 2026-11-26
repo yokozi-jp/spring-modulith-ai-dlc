@@ -67,7 +67,7 @@
 - [ADR-063: Gradle の依存キャッシュを MIT の範囲で restore-keys 付きに復元する](ADR-063-restore-gradle-cache-with-restore-keys-on-mit-caching.md)（Proposed, 2026-10-06）
 - [ADR-064: OpenAPI 契約を test タスクで書き出し、Backend CI のテスト二重実行をやめる](ADR-064-write-openapi-contract-from-test-task-in-ci.md)（Proposed, 2026-10-06）
 - [ADR-065: 区分値を DB と API で enum の名前のまま持つ](ADR-065-store-category-values-as-enum-names.md)（Proposed, 2026-10-06）
-- [ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける](ADR-066-harden-csrf-cookie-with-host-prefix.md)（Accepted, Amended by ADR-119, 2026-10-06）
+- [ADR-066: CSRF の Cookie を __Host- の名前にし、SameSite=Lax を付ける](ADR-066-harden-csrf-cookie-with-host-prefix.md)（Accepted, Amended by ADR-119, Amended by ADR-134, 2026-10-06）
 - [ADR-067: jOOQ の生成物を Spring Modulith の OPEN のモジュールにする](ADR-067-open-jooq-generated-module.md)（Proposed, 2026-10-06）
 - [ADR-068: ブラウザのテレメトリを Faro Web SDK で集め、同一オリジンの /collect から Collector へ送る](ADR-068-collect-browser-telemetry-with-faro-via-collector.md)（Proposed, 2026-10-06）
 - [ADR-069: モジュール名とスキーマ名に SQL の予約語を使わない](ADR-069-avoid-sql-reserved-words-in-module-names.md)（Proposed, 2026-10-07）
@@ -132,3 +132,4 @@
 - [ADR-130: E2E のデータを各テストが作り、商品は本番の商品を登録する API で作る](ADR-130-create-e2e-data-per-test-with-product-registration-api.md)（Proposed, 2026-11-25）
 - [ADR-131: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す](ADR-131-archive-removed-child-rows-in-table-writer.md)（Proposed, 2026-11-25）
 - [ADR-132: 配信するセキュリティヘッダーに CORP と COOP を足し、HSTS を ADR-014 に揃える](ADR-132-add-corp-and-coop-to-delivered-security-headers.md)（Proposed, 2026-11-25）
+- [ADR-134: 更新系の要求の Origin と Sec-Fetch-Site を CSRF の token の前に確かめる](ADR-134-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)（Proposed, 2026-11-26）
