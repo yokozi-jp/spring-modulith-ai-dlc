@@ -69,6 +69,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 
 - `AuthorizationFilter` が拒否し、`ExceptionTranslationFilter` が返す 403
 - `TenantSelectionFilter` が投げる `TenantNotSelectedException`
+- `CrossOriginRequestFilter` が拒否する、別のオリジンからの更新系の要求
 - CSRF の検証の失敗
 
 認証していないリクエストのログは、`user.id` も `tenant.id` も持たない。

@@ -123,6 +123,7 @@ public class OpenApiConfig {
                 "ForbiddenProblem",
                 problemResponse(
                     "操作の権限がない。CSRF トークンの検証に失敗したときの type は /problems/csrf-token-invalid、"
+                        + "別のオリジンからの更新を拒否したときの type は /problems/cross-origin-request-rejected、"
                         + "テナントを選ぶ前に業務の API を呼んだときの type は /problems/tenant-not-selected",
                     PROBLEM_DETAIL))
             .addResponses("NotFoundProblem", problemResponse("対象のリソースが存在しない", PROBLEM_DETAIL))

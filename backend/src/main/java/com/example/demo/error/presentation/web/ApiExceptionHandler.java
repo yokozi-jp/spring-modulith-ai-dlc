@@ -5,6 +5,7 @@ import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
 import com.example.demo.shared.idempotency.IdempotencyKeyException;
+import com.example.demo.shared.security.CrossOriginRequestRejectedException;
 import com.example.demo.shared.security.TenantNotSelectedException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -67,13 +68,19 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return problem(exception, HttpStatus.UNAUTHORIZED, request);
   }
 
-  /** 権限が不足する API リクエストを 403 の about:blank に、CSRF token の失敗とテナントを選ぶ前の拒否をそれぞれ専用の type に変換する。 */
+  /**
+   * 権限が不足する API リクエストを 403 の about:blank に、CSRF token の失敗、別のオリジンからの更新の拒否、テナントを選ぶ前の拒否をそれぞれ専用の type
+   * に変換する。
+   */
   @ExceptionHandler(AccessDeniedException.class)
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
     // Invalid と Missing の親にあたる CsrfException で受け、subtype が増えても専用の type にする。
     if (exception instanceof CsrfException) {
       return problem(exception, CommonProblem.CSRF_TOKEN_INVALID, request);
+    }
+    if (exception instanceof CrossOriginRequestRejectedException) {
+      return problem(exception, CommonProblem.CROSS_ORIGIN_REQUEST_REJECTED, request);
     }
     if (exception instanceof TenantNotSelectedException) {
       return problem(exception, CommonProblem.TENANT_NOT_SELECTED, request);

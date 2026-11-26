@@ -30,6 +30,7 @@ class ProblemTypesTest {
             "/problems/idempotency-key-invalid",
             "/problems/idempotency-key-payload-mismatch",
             "/problems/csrf-token-invalid",
+            "/problems/cross-origin-request-rejected",
             "/problems/tenant-not-selected",
             "/problems/version-conflict",
             "/problems/lock-timeout",

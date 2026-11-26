@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequest
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.savedrequest.NullRequestCache;
@@ -146,6 +147,8 @@ public class SecurityConfig {
         // SPA が __Host-XSRF-TOKEN Cookie を読み、更新系リクエストの X-XSRF-TOKEN Header で送り返す。
         // spa() も repository を設定するため、その後で差し替える（逆の順では spa() が上書きする）。
         .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokenRepository()))
+        // 別のオリジンから来た更新系の要求は、token を確かめる前に専用の type の 403 にする（ADR-134）。
+        .addFilterBefore(new CrossOriginRequestFilter(handlerExceptionResolver), CsrfFilter.class)
         .oauth2Login(oauth2 ->
             oauth2.authorizationEndpoint(authorization ->
                 authorization.authorizationRequestResolver(authorizationRequestResolver)))

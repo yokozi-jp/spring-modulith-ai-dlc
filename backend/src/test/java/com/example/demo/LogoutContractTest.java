@@ -122,6 +122,25 @@ class LogoutContractTest {
   }
 
   @Test
+  @DisplayName("別のオリジンからの POST /logout は、CSRF トークンが正しくても専用の type の 403 になり、セッションを残す")
+  void crossOriginLogoutIsRejected() throws Exception {
+    mockMvc
+        .perform(
+            post("/logout")
+                .cookie(sessionCookie)
+                .with(csrf())
+                .header(HttpHeaders.ORIGIN, "https://evil.localhost")
+                .header("Sec-Fetch-Site", "same-site"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value("/problems/cross-origin-request-rejected"));
+
+    assertNotNull(
+        sessionRepository.findById(sessionId),
+        () -> "別のオリジンからの POST /logout の後にセッションが消えた: sessionId=" + sessionId);
+  }
+
+  @Test
   @DisplayName("誤った CSRF トークン付きの POST /logout は 403 になり、セッションを残す")
   void logoutWithInvalidCsrfTokenIsForbidden() throws Exception {
     mockMvc

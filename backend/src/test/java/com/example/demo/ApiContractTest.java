@@ -25,6 +25,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ArgumentsSource;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -33,6 +34,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 /** API の Problem Details、locale、ブラウザ向けセキュリティヘッダを HTTP レベルで検証する。 */
@@ -52,6 +54,13 @@ class ApiContractTest {
 
   /** CSRF トークンの検証失敗による 403 の problem type（ADR-058）。 */
   private static final String CSRF_TOKEN_INVALID = "/problems/csrf-token-invalid";
+
+  /** 別のオリジンからの更新を、CSRF トークンを確かめる前に拒否した 403 の problem type（ADR-134）。 */
+  private static final String CROSS_ORIGIN_REQUEST_REJECTED =
+      "/problems/cross-origin-request-rejected";
+
+  /** テナントを選ぶ前に業務の API を呼んだ 403 の problem type。CSRF の検査を通り抜けたことを示す。 */
+  private static final String TENANT_NOT_SELECTED = "/problems/tenant-not-selected";
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
@@ -200,6 +209,123 @@ class ApiContractTest {
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID))
         .andExpect(cookie().doesNotExist(CSRF_COOKIE));
+  }
+
+  @ParameterizedTest(name = "{0}: {1}")
+  @CsvSource({
+    "Origin, https://evil.localhost",
+    "Origin, http://localhost:8080",
+    "Origin, null",
+    "Origin, http://localhost:abc",
+    "Sec-Fetch-Site, cross-site",
+    "Sec-Fetch-Site, same-site",
+  })
+  @DisplayName("別のオリジンを示す更新は、CSRF トークンが正しくても専用の type の 403 Problem Details を返す")
+  void crossOriginUpdateIsRejectedBeforeCsrfToken(final String name, final String value)
+      throws Exception {
+    mockMvc
+        .perform(
+            post("/api/orders")
+                .with(user("test-user").roles("MEMBER"))
+                .with(csrf())
+                .header(name, value)
+                .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
+        .andExpect(status().isForbidden())
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+        .andExpect(jsonPath("$.type").value(CROSS_ORIGIN_REQUEST_REJECTED))
+        .andExpect(jsonPath("$.title").value("別のオリジンからの更新は受け付けません"))
+        .andExpect(jsonPath("$.status").value(403))
+        .andExpect(jsonPath("$.detail").doesNotExist());
+  }
+
+  @Test
+  @DisplayName("同じオリジンの Origin でも、Sec-Fetch-Site が same-site なら拒否する")
+  void sameSiteFetchIsRejectedEvenWithSameOrigin() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/orders")
+                .with(user("test-user").roles("MEMBER"))
+                .with(csrf())
+                .header(HttpHeaders.ORIGIN, "http://localhost")
+                .header("Sec-Fetch-Site", "same-site"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.type").value(CROSS_ORIGIN_REQUEST_REJECTED));
+  }
+
+  @ParameterizedTest(name = "Origin={0}, Sec-Fetch-Site={1}")
+  @CsvSource(
+      nullValues = "-",
+      value = {"http://localhost, same-origin", "http://localhost, -", "-, none", "-, -"})
+  @DisplayName("同じオリジンを示すか、どちらの header もない更新は、CSRF トークンが正しければ通る")
+  void sameOriginOrHeaderlessUpdatePassesWithCsrfToken(final String origin, final String fetchSite)
+      throws Exception {
+    final MockHttpServletRequestBuilder request =
+        post("/api/orders").with(user("test-user").roles("MEMBER")).with(csrf());
+    if (origin != null) {
+      request.header(HttpHeaders.ORIGIN, origin);
+    }
+    if (fetchSite != null) {
+      request.header("Sec-Fetch-Site", fetchSite);
+    }
+    // CSRF の検査の後ろの TenantSelectionFilter まで届いたことを、その専用の type で確かめる。
+    mockMvc
+        .perform(request)
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.type").value(TENANT_NOT_SELECTED));
+  }
+
+  @Test
+  @DisplayName("Origin と Sec-Fetch-Site が同じオリジンでも、CSRF トークンがなければ CSRF の 403 を返す")
+  void sameOriginUpdateWithoutCsrfTokenStillFailsCsrf() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/orders")
+                .with(user("test-user").roles("MEMBER"))
+                .header(HttpHeaders.ORIGIN, "http://localhost")
+                .header("Sec-Fetch-Site", "same-origin"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.type").value(CSRF_TOKEN_INVALID));
+  }
+
+  @Test
+  @DisplayName("X-Forwarded-Host と X-Forwarded-Proto が示す公開のオリジンの Origin は通る")
+  void publicOriginBehindProxyPasses() throws Exception {
+    mockMvc
+        .perform(
+            post("/api/orders")
+                .with(user("test-user").roles("MEMBER"))
+                .with(csrf())
+                .header("X-Forwarded-Host", "app.example.com")
+                .header("X-Forwarded-Proto", "https")
+                .header(HttpHeaders.ORIGIN, "https://app.example.com")
+                .header("Sec-Fetch-Site", "same-origin"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.type").value(TENANT_NOT_SELECTED));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"GET", "HEAD", "OPTIONS"})
+  @DisplayName("GET、HEAD、OPTIONS は、別のオリジンを示しても拒否せず、認証の検査に進む")
+  void safeMethodsAreNotCheckedForOrigin(final String method) throws Exception {
+    mockMvc
+        .perform(
+            request(HttpMethod.valueOf(method), "/api/orders")
+                .header(HttpHeaders.ORIGIN, "https://evil.localhost")
+                .header("Sec-Fetch-Site", "cross-site"))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("/api/** と /logout の外の更新は、別のオリジンを示しても拒否しない")
+  void updateOutsideApiAndLogoutIsNotCheckedForOrigin() throws Exception {
+    // CSRF の検査の後ろの、認証の検査まで届く。
+    mockMvc
+        .perform(
+            post("/orders")
+                .with(csrf())
+                .header(HttpHeaders.ORIGIN, "https://evil.localhost")
+                .header("Sec-Fetch-Site", "cross-site"))
+        .andExpect(status().isUnauthorized());
   }
 
   @Test

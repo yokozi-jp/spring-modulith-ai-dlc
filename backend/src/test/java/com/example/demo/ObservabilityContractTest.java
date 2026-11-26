@@ -36,6 +36,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
@@ -277,6 +278,25 @@ class ObservabilityContractTest {
         .perform(MockMvcRequestBuilders.post(path).with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/csrf-token-invalid"));
+
+    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
+  }
+
+  @Test
+  @DisplayName("別のオリジンからの更新の拒否のログは、user.id を持ち、tenant.id を持たない")
+  void crossOriginRejectionLogCarriesUserWithoutTenant() throws Exception {
+    final String path = ORDERS_PATH + UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post(path)
+                .with(AppUsers.oidcLogin())
+                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                .header(HttpHeaders.ORIGIN, "https://evil.localhost"))
+        .andExpect(MockMvcResultMatchers.status().isForbidden())
+        .andExpect(
+            MockMvcResultMatchers.jsonPath("$.type")
+                .value("/problems/cross-origin-request-rejected"));
 
     assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
   }
