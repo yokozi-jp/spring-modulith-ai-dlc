@@ -3,16 +3,19 @@ package com.example.demo.eventcontract;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static java.util.stream.Collectors.toSet;
 
+import java.lang.reflect.Method;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.jackson.autoconfigure.JacksonAutoConfiguration;
@@ -39,6 +42,10 @@ final class EventContract {
    *
    * <p>{@code application.yaml} を読み、Spring Boot の Jackson の自動構成と、Spring Modulith の Jackson 3 の
    * {@code EventSerializer} の自動構成だけを載せる。後者は package-private のため、名前で読み込む。
+   *
+   * <p>Spring Modulith の版を上げると、{@code JacksonEventSerializationConfiguration}
+   * の名前かパッケージが変わるか、外から見えなくなることがある。この定数がクラスの初期化で例外を投げたら、新しい版の {@code spring-modulith-events-jackson}
+   * で {@code EventSerializer} を登録する自動構成のクラスを探し、ここの名前をそれに直す。
    */
   /* package */ static final ApplicationContextRunner SERIALIZER_CONTEXT =
       new ApplicationContextRunner()
@@ -50,206 +57,242 @@ final class EventContract {
                       "org.springframework.modulith.events.jackson.JacksonEventSerializationConfiguration",
                       null)));
 
-  /** fixture の置き場所。直し方のメッセージに使う。 */
-  private static final String FIXTURE_DIR = "backend/src/test/resources/events/";
+  /** テストのリソースの根。直し方に fixture の置き場所を書くのに使う。 */
+  private static final String RESOURCE_ROOT = "backend/src/test/resources/";
 
-  /** 型の名前とパッケージを変えたときの直し方。 */
-  private static final String KEEP_TYPE_NAME =
-      "型の名前とパッケージを変えず、新しい型を足す。DB に古い型の出版が残る間は、古い型とそれを受けるリスナーを残す。";
+  /** 変更の規則に反したときの直し方。 */
+  private static final String FOLLOW_CHANGE_RULE =
+      "docs/backend/class-roles/event.md の「必須の記述」の変更の規則に従う。変更を戻すか、新しい型のイベントを足す。";
 
   /** JSON の木の比較だけに使う、設定を持たない mapper。 */
   private static final JsonMapper TREE = JsonMapper.shared();
 
   private EventContract() {}
 
-  /**
-   * 1 件の fixture。
-   *
-   * @param typeName ファイル名が示すイベントの型の完全な名前
-   * @param version ファイル名が示す版（1 から）
-   * @param json ファイルの中身
-   * @param fileName ファイル名
-   */
-  /* package */ record EventFixture(String typeName, int version, String json, String fileName) {
-
-    /** 型と版から fixture のファイル名を作る。 */
-    /* package */ static String fileName(final String typeName, final int version) {
-      return typeName + ".v" + version + ".json";
-    }
-  }
-
-  /**
-   * 規則の違反。
-   *
-   * @param fixture 違反した fixture のファイル名（ない fixture は、置くべきファイル名）
-   * @param problem 何が悪いか
-   * @param fix 直し方
-   */
-  /* package */ record Violation(String fixture, String problem, String fix) {
-
-    @Override
-    public String toString() {
-      return fixture + "：" + problem + " 直し方：" + fix;
-    }
-  }
+  /** {@link EventSerializer} で読めた fixture と、読んだ値。 */
+  private record ReadFixture(EventFixture fixture, Object value) {}
 
   /** 読んだ値で {@code null} だった component。 */
   private record NullComponent(String path, boolean nullable) {}
 
   /**
-   * クラスパスのディレクトリの fixture を読み、ファイル名の違反と {@link #check} の違反を返す。
+   * クラスパスのディレクトリの fixture を読み、リスナーが受ける型と照らして違反を返す。
    *
    * @param listenedEventTypes {@code @ApplicationModuleListener} が受けるイベントの型
-   * @param directory fixture を置くクラスパスのディレクトリ
+   * @param fixtureDirectory fixture を置くクラスパスのディレクトリ（{@code events} など）
    * @param serializer 本番と同じ {@link EventSerializer}
    * @return 違反。ない場合は空
    */
-  /* package */ static List<Violation> checkDirectory(
+  /* package */ static List<ContractViolation> check(
       final Set<Class<?>> listenedEventTypes,
-      final String directory,
+      final String fixtureDirectory,
       final EventSerializer serializer) {
-    final EventFixtures.Loaded loaded = EventFixtures.load(directory);
-    final List<Violation> violations = new ArrayList<>(loaded.violations());
-    violations.addAll(check(listenedEventTypes, loaded.fixtures(), serializer));
-    return violations;
-  }
-
-  /**
-   * リスナーが受ける型と fixture を照らし、違反を返す。
-   *
-   * @param listenedEventTypes {@code @ApplicationModuleListener} が受けるイベントの型
-   * @param fixtures 名前を解釈した fixture
-   * @param serializer 本番と同じ {@link EventSerializer}
-   * @return 違反。ない場合は空
-   */
-  /* package */ static List<Violation> check(
-      final Set<Class<?>> listenedEventTypes,
-      final List<EventFixture> fixtures,
-      final EventSerializer serializer) {
+    final EventFixtures.Loaded loaded = EventFixtures.load(fixtureDirectory);
     final Map<String, Class<?>> listened =
         listenedEventTypes.stream()
             .collect(toMap(Class::getName, Function.identity(), (a, b) -> a, TreeMap::new));
     final Map<String, List<EventFixture>> byType =
-        fixtures.stream()
+        loaded.fixtures().stream()
             .sorted(Comparator.comparingInt(EventFixture::version))
             .collect(groupingBy(EventFixture::typeName, TreeMap::new, toList()));
-    final List<Violation> violations = new ArrayList<>();
-    listened.keySet().forEach(typeName -> checkVersions(typeName, byType, violations));
-    byType.forEach((typeName, versions) -> {
-      final int newest = versions.getLast().version();
-      versions.forEach(fixture ->
-          checkFixture(
-              fixture,
-              listened.get(typeName),
-              fixture.version() == newest,
-              serializer,
-              violations));
+    final List<ContractViolation> violations = new ArrayList<>(loaded.violations());
+    listened
+        .keySet()
+        .forEach(typeName ->
+            violations.addAll(
+                missingVersions(
+                    typeName, byType.getOrDefault(typeName, List.of()), fixtureDirectory)));
+    byType.forEach((typeName, fixtures) -> {
+      final Class<?> type = listened.get(typeName);
+      violations.addAll(
+          type == null
+              ? unresolvedType(fixtures)
+              : readableFixtures(type, fixtures, fixtureDirectory, serializer));
     });
     return violations;
   }
 
-  /** リスナーが受ける型に、v1 から欠けずに続く fixture がある。 */
-  private static void checkVersions(
-      final String typeName,
-      final Map<String, List<EventFixture>> byType,
-      final List<Violation> violations) {
-    final Set<Integer> versions = new TreeSet<>();
-    byType.getOrDefault(typeName, List.of()).forEach(fixture -> versions.add(fixture.version()));
-    final int newest = versions.stream().max(Integer::compare).orElse(1);
-    for (int version = 1; version <= newest; version++) {
-      if (!versions.contains(version)) {
-        violations.add(
-            new Violation(
-                EventFixture.fileName(typeName, version),
-                "リスナーが受ける型 " + typeName + " の v" + version + " の fixture がない。",
-                "版は v1 から欠けずに続ける。v1 がないなら、今の型を EventSerializer で書いた JSON を "
-                    + FIXTURE_DIR
-                    + EventFixture.fileName(typeName, 1)
-                    + " に置く。途中の版がないなら、消した fixture を戻す。"));
-      }
-    }
+  /** リスナーが受ける型の、v1 から最も新しい版までで欠けた版。版の昇順に並んだ fixture を受ける。 */
+  private static List<ContractViolation> missingVersions(
+      final String typeName, final List<EventFixture> fixtures, final String fixtureDirectory) {
+    final Set<Integer> present = fixtures.stream().map(EventFixture::version).collect(toSet());
+    final int newest = fixtures.isEmpty() ? 1 : fixtures.getLast().version();
+    return IntStream.rangeClosed(1, newest)
+        .filter(version -> !present.contains(version))
+        .mapToObj(version -> {
+          final String fileName = EventFixture.fileName(typeName, version);
+          return new ContractViolation(
+              fileName,
+              "リスナーが受ける型 " + typeName + " の v" + version + " の fixture がない。版は v1 から欠けずに続ける。",
+              "fixture を " + RESOURCE_ROOT + fixtureDirectory + "/" + fileName + " に置く。");
+        })
+        .toList();
   }
 
-  /** fixture の型にリスナーがあり、今の型で読め、同じ JSON に書き直し、必須の component が埋まる。最も新しい版はすべての component が埋まる。 */
-  private static void checkFixture(
-      final EventFixture fixture,
-      final @Nullable Class<?> type,
-      final boolean newest,
-      final EventSerializer serializer,
-      final List<Violation> violations) {
-    if (type == null) {
-      violations.add(
-          new Violation(
-              fixture.fileName(),
-              ClassUtils.isPresent(fixture.typeName(), null)
-                  ? "fixture の型 " + fixture.typeName() + " を受けるリスナーがない。"
-                  : "fixture の型 "
+  /** リスナーが受けない型の fixture。型を読み込めるならリスナーがなく、読み込めないなら型の名前かパッケージが変わった。 */
+  private static List<ContractViolation> unresolvedType(final List<EventFixture> fixtures) {
+    return fixtures.stream()
+        .map(fixture -> {
+          final String fileName = EventFixture.fileName(fixture.typeName(), fixture.version());
+          return ClassUtils.isPresent(fixture.typeName(), null)
+              ? new ContractViolation(
+                  fileName,
+                  "fixture の型 " + fixture.typeName() + " を受けるリスナーがない。",
+                  "DB に古い型の出版が残る間は、その型を受けるリスナーを残す。")
+              : new ContractViolation(
+                  fileName,
+                  "fixture の型 "
                       + fixture.typeName()
                       + " を読み込めない。型の名前かパッケージを変えると、Spring Modulith は DB に残る出版を WARN だけを出して落とす。",
-              KEEP_TYPE_NAME));
-      return;
-    }
-    final Object value;
-    try {
-      value = serializer.deserialize(fixture.json(), type);
-    } catch (final JacksonException e) {
-      violations.add(
-          new Violation(
-              fixture.fileName(),
-              "EventSerializer で " + type.getName() + " に読めない：" + e.getOriginalMessage(),
-              "component の型を戻す。型を変えたいなら、新しい型のイベントを足す。"));
-      return;
-    }
-    final JsonNode expected = TREE.readTree(fixture.json());
-    final JsonNode actual = TREE.readTree(serializer.serialize(value).toString());
-    if (!expected.equals(actual)) {
-      violations.add(
-          new Violation(
-              fixture.fileName(),
-              "読んで書き直した JSON が fixture と違う。fixture=" + expected + "、書き直した JSON=" + actual,
-              "component の削除と名前の変更、spring.jackson の設定の変更を戻す。足すのは @Nullable の参照型の component"
-                  + " だけにし、プリミティブを足さない。形を変えたいなら新しい型のイベントを足す。過去の fixture は書き換えない。"));
-    }
-    final List<NullComponent> nulls = new ArrayList<>();
-    collectNulls(value, "", nulls);
-    for (final NullComponent component : nulls) {
-      if (component.nullable()) {
-        if (newest) {
-          violations.add(
-              new Violation(
-                  fixture.fileName(),
-                  "最も新しい版の fixture を読んだ値の component "
-                      + component.path()
-                      + " が null である。今の形の fixture がない。",
-                  "今の型を EventSerializer で書いた JSON を、次の版の "
-                      + FIXTURE_DIR
-                      + EventFixture.fileName(fixture.typeName(), fixture.version() + 1)
-                      + " に足す。過去の fixture は書き換えない。"));
-        }
-      } else {
-        violations.add(
-            new Violation(
-                fixture.fileName(),
-                "読んだ値の @Nullable でない component " + component.path() + " が null である。",
-                "component の名前を変えたなら戻す。足した component なら @Nullable を付けるか、必須の項目なら新しい型のイベントを足す。"));
-      }
-    }
+                  "型の名前とパッケージを変えず、新しい型を足す。");
+        })
+        .toList();
   }
 
   /**
-   * record の component を入れ子の record までたどり、値のない component を集める。
+   * リスナーが受ける型の fixture を今の型で読み、同じ JSON に書き直すことと、必須の component が埋まることを確かめる。最も新しい版は {@code @Nullable}
+   * の component も埋まることを確かめる。
    *
-   * <p>ponytail: コレクション、{@link Map}、配列の中はたどらない。イベントにそれらを持たせるときに足す。
+   * @param fixtures 版の昇順に並んだ、1 件以上の fixture
    */
-  private static void collectNulls(
-      final Object value, final String path, final List<NullComponent> found) {
-    if (!(value instanceof Record)) {
-      return;
+  private static List<ContractViolation> readableFixtures(
+      final Class<?> type,
+      final List<EventFixture> fixtures,
+      final String fixtureDirectory,
+      final EventSerializer serializer) {
+    final List<ContractViolation> violations = new ArrayList<>();
+    final List<ReadFixture> reads = new ArrayList<>();
+    for (final EventFixture fixture : fixtures) {
+      try {
+        reads.add(new ReadFixture(fixture, serializer.deserialize(fixture.json(), type)));
+      } catch (final JacksonException e) {
+        violations.add(
+            new ContractViolation(
+                EventFixture.fileName(fixture.typeName(), fixture.version()),
+                "EventSerializer で " + type.getName() + " に読めない：" + e.getOriginalMessage(),
+                FOLLOW_CHANGE_RULE));
+      }
     }
-    for (final RecordComponent component : value.getClass().getRecordComponents()) {
+    for (final ReadFixture read : reads) {
+      roundTrip(read.fixture(), read.value(), serializer).ifPresent(violations::add);
+      violations.addAll(requiredNulls(read.fixture(), read.value()));
+    }
+    if (!reads.isEmpty() && reads.getLast().fixture().equals(fixtures.getLast())) {
+      violations.addAll(
+          nullsInNewest(reads.getLast().fixture(), reads.getLast().value(), fixtureDirectory));
+    }
+    return violations;
+  }
+
+  /** 読んだ値を {@link EventSerializer} で書き直した JSON が、fixture と JSON の木で等しい。 */
+  private static Optional<ContractViolation> roundTrip(
+      final EventFixture fixture, final Object value, final EventSerializer serializer) {
+    final JsonNode actual;
+    try {
+      actual = TREE.readTree(serializer.serialize(value).toString());
+    } catch (final JacksonException e) {
+      return Optional.of(
+          new ContractViolation(
+              EventFixture.fileName(fixture.typeName(), fixture.version()),
+              "読んだ値を EventSerializer で書き直せない：" + e.getOriginalMessage(),
+              FOLLOW_CHANGE_RULE));
+    }
+    final JsonNode expected = TREE.readTree(fixture.json());
+    return expected.equals(actual)
+        ? Optional.empty()
+        : Optional.of(
+            new ContractViolation(
+                EventFixture.fileName(fixture.typeName(), fixture.version()),
+                "読んで書き直した JSON が fixture と違う。component の削除、名前の変更、プリミティブの追加、spring.jackson の設定の変更で起きる。fixture="
+                    + expected
+                    + "、書き直した JSON="
+                    + actual,
+                FOLLOW_CHANGE_RULE));
+  }
+
+  /** 読んだ値の {@code @Nullable} でない component が {@code null} である（必須の component を足した）。 */
+  private static List<ContractViolation> requiredNulls(
+      final EventFixture fixture, final Object value) {
+    return nulls(value).stream()
+        .filter(component -> !component.nullable())
+        .map(component ->
+            new ContractViolation(
+                EventFixture.fileName(fixture.typeName(), fixture.version()),
+                "読んだ値の @Nullable でない component " + component.path() + " が null である。",
+                FOLLOW_CHANGE_RULE))
+        .toList();
+  }
+
+  /**
+   * 最も新しい版の fixture を読んだ値の {@code @Nullable} の component が {@code null} である（今の形の fixture
+   * を足し忘れた）。{@code @Nullable} でない component の {@code null} は {@link #requiredNulls} が挙げる。
+   */
+  private static List<ContractViolation> nullsInNewest(
+      final EventFixture newest, final Object value, final String fixtureDirectory) {
+    return nulls(value).stream()
+        .filter(NullComponent::nullable)
+        .map(component ->
+            new ContractViolation(
+                EventFixture.fileName(newest.typeName(), newest.version()),
+                "最も新しい版の fixture を読んだ値の component "
+                    + component.path()
+                    + " が null である。今の形の fixture がない。",
+                "今の型を EventSerializer で書いた JSON を、次の版の "
+                    + RESOURCE_ROOT
+                    + fixtureDirectory
+                    + "/"
+                    + EventFixture.fileName(newest.typeName(), newest.version() + 1)
+                    + " に置く。"))
+        .toList();
+  }
+
+  /** 読んだ値の、{@code null} の component。 */
+  private static List<NullComponent> nulls(final Object value) {
+    final List<NullComponent> found = new ArrayList<>();
+    collectNulls(value, "", found);
+    return found;
+  }
+
+  /**
+   * record の component を、入れ子の record と、{@link Iterable} の要素、{@link Map} の値、配列の要素、{@link Optional}
+   * の中身までたどり、値のない component を集める。
+   *
+   * <p>要素や値そのものの {@code null} は挙げない。fixture に書いた {@code null} であり、足した component の欠けではないためである。
+   */
+  // Object は sealed でないため、record、コレクション、Optional の外の値はすべて default で受ける。
+  @SuppressWarnings("PMD.NoDefaultInPatternOrEnumSwitch")
+  private static void collectNulls(
+      final @Nullable Object value, final String path, final List<NullComponent> found) {
+    switch (value) {
+      case Record record -> collectComponentNulls(record, path, found);
+      case Iterable<?> items -> {
+        int index = 0;
+        for (final Object item : items) {
+          collectNulls(item, path + "[" + index + "]", found);
+          index++;
+        }
+      }
+      case Map<?, ?> map ->
+          map.forEach((key, item) -> collectNulls(item, path + "[" + key + "]", found));
+      case Object[] array -> {
+        for (int index = 0; index < array.length; index++) {
+          collectNulls(array[index], path + "[" + index + "]", found);
+        }
+      }
+      case Optional<?> optional -> optional.ifPresent(item -> collectNulls(item, path, found));
+      case null, default -> {}
+    }
+  }
+
+  /** record の component の値を読み、{@code null} なら集め、そうでなければ {@link #collectNulls} でたどる。 */
+  private static void collectComponentNulls(
+      final Record record, final String path, final List<NullComponent> found) {
+    for (final RecordComponent component : record.getClass().getRecordComponents()) {
       final String componentPath =
           path.isEmpty() ? component.getName() : path + "." + component.getName();
-      final Object child = ReflectionUtils.invokeMethod(component.getAccessor(), value);
+      final Method accessor = component.getAccessor();
+      ReflectionUtils.makeAccessible(accessor);
+      final Object child = ReflectionUtils.invokeMethod(accessor, record);
       if (child == null) {
         found.add(
             new NullComponent(

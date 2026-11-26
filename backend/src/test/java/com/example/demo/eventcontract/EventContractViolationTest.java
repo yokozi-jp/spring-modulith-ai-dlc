@@ -6,14 +6,13 @@ import archfixture.eventcontract.CompatibleEvent;
 import archfixture.eventcontract.ComponentRemoved;
 import archfixture.eventcontract.ComponentRenamed;
 import archfixture.eventcontract.ComponentTypeChanged;
+import archfixture.eventcontract.ListElementRequiredComponentAdded;
 import archfixture.eventcontract.NestedRequiredComponentAdded;
 import archfixture.eventcontract.NullableComponentAdded;
 import archfixture.eventcontract.PrimitiveAdded;
 import archfixture.eventcontract.RequiredComponentAdded;
 import archfixture.eventcontract.VersionGap;
 import archfixture.eventcontract.WithoutFixture;
-import com.example.demo.eventcontract.EventContract.Violation;
-import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.modulith.events.core.EventSerializer;
 
 /**
@@ -37,6 +37,15 @@ class EventContractViolationTest {
   /** 読んで書き直した JSON が fixture と違うときの問題の書き出し。 */
   private static final String REWRITTEN_DIFFERS = "読んで書き直した JSON が fixture と違う";
 
+  /** ファイル名の形が違うときの問題の書き出し。 */
+  private static final String BAD_FILE_NAME = "ファイル名が <型の完全な名前>.v<n>.json の形でない";
+
+  /** ファイル名の形が違う fixture を置くシナリオ。 */
+  private static final String BAD_FILE_NAME_SCENARIO = "bad-file-name";
+
+  /** シナリオの fixture を置くクラスパスのディレクトリの接頭辞。 */
+  private static final String SCENARIO_ROOT = "archfixture-events/";
+
   @ParameterizedTest(name = "{0} は {2} を「{3}」で挙げる")
   @MethodSource("violations")
   @DisplayName("違反する型と fixture を、fixture と問題を挙げて検出する")
@@ -45,14 +54,24 @@ class EventContractViolationTest {
       final Set<Class<?>> listenedEventTypes,
       final String fixture,
       final String problem) {
-    EventContract.SERIALIZER_CONTEXT.run(context ->
-        assertThat(check(scenario, listenedEventTypes, context.getBean(EventSerializer.class)))
-            .as("シナリオ %s の違反", scenario)
-            .anySatisfy(violation -> {
-              assertThat(violation.fixture()).isEqualTo(fixture);
-              assertThat(violation.problem()).contains(problem);
-              assertThat(violation.fix()).isNotBlank();
-            }));
+    assertThat(new ClassPathResource(SCENARIO_ROOT + scenario).exists())
+        .as("シナリオ %s の fixture のディレクトリ %s%s がある", scenario, SCENARIO_ROOT, scenario)
+        .isTrue();
+    assertDetects(scenario, listenedEventTypes, fixture, problem);
+  }
+
+  @Test
+  @DisplayName("fixture のディレクトリがないとき、リスナーが受ける型の v1 の fixture がないことを挙げる")
+  void detectsMissingFixtureWithoutDirectory() {
+    // git は空のディレクトリを持てないため、no-fixture のディレクトリは置かない。ディレクトリがないことがこのシナリオである。
+    assertThat(new ClassPathResource(SCENARIO_ROOT + "no-fixture").exists())
+        .as("シナリオ no-fixture の fixture のディレクトリ %sno-fixture がない", SCENARIO_ROOT)
+        .isFalse();
+    assertDetects(
+        "no-fixture",
+        Set.of(WithoutFixture.class),
+        PACKAGE + "WithoutFixture.v1.json",
+        "の v1 の fixture がない");
   }
 
   @Test
@@ -60,9 +79,9 @@ class EventContractViolationTest {
   void acceptsNullableComponentWithNewestFixture() {
     EventContract.SERIALIZER_CONTEXT.run(context ->
         assertThat(
-                check(
-                    "compatible",
+                EventContract.check(
                     Set.of(CompatibleEvent.class),
+                    SCENARIO_ROOT + "compatible",
                     context.getBean(EventSerializer.class)))
             .as("シナリオ compatible の違反")
             .isEmpty());
@@ -102,6 +121,11 @@ class EventContractViolationTest {
             PACKAGE + "NestedRequiredComponentAdded.v1.json",
             "@Nullable でない component item.note が null"),
         Arguments.of(
+            "list-element-required-component-added",
+            Set.of(ListElementRequiredComponentAdded.class),
+            PACKAGE + "ListElementRequiredComponentAdded.v1.json",
+            "@Nullable でない component items[0].note が null"),
+        Arguments.of(
             "primitive-added",
             Set.of(PrimitiveAdded.class),
             PACKAGE + "PrimitiveAdded.v1.json",
@@ -117,26 +141,41 @@ class EventContractViolationTest {
             PACKAGE + "NullableComponentAdded.v1.json",
             "最も新しい版の fixture を読んだ値の component note が null"),
         Arguments.of(
-            "no-fixture",
-            Set.of(WithoutFixture.class),
-            PACKAGE + "WithoutFixture.v1.json",
-            "の v1 の fixture がない"),
-        Arguments.of(
             "version-gap",
             Set.of(VersionGap.class),
             PACKAGE + "VersionGap.v2.json",
             "の v2 の fixture がない"),
         Arguments.of("no-listener", Set.of(), PACKAGE + "WithoutListener.v1.json", "を受けるリスナーがない"),
-        Arguments.of("bad-file-name", Set.of(), PACKAGE + "WithoutListener.v01.json", "の形でない"),
-        Arguments.of("bad-file-name", Set.of(), PACKAGE + "WithoutListener.v0.json", "の形でない"),
-        Arguments.of("bad-file-name", Set.of(), PACKAGE + "WithoutListener.json", "の形でない"));
+        Arguments.of(
+            BAD_FILE_NAME_SCENARIO, Set.of(), PACKAGE + "WithoutListener.v01.json", BAD_FILE_NAME),
+        Arguments.of(
+            BAD_FILE_NAME_SCENARIO, Set.of(), PACKAGE + "WithoutListener.v0.json", BAD_FILE_NAME),
+        Arguments.of(
+            BAD_FILE_NAME_SCENARIO, Set.of(), PACKAGE + "WithoutListener.json", BAD_FILE_NAME),
+        Arguments.of(
+            "bad-file-name",
+            Set.of(),
+            PACKAGE + "WithoutListener.v99999999999.json",
+            BAD_FILE_NAME));
   }
 
-  private static List<Violation> check(
+  /** シナリオの fixture を検査し、fixture と問題を挙げた違反があることを確かめる。 */
+  private static void assertDetects(
       final String scenario,
       final Set<Class<?>> listenedEventTypes,
-      final EventSerializer serializer) {
-    return EventContract.checkDirectory(
-        listenedEventTypes, "archfixture-events/" + scenario, serializer);
+      final String fixture,
+      final String problem) {
+    EventContract.SERIALIZER_CONTEXT.run(context ->
+        assertThat(
+                EventContract.check(
+                    listenedEventTypes,
+                    SCENARIO_ROOT + scenario,
+                    context.getBean(EventSerializer.class)))
+            .as("シナリオ %s の違反", scenario)
+            .anySatisfy(violation -> {
+              assertThat(violation.fixture()).isEqualTo(fixture);
+              assertThat(violation.problem()).contains(problem);
+              assertThat(violation.fix()).isNotBlank();
+            }));
   }
 }
