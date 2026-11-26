@@ -81,11 +81,10 @@ describe("注文の詳細の画面", () => {
 
     await renderRoute(detailPath);
 
-    await expect(
-      screen.findByRole("heading", { name: "ページが見つかりません" }),
-    ).resolves.toBeTruthy();
+    const heading = await screen.findByRole("heading", { name: "ページが見つかりません" });
     // アプリシェルの main の中に出し、main を重ねない。
-    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(screen.getByRole("main")).toContainElement(heading);
+    expect(screen.getByRole("button", { name: "ログアウト" })).toBeTruthy();
   });
 
   it("下書きでなければ更新の操作を出さない", async () => {
