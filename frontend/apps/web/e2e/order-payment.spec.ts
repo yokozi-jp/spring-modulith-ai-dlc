@@ -1,4 +1,4 @@
-import type { Page, TestInfo } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 import { listPayments, readJson } from "./api";
 import type { Product } from "./fixtures";
@@ -14,10 +14,6 @@ import type { ChargeFailure } from "./payment-gateway";
 // 決済代行の応答は、WireMock の管理 API で注文ごとに実行中に切り替える（ADR-072）。
 // 出版の状態、試行の回数、再投入の後の決済記録は、読む公開の入口も再投入の公開の入口も無いため、
 // backend の PaymentGatewayClientIntegrationTest が本番の Client と既存の再投入の入口で確かめる。
-
-async function attachScreenshot(page: Page, testInfo: TestInfo, name: string): Promise<void> {
-  await testInfo.attach(name, { body: await page.screenshot(), contentType: "image/png" });
-}
 
 interface OrderScreens {
   page: Page;
@@ -54,7 +50,8 @@ test("注文を作成し確定すると、Listener が決済代行へ請求し�
   orderDetailPage,
   orderListPage,
   productFactory,
-}, testInfo) => {
+  expectNoA11yViolations,
+}) => {
   const { orderId, code, total } = await createAndConfirm(
     { page, orderCreatePage, orderDetailPage },
     { product: await productFactory(), prefix: "E2E-PAY" },
@@ -68,7 +65,7 @@ test("注文を作成し確定すると、Listener が決済代行へ請求し�
     new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY" }).format(total),
   );
   expect(await chargeRequestCount(page.request, orderId), `orderId=${orderId} の請求`).toBe(1);
-  await attachScreenshot(page, testInfo, "paid");
+  await expectNoA11yViolations("paid");
 
   await orderListPage.openDetail(code);
   await expectPaymentText(orderDetailPage, "決済済み");
@@ -88,7 +85,7 @@ async function expectNotResubmitted(
 // 一時障害のあいだは決済記録が無い。E2E の backend は `.env.test` で定期の再投入を無効にしているため（ADR-079）、成功に戻しても自動では再投入しない。
 async function expectTransientFailure(
   screens: OrderScreens,
-  testInfo: TestInfo,
+  expectNoA11yViolations: (name: string) => Promise<void>,
   { product, failure }: { product: Product; failure: ChargeFailure },
 ): Promise<void> {
   // 決済の欄の読み直しの期間（15 秒）を、確定の後と読み直しのボタンの後の二度待つため、既定の 30 秒を超える。
@@ -109,7 +106,7 @@ async function expectTransientFailure(
     // 欄は読み直しの期間が過ぎるまで処理中を出し、その後に再投入待ちを出す。
     await expectPaymentText(screens.orderDetailPage, screens.orderDetailPage.paymentNotYetText);
     expect(await listPayments(screens.page.request, orderId), `orderId=${orderId}`).toEqual([]);
-    await attachScreenshot(screens.page, testInfo, `${failure.kind}-not-yet`);
+    await expectNoA11yViolations(`${failure.kind}-not-yet`);
   } finally {
     await Promise.all(restores.map((restore) => restore()));
   }
@@ -121,8 +118,9 @@ test("決済代行が 5xx を返すと、決済記録を作らず、成功に戻
   orderCreatePage,
   orderDetailPage,
   productFactory,
-}, testInfo) => {
-  await expectTransientFailure({ page, orderCreatePage, orderDetailPage }, testInfo, {
+  expectNoA11yViolations,
+}) => {
+  await expectTransientFailure({ page, orderCreatePage, orderDetailPage }, expectNoA11yViolations, {
     product: await productFactory(),
     failure: { kind: "status", status: 503 },
   });
@@ -133,8 +131,9 @@ test("決済代行の応答がタイムアウトすると、決済記録を作�
   orderCreatePage,
   orderDetailPage,
   productFactory,
-}, testInfo) => {
-  await expectTransientFailure({ page, orderCreatePage, orderDetailPage }, testInfo, {
+  expectNoA11yViolations,
+}) => {
+  await expectTransientFailure({ page, orderCreatePage, orderDetailPage }, expectNoA11yViolations, {
     product: await productFactory(),
     failure: { kind: "delay", milliseconds: 3000 },
   });
@@ -146,6 +145,7 @@ test("決済代行が拒否すると、拒否を表示する", async ({
   orderDetailPage,
   orderListPage,
   productFactory,
+  expectNoA11yViolations,
 }) => {
   const product = await productFactory();
   const restores: (() => Promise<void>)[] = [];
@@ -159,6 +159,7 @@ test("決済代行が拒否すると、拒否を表示する", async ({
     );
 
     await expectPaymentText(orderDetailPage, "決済代行が決済を拒否しました。");
+    await expectNoA11yViolations("declined");
     await orderListPage.openDetail(code);
     await expectPaymentText(orderDetailPage, "決済代行が決済を拒否しました。");
   } finally {
@@ -266,6 +267,7 @@ test.describe("一覧と詳細と作成の画面で、注文と商品の状態�
     orderDetailPage,
     orderListPage,
     productFactory,
+    expectNoA11yViolations,
   }) => {
     const code = await createInStatus(
       { orderCreatePage, orderDetailPage },
@@ -276,6 +278,7 @@ test.describe("一覧と詳細と作成の画面で、注文と商品の状態�
     await orderListPage.openDetail(code);
 
     await expectPaymentText(orderDetailPage, "この注文は決済の対象ではありません。");
+    await expectNoA11yViolations("cancelled");
   });
 
   test("作成の画面の商品の選択肢に、販売終了の商品を出さない", async ({

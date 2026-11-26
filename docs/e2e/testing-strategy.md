@@ -1,8 +1,8 @@
 ---
 type: Convention
 title: E2E テストの方針と書き方
-description: E2E テストの対象、配置、テストデータ、外部システムの偽物、認証、書き方、不安定なテスト、実行環境、後片付け、失敗の調べ方、CI を定める規約。E2E テストを追加、変更するとき、Playwright の設定や task e2e、E2E の CI を変えるとき、E2E の失敗を調べるときに読む。
-tags: [convention, e2e, playwright, testing]
+description: E2E テストの対象、配置、テストデータ、外部システムの偽物、認証、アクセシビリティの検査、書き方、不安定なテスト、実行環境、後片付け、失敗の調べ方、CI を定める規約。E2E テストを追加、変更するとき、Playwright の設定や task e2e、E2E の CI を変えるとき、E2E の失敗を調べるときに読む。
+tags: [convention, e2e, playwright, testing, accessibility]
 ---
 
 # E2E テストの方針と書き方
@@ -18,6 +18,7 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 - 複数画面にまたがる主要な利用者の流れに限る。
 - unit test と component test で確かめられる観点は E2E に書かない。
   観点の割り当ては[テスト観点の割り当て](../frontend/test-strategy.md)に従う。
+- 例外として、画面ごとのアクセシビリティの axe の検査を E2E に置く。jsdom は描画の色を計算できないためである（[アクセシビリティの検査](#アクセシビリティの検査)）。
 
 ## 配置と構成
 
@@ -29,10 +30,11 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 `telemetry.ts` と `pages.ts` は Playwright の中だけで使うため、相対の import に拡張子を付けない。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
-`frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/v1/products`）で商品を作る `productFactory` を持つ。
+`frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/v1/products`）で商品を作る `productFactory` と、axe で画面を検査する `makeAxeBuilder` と `expectNoA11yViolations` を持つ（[アクセシビリティの検査](#アクセシビリティの検査)）。
 `frontend/apps/web/e2e/api.ts` は、公開 API の応答の本文を読む `readJson` と、注文の決済記録を読む `listPayments` を持つ。
 `environment.ts`、`fixtures.ts`、`api.ts`、`payment-gateway.ts` と、画面のクラス（`order-create-page.ts`、`order-list-page.ts`、`order-detail-page.ts`）は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
 `task fe-check` が、この 7 つを Node で import できることを確かめる。
+`fixtures.ts` が import する `@axe-core/playwright` も、この import で解決できることを確かめる。
 画面の操作と文言は、[ページオブジェクト](#ページオブジェクト)に従い、画面ごとのクラスに置く。
 決済の欄は、確定した注文に決済記録がない間、確定から 15 秒まで 1 秒ごとに自分で読み直し、その間は処理中を出す。
 期間が過ぎても記録がなければ再投入待ちを出し、読み直しのボタンを出す。
@@ -44,6 +46,8 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 - `order-payment.spec.ts`：注文の作成、確定、Listener の請求、決済の表示と、決済代行の 5xx、タイムアウト、拒否、CSRF を確かめる。
   一覧の状態の絞り込み、取消済みの注文の詳細、作成の画面で販売終了の商品を出さないことも、自分で作った注文と商品で確かめる。
 - `order-conflict.spec.ts`：同じ注文を 2 つのタブで開き、楽観的ロックの競合と、画面が示す回復の選択肢ごとの結果を確かめる。
+
+画面ごとのアクセシビリティは `a11y.spec.ts` が確かめる（[アクセシビリティの検査](#アクセシビリティの検査)）。
 
 `frontend/apps/web/playwright.config.ts` の設定は次のとおりである。
 
@@ -129,6 +133,24 @@ setup project は、`storageState` を持たない browser context で `/oauth2/
 - Lint はルートの `frontend/vite.config.ts` の設定で `vp check` が検査する。
   Playwright Test の API に当たる vitest plugin の規則だけを `apps/web/e2e/**` で外している（[フロントエンドのLint設定](../frontend/lint-config.md#ファイルの範囲ごとの制限)）。
   `apps/web/e2e/**` からもテレメトリの SDK（`@grafana/*`）を import できない。
+
+## アクセシビリティの検査
+
+`a11y.spec.ts` は、画面ごとに axe（`@axe-core/playwright`）を流し、違反が 1 件でもあれば失敗にする（[ADR-142](../adr/ADR-142-check-accessibility-with-axe-in-playwright-e2e.md)）。
+
+- 規則は、タグ `wcag2a`、`wcag2aa`、`wcag21a`、`wcag21aa`、`wcag22aa`、`best-practice` で選ぶ。`fixtures.ts` の `makeAxeBuilder` がこのタグの `AxeBuilder` を返す。
+- 画面は、トップ、注文の一覧、注文の作成（空のまま送信した検証エラーの状態を含む）、下書きと確定済みの注文の詳細、メンバー、テナントの選択、404、ログアウト後の画面である。
+  メンバーの画面は、`test-user` が管理者でないため、管理者だけが使えることを示す表示を検査する。所属の一覧の表は検査しない。
+  注文は、[テストデータ](#テストデータ)のとおり各テストが画面で作る。
+  ログアウト後の画面とログアウトした後の 404 は、専用の browser context でログインしてから確かめる。
+- 配色は、ライトとダーク（Playwright の `colorScheme`。画面は `prefers-color-scheme` に従う）の両方で流す。
+  配色や幅の組を足すときは、`a11y.spec.ts` の `variants` に 1 行足す。
+- Keycloak のログインの画面は、この repo の画面ではないので含めない。
+- 流れの中でしか届かない状態（競合の選択肢、決済の欄の決済済み、再投入待ち、拒否、対象外）は、その流れの spec が `expectNoA11yViolations` を呼んで確かめる。
+- `expectNoA11yViolations` は、画面の screenshot と、axe の結果の全体（`incomplete` を含む JSON）を HTML report に添付する。
+  違反は、規則の id、対象の selector、`helpUrl` を失敗の文言に出す。
+- `incomplete`（axe が自動で決められなかった項目）は失敗にしない。report の JSON を読んで、人が確かめる。
+- 1 つの spec だけが開く画面（メンバー、テナントの選択、404）は、画面のクラスを作らず、`a11y.spec.ts` の中で開いて見出しを待つ。
 
 ## ページオブジェクト
 
@@ -243,7 +265,7 @@ build、コンテナの起動、後片付けは行わない。
 
 ## 証拠
 
-- spec は、主要な状態（決済済み、再投入待ち、競合の選択肢）の screenshot を `testInfo.attach` で HTML report に添付する。
+- spec は、主要な状態（決済済み、再投入待ち、拒否、対象外、競合の選択肢）の screenshot を、`expectNoA11yViolations` で axe の結果と一緒に HTML report に添付する。
 - CI は、成功時に `e2e-evidence` artifact に HTML report を保存する。
   `backend.log` は失敗の調査にだけ使うため、成功時には保存せず、失敗時の `e2e-results` だけに入れる。
   retry で成功したテストも、失敗した試行の trace を HTML report に残す。

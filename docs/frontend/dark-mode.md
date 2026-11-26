@@ -15,6 +15,8 @@ tags: [convention, frontend, ui, theme, accessibility, future-arch-guidelines]
 - 明暗の配色は `packages/ui/src/style.css` のsemantic token（`--background` など）の値として定義し、componentに具体的な色を書かない（[ADR-025](../adr/ADR-025-adopt-shadcn-base-ui-and-tailwind.md)）。
 - 現在はOSの設定に従い、`prefers-color-scheme: dark` のときにtokenの値を切り替える。
 - 明暗の両方で、文字と操作要素の視認性とcontrastを確認する。
+  E2Eの`a11y.spec.ts`が、画面ごとにライトとダークの配色でaxeの`color-contrast`を流し、文字と背景の組が4.5:1（大きな文字は3:1）に届かなければ失敗にする（[アクセシビリティの検査](../e2e/testing-strategy.md#アクセシビリティの検査)）。
+  hover、focus、無効の状態の組と、文字でない操作要素の境界（WCAGの1.4.11）は、axeが確かめないので手で確認する。
 - 画像は明暗のどちらの背景でも見えるよう、背景を透過できる形式（SVG、PNG、WebPなど）にする。
 
 ## 手動の切替を加える場合

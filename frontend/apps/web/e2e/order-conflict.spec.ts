@@ -34,17 +34,14 @@ async function conflictOnLines(detail: OrderDetailPage): Promise<void> {
 }
 
 test("明細の競合で「変更を捨てて最新を表示する」を選ぶと、ほかのタブの明細に戻り、続けて保存できる", async ({
-  page,
   orderCreatePage,
   orderDetailPage,
   productFactory,
-}, testInfo) => {
+  expectNoA11yViolations,
+}) => {
   await openTwoTabs({ orderCreatePage, orderDetailPage }, await productFactory());
   await conflictOnLines(orderDetailPage);
-  await testInfo.attach("conflict-choices", {
-    body: await page.screenshot(),
-    contentType: "image/png",
-  });
+  await expectNoA11yViolations("conflict-choices");
 
   await orderDetailPage.discardChangesButton.click();
 
