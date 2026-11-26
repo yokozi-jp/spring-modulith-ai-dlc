@@ -6,24 +6,19 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import ch.qos.logback.classic.Level;
-import ch.qos.logback.classic.Logger;
-import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.classic.spi.IThrowableProxy;
-import ch.qos.logback.core.read.ListAppender;
+import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.SharedTestConfiguration;
+import io.opentelemetry.api.common.AttributeKey;
+import io.opentelemetry.api.common.Attributes;
+import io.opentelemetry.api.logs.Severity;
+import io.opentelemetry.sdk.logs.data.LogRecordData;
 import jakarta.servlet.http.Cookie;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.stream.Collectors;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -35,7 +30,6 @@ import org.springframework.security.web.WebAttributes;
 import org.springframework.session.Session;
 import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
@@ -46,8 +40,7 @@ import org.springframework.web.util.UriUtils;
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(SharedTestConfiguration.class)
-// 補助のメソッドは、Exception を宣言する MockMvc.perform を呼ぶ。
-@SuppressWarnings({"PMD.SignatureDeclareThrowsException", "PMD.TooManyStaticImports"})
+@SuppressWarnings("PMD.TooManyStaticImports")
 class LoginFailureContractTest {
 
   /** ログインのコールバック。 */
@@ -65,6 +58,9 @@ class LoginFailureContractTest {
   /** コールバックの後のセッションを読む JDBC のリポジトリ。 */
   @Autowired private JdbcIndexedSessionRepository sessionRepository;
 
+  /** OTLP へ送る直前の LogRecord。 */
+  @Autowired private CapturedLogRecords capturedLogRecords;
+
   @Test
   @DisplayName("IdP のエラーのコールバックは /login-failed へ移り、error code だけを INFO に残し、error_description を残さない")
   void idpErrorRedirectsToLoginFailed() throws Exception {
@@ -78,46 +74,43 @@ class LoginFailureContractTest {
         Objects.requireNonNull(start.getCookie(SESSION_COOKIE), "認可の開始でセッションの Cookie が来ない");
     final String state = state(Objects.requireNonNull(start.getHeader(HttpHeaders.LOCATION)));
     final String description = "marker-" + UUID.randomUUID();
+    final int failuresBefore = capturedLogRecords.withBody(EVENT).size();
 
-    final List<ILoggingEvent> logs = new ArrayList<>();
-    final ResultActions callback =
-        captureLogs(
-            logs,
-            () ->
-                mockMvc.perform(
-                    get(CALLBACK)
-                        .cookie(session)
-                        .param(OAuth2ParameterNames.ERROR, "access_denied")
-                        .param(OAuth2ParameterNames.ERROR_DESCRIPTION, description)
-                        .param(OAuth2ParameterNames.STATE, state)));
+    mockMvc
+        .perform(
+            get(CALLBACK)
+                .cookie(session)
+                .param(OAuth2ParameterNames.ERROR, "access_denied")
+                .param(OAuth2ParameterNames.ERROR_DESCRIPTION, description)
+                .param(OAuth2ParameterNames.STATE, state))
+        .andExpect(status().isFound())
+        .andExpect(redirectedUrl("/login-failed"));
 
-    callback.andExpect(status().isFound()).andExpect(redirectedUrl("/login-failed"));
     final Session stored =
         Objects.requireNonNull(sessionRepository.findById(sessionId(session)), "コールバックの後のセッションがない");
     assertThat(stored.getAttributeNames())
         .as("コールバックの後のセッションの属性")
         .doesNotContain(WebAttributes.AUTHENTICATION_EXCEPTION);
-    assertFailureLogged(logs, "access_denied");
-    assertThat(logs)
-        .as("コールバックの間の INFO 以上のログ")
-        .noneSatisfy(log -> assertThat(textOf(log)).contains(description));
+    assertFailureLogged(failuresBefore, "access_denied");
+    assertThat(capturedLogRecords.all())
+        .as("LogRecord")
+        .noneSatisfy(record -> assertThat(record.toString()).contains(description));
   }
 
   @Test
   @DisplayName("認可リクエストを持つセッションのないコールバックは /login-failed へ移り、その error code を INFO に残す")
   void callbackWithoutAuthorizationRequestRedirectsToLoginFailed() throws Exception {
-    final List<ILoggingEvent> logs = new ArrayList<>();
-    final ResultActions callback =
-        captureLogs(
-            logs,
-            () ->
-                mockMvc.perform(
-                    get(CALLBACK)
-                        .param(OAuth2ParameterNames.CODE, "x")
-                        .param(OAuth2ParameterNames.STATE, "y")));
+    final int failuresBefore = capturedLogRecords.withBody(EVENT).size();
 
-    callback.andExpect(status().isFound()).andExpect(redirectedUrl("/login-failed"));
-    assertFailureLogged(logs, "authorization_request_not_found");
+    mockMvc
+        .perform(
+            get(CALLBACK)
+                .param(OAuth2ParameterNames.CODE, "x")
+                .param(OAuth2ParameterNames.STATE, "y"))
+        .andExpect(status().isFound())
+        .andExpect(redirectedUrl("/login-failed"));
+
+    assertFailureLogged(failuresBefore, "authorization_request_not_found");
   }
 
   /** IdP へ移す Location から、セッションに保存した認可リクエストの state を読む。 */
@@ -135,53 +128,13 @@ class LoginFailureContractTest {
     return new String(Base64.getDecoder().decode(session.getValue()), UTF_8);
   }
 
-  private static void assertFailureLogged(final List<ILoggingEvent> logs, final String errorType) {
-    final List<ILoggingEvent> failures =
-        logs.stream().filter(log -> EVENT.equals(log.getMessage())).toList();
-    assertThat(failures).as("event=%s の記録", EVENT).hasSize(1);
-    final ILoggingEvent failure = failures.getFirst();
-    assertThat(failure.getLevel()).as("レベル").isEqualTo(Level.INFO);
-    assertThat(failure.getThrowableProxy()).as("例外").isNull();
-    final Map<String, @Nullable Object> keyValues =
-        failure.getKeyValuePairs().stream()
-            .collect(Collectors.toMap(pair -> pair.key, pair -> pair.value));
-    assertThat(keyValues).as("属性").isEqualTo(Map.of("error.type", errorType));
-  }
-
-  /** 記録の message、属性、例外の message をつないだ文字列。 */
-  private static String textOf(final ILoggingEvent log) {
-    final StringBuilder text = new StringBuilder(log.getFormattedMessage());
-    if (log.getKeyValuePairs() != null) {
-      log.getKeyValuePairs().forEach(pair -> text.append(' ').append(pair.value));
-    }
-    for (IThrowableProxy cause = log.getThrowableProxy(); cause != null; cause = cause.getCause()) {
-      text.append(' ').append(cause.getMessage());
-    }
-    return text.toString();
-  }
-
-  /** root の logger に appender を付けて要求を送り、INFO 以上の記録を {@code logs} に入れる。 */
-  // 記録を書くのではなく、root の logger に appender を付けて読むため、LoggerFactory を使う。
-  @SuppressWarnings("PMD.UseLombokSlf4j")
-  private static ResultActions captureLogs(
-      final List<ILoggingEvent> logs, final ThrowingRequest request) throws Exception {
-    // key-value はコンソールの書式によって出ないため、Logback の記録そのものを読む。
-    final Logger root = (Logger) LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
-    final ListAppender<ILoggingEvent> appender = new ListAppender<>();
-    appender.start();
-    root.addAppender(appender);
-    try {
-      return request.perform();
-    } finally {
-      root.detachAppender(appender);
-      logs.addAll(appender.list);
-    }
-  }
-
-  /** 例外を投げうる要求の送信。 */
-  @FunctionalInterface
-  private interface ThrowingRequest {
-    /** 要求を送り、応答を返す。 */
-    ResultActions perform() throws Exception;
+  private void assertFailureLogged(final int failuresBefore, final String errorType) {
+    final List<LogRecordData> failures = capturedLogRecords.withBody(EVENT);
+    assertThat(failures).as("event=%s の記録", EVENT).hasSize(failuresBefore + 1);
+    final LogRecordData failure = failures.getLast();
+    assertThat(failure.getSeverity()).as("レベル").isEqualTo(Severity.INFO);
+    assertThat(failure.getAttributes())
+        .as("属性")
+        .isEqualTo(Attributes.of(AttributeKey.stringKey("error.type"), errorType));
   }
 }
