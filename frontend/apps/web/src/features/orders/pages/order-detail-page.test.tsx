@@ -5,23 +5,21 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { http } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
+import { stubCsrfCookie } from "@/testing/csrf-cookie";
 import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
+import { firstLineRow, notice, saveQuantity } from "@/testing/order-detail-screen";
 import {
   draftOrder,
   eraserId,
-  firstLineRow,
   noContent,
-  notice,
   orderId,
   penId,
   problemResponse,
   products,
-  saveQuantity,
   serveDetail,
   serveDetailFailingRefetch,
   serveUpdate,
-  stubCsrfCookie,
 } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";
 

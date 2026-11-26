@@ -23,6 +23,8 @@ tags: [convention, frontend, file-role]
 - `apps/web/src/testing/render-route.tsx`：`renderRoute(path, { locale })`。`main.tsx` と同じ provider と router の既定値で、最初の loader を終えてから描画する
 - `apps/web/src/testing/query-client.ts`：`createTestQueryClient()`。本番の `createQueryClient()` から query の再試行だけを外す
 - `apps/web/src/testing/gate.ts`：`createGate()`。`release` を呼ぶまで解決しない promise を作る
+- `apps/web/src/testing/csrf-cookie.ts`：`stubCsrfCookie()`。`document.cookie` が CSRF の Cookie を返すようにする
+- `apps/web/src/testing/order-detail-screen.ts`：注文の詳細の画面を操作し、要素を取る（`saveQuantity`、`notice`、`firstLineRow`）
 - `apps/web/src/testing/catalog-i18n.ts`：Node のテストが使う `t`。`ja.json` だけを読んだ instance から取る
 
 MSW の server（`src/testing/msw.ts`）と、業務機能ごとの fixture と handler（`src/testing/<feature>.ts`）は [MSW の handler と fixture](msw-handler.md) が扱う。

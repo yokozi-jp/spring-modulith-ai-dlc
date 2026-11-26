@@ -6,8 +6,9 @@ import type { PaymentSummaryResponse } from "@frontend/api/models";
 import { screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
 
+import { stubCsrfCookie } from "@/testing/csrf-cookie";
 import { server } from "@/testing/msw";
-import { draftOrder, orderId, products, serveDetail, stubCsrfCookie } from "@/testing/orders";
+import { draftOrder, orderId, products, serveDetail } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";
 
 const detailPath = `/orders/${orderId}`;
