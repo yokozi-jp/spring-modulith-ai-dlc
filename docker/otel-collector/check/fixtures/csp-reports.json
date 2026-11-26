@@ -170,5 +170,26 @@
     },
     "type": "csp-violation",
     "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src"
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "blockedURL": "",
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src"
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
   }
 ]

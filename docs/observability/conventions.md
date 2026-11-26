@@ -205,10 +205,12 @@ Compose の `otel-collector` にはメモリ上限が無いので、ローカル
 
 transform と filter の `error_mode` は `ignore` にする。
 失敗した文は Collector のログに warn で出て、処理は続く。
-次の processor だけは `silent` に残し、理由を設定のコメントに書く。
+通常の経路で失敗する文には、guard を付けて実行しない。
+OTTL の関数には、nil や一致しない入力で失敗するものがある（`Len`、`ExtractPatterns` など）。
+失敗する文が通常の経路に残ると、`error_mode: ignore` の warn が record ごとに出て、文を壊した退行の warn と区別できない。
 
-- `transform/frontend_validate`、`transform/frontend_csp`：型や項目が違う record で nil に対する文が失敗するのが通常の経路で、record ごとに warn が出る。
-- `transform/frontend_csp_parse`：JSON でない本文を送られるたびに、送り手が書いた文字を含む warn が出る。
+`transform/frontend_csp_parse` だけは `silent` に残し、理由を設定のコメントに書く。
+JSON でない本文を送られるたびに、送り手が書いた文字を含む warn が出るためである。
 
 ## 検証
 
@@ -223,7 +225,11 @@ transform と filter の `error_mode` は `ignore` にする。
   CSP の報告の fixture（`csp-reports.json`）を `logs/frontend_csp` に流し、出口の件数、4 つの属性、縮約した URL、resource 属性、空の scope の属性を確かめる。
   fixture は、query と fragment、大文字の scheme、userinfo、path の ID、長すぎる origin、数値でない port、`@` を重ねた userinfo、`documentURL`、`sourceFile`、`lineNumber`、`columnNumber` の入力、`disposition` のない報告、CSP 以外の型（deprecation、intervention、crash）を含み、CSP 以外の型、不正な directive、`disposition` のない報告が捨てられることを確かめる。
   `webhook_event` の受け口が、`application/reports+json` 以外の `Content-Type`（旧形式、header なし、有効な本文の `text/plain`）に 401、正しい `Content-Type` の JSON でない本文に 200（出口には残さない）、64 KiB を超える本文と空の本文に 400、GET に 405、別のパスに 404 を返すことも確かめる。
+  `blockedURL` が無い報告と空の報告も流し、`csp.blocked` を残さず報告だけが残ることを確かめる。
   Collector の設定を変えたら実行する。
+- **`task otel-collector-check` のログの検査**：fixture を流し終えた後、Collector のログに `failed to execute statement` が 1 件もないことを確かめる。
+  `error_mode: ignore` の processor で通常の経路の文が失敗すると、ここで落ちる。
+  `value` が無い exception と空の exception、`blockedURL` が無い報告と空の報告は、guard の欠落を捕まえる fixture である。
 - **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることと、ログとトレースの resource が同じ `service.instance.id` を持つことを確かめる。
   MDC の `tenant.id` と `user.id` がコンソールの JSON の入れ子の項目と LogRecord の属性に出ることと、テナントを選んだ要求の中のログと受信の span がその 2 つを持つことも確かめる（`http.server.request.duration` の tag が持たないことは[指標の名前と属性](metrics.md#検証)で確かめる）。
 - **`OrderConfirmedListenerTest`**：リスナーの中のログが、イベントのテナントの `tenant.id` を持ち、発行したスレッドの MDC の `user.id` を持たないことを確かめる。

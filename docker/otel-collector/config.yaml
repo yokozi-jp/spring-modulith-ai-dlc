@@ -43,10 +43,9 @@ processors:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
       - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code", "conflict.kind", "problem.type", "error.type", "tenant.id", "user.id", "event_publication.id", "event_publication.event_type", "event_publication.listener_id", "event_publication.completion_attempts", "event_publication.resubmitted.count", "event_publication.over_limit.count", "event_publication.completed.count", "event_publication.incomplete.count", "event_publication.remaining.count"])
   # faro receiver の logfmt 本文を解析し、型と値を検証した record だけへ Collector 内部の印を付ける。
+  # 文が失敗した record には印が付かず、filter/frontend_logs が捨てる。
   transform/frontend_validate:
-    # 型が違う record では Len が nil に対して失敗するのが通常の経路で、record ごとに warn が出る。
-    # 失敗した文は属性を付けず、frontend.accepted が付かない record は filter が捨てるので silent にする。
-    error_mode: silent
+    error_mode: ignore
     log_statements:
       - delete_key(log.attributes, "frontend.accepted")
       - delete_key(log.attributes, "frontend.session")
@@ -63,10 +62,10 @@ processors:
       - set(log.cache["route"], log.cache["event_data_toView"]) where log.attributes["kind"] == "event"
       # route の allowlist はこの 1 行だけに書く。task fe-route-tree-check と task otel-collector-check が routeTree.gen.ts と照合する。
       - set(log.attributes["frontend.view"], log.cache["route"]) where IsMatch(log.cache["route"], "^(?:/|/logged-out|/login-failed|/members|/orders/|/orders/[$$]orderId/|/orders/new|/tenants)$$")
-      - set(log.attributes["frontend.lcp"], Double(log.cache["value_lcp"])) where Len(log.cache["value_lcp"]) >= 1 and Len(log.cache["value_lcp"]) <= 32 and IsMatch(log.cache["value_lcp"], "^[0-9]+(?:\\.[0-9]+)?$$")
-      - set(log.attributes["frontend.inp"], Double(log.cache["value_inp"])) where Len(log.cache["value_inp"]) >= 1 and Len(log.cache["value_inp"]) <= 32 and IsMatch(log.cache["value_inp"], "^[0-9]+(?:\\.[0-9]+)?$$")
-      - set(log.attributes["frontend.cls"], Double(log.cache["value_cls"])) where Len(log.cache["value_cls"]) >= 1 and Len(log.cache["value_cls"]) <= 32 and IsMatch(log.cache["value_cls"], "^[0-9]+(?:\\.[0-9]+)?$$")
-      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "exception" and log.attributes["frontend.session"] != nil and IsMatch(log.cache["type"], "^[A-Za-z_$$][A-Za-z0-9_$$.]{0,127}$$") and Len(log.cache["value"]) <= 8192 and (log.cache["stacktrace"] == nil or Len(log.cache["stacktrace"]) <= 65536)
+      - set(log.attributes["frontend.lcp"], Double(log.cache["value_lcp"])) where IsMatch(log.cache["value_lcp"], "^[0-9]+(?:\\.[0-9]+)?$$") and Len(log.cache["value_lcp"]) <= 32
+      - set(log.attributes["frontend.inp"], Double(log.cache["value_inp"])) where IsMatch(log.cache["value_inp"], "^[0-9]+(?:\\.[0-9]+)?$$") and Len(log.cache["value_inp"]) <= 32
+      - set(log.attributes["frontend.cls"], Double(log.cache["value_cls"])) where IsMatch(log.cache["value_cls"], "^[0-9]+(?:\\.[0-9]+)?$$") and Len(log.cache["value_cls"]) <= 32
+      - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "exception" and log.attributes["frontend.session"] != nil and IsMatch(log.cache["type"], "^[A-Za-z_$$][A-Za-z0-9_$$.]{0,127}$$") and IsString(log.cache["value"]) and Len(log.cache["value"]) <= 8192 and (log.cache["stacktrace"] == nil or Len(log.cache["stacktrace"]) <= 65536)
       - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "event" and log.cache["event_name"] == "view_changed" and log.attributes["frontend.session"] != nil and log.attributes["frontend.view"] != nil
       - set(log.attributes["frontend.accepted"], "true") where log.attributes["kind"] == "measurement" and log.cache["type"] == "web-vitals" and log.attributes["frontend.session"] != nil and log.attributes["frontend.view"] != nil and ((log.attributes["frontend.lcp"] != nil and log.attributes["frontend.lcp"] >= 0 and log.cache["value_inp"] == nil and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.attributes["frontend.inp"] != nil and log.attributes["frontend.inp"] >= 0 and log.cache["value_cls"] == nil) or (log.cache["value_lcp"] == nil and log.cache["value_inp"] == nil and log.attributes["frontend.cls"] != nil and log.attributes["frontend.cls"] >= 0))
   filter/frontend_logs:
@@ -136,10 +135,9 @@ processors:
         - log.attributes["frontend.accepted"] != "true"
   # 検証済みの報告から固定本文と最終属性を作る。文書の URL は残さず、blockedURL は origin か scheme かキーワードまで縮約する。
   # 属性を足すときは docs/observability/conventions.md と同じ変更で直す。
+  # 文が失敗すると、その文が付ける属性は付かない。
   transform/frontend_csp:
-    # blockedURL のない報告では、nil に対する Len、ExtractPatterns、ConvertCase が失敗するのが通常の経路で、報告ごとに warn が出る。
-    # 失敗した文は属性を付けない側に倒れるので silent にする。
-    error_mode: silent
+    error_mode: ignore
     log_statements:
       - set(log.cache["blocked"], log.body["body"]["blockedURL"]) where IsString(log.body["body"]["blockedURL"]) and Len(log.body["body"]["blockedURL"]) <= 8192
       # inline、eval、data などのキーワードはそのまま残す。
@@ -147,13 +145,13 @@ processors:
       # 階層を持つ URL は scheme と host と port だけにし、userinfo、path、path parameter、query、fragment を落とす。
       # authority の全体が hostname か角括弧の IPv6 と数値の port に一致しなければ残さない。@ を重ねた URL と数値でない port は落とす。
       # \ は WHATWG URL と同じく path の始まりとみなすので、\@ で区切りをごまかした URL は \ の前の host になる。
-      - set(log.cache["origin"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*://)(?:[^/?#@\\s\\\\]*@)?(?P<authority>(?:[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:.]+\\])(?::[0-9]{1,5})?)(?:[/?#;\\\\]|$$)"))
+      - set(log.cache["origin"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*://)(?:[^/?#@\\s\\\\]*@)?(?P<authority>(?:[A-Za-z0-9.-]+|\\[[0-9A-Fa-f:.]+\\])(?::[0-9]{1,5})?)(?:[/?#;\\\\]|$$)")) where IsString(log.cache["blocked"])
       - set(log.attributes["csp.blocked"], Concat([log.cache["origin"]["scheme"], log.cache["origin"]["authority"]], "")) where log.attributes["csp.blocked"] == nil and log.cache["origin"]["authority"] != nil
       # data: のような階層を持たない URL は scheme だけを残す。authority が不正な階層 URL を scheme に縮約しない。
-      - set(log.attributes["csp.blocked"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*):")["scheme"]) where log.attributes["csp.blocked"] == nil and not IsMatch(log.cache["blocked"], "^[A-Za-z][A-Za-z0-9+.-]*://")
+      - set(log.attributes["csp.blocked"], ExtractPatterns(log.cache["blocked"], "^(?P<scheme>[A-Za-z][A-Za-z0-9+.-]*):")["scheme"]) where log.attributes["csp.blocked"] == nil and IsMatch(log.cache["blocked"], "^[A-Za-z][A-Za-z0-9+.-]*:") and not IsMatch(log.cache["blocked"], "^[A-Za-z][A-Za-z0-9+.-]*://")
       - set(log.attributes["csp.blocked"], ConvertCase(log.attributes["csp.blocked"], "lower")) where log.attributes["csp.blocked"] != nil
       # 長すぎる origin は送り手が任意の値を詰められるので残さない。
-      - delete_key(log.attributes, "csp.blocked") where Len(log.attributes["csp.blocked"]) > 300
+      - delete_key(log.attributes, "csp.blocked") where IsString(log.attributes["csp.blocked"]) and Len(log.attributes["csp.blocked"]) > 300
       - set(log.attributes["csp.directive"], log.body["body"]["effectiveDirective"])
       - set(log.attributes["csp.disposition"], log.body["body"]["disposition"])
       - set(log.attributes["telemetry.signal"], "csp-violation")
