@@ -48,8 +48,8 @@ gh pr checks <番号> --required --watch --fail-fast
 - CIとhookのゲートを変える。`.github/`（workflow、CODEOWNERS、`dependabot.yml`）、`lefthook.yml`、`commitlint.config.mjs`、ruleset、検査の設定と除外（`.betterleaks.toml`、`docker/zap/`、PMD、SpotBugs、Semgrepのルール）、`Taskfile.yml`の検査Taskが該当する。
 - 認証、認可、CSRF、秘密情報の扱いを変える。
 - 依存を追加する。
-- テストを弱める。テストファイルを消す、テストケースを減らす、coverageやmutationの基準を下げる、検査をskipするなどが該当する。
-  テストファイルの削除とテストケースの減少は、pre-pushの[`task test-weakening`](../tooling/lint-and-test.md)が警告する。
+- テストを弱める。テストファイルを消す、テストケースを減らす、過去のイベントのfixture（`backend/src/test/resources/events/`）を書き換えるか消す、coverageやmutationの基準を下げる、検査をskipするなどが該当する。
+  テストファイルの削除、テストケースの減少、イベントのfixtureの変更と削除は、pre-pushの[`task test-weakening`](../tooling/lint-and-test.md)が警告する。
 
 Dependabotのpatchとminorの更新は、[ADR-021](../adr/ADR-021-group-dependabot-minor-and-patch-updates.md)に従って自動でマージされるため、この条件の対象にしない。
 

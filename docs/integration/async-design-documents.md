@@ -38,6 +38,7 @@ tags: [convention, integration, async, documentation, future-arch-guidelines]
 一律に定義を置くと抜け漏れを防ぎやすく、コンシューマー側との認識違いを防げ、スキーマ変更時のやり取りと再実行の運用に必要な情報が残る。
 
 - モジュール間のイベントは、モジュールルートに置くイベント型を契約とする（[バックエンドアーキテクチャ](../backend/architecture.md)）。
+  保存した出版はデプロイの後のコードが読むため、イベント型の変更は `@Nullable` の component の追加だけにし、`EventContractTest` が過去の版の fixture で確かめる（[クラスの役割：イベント](../backend/class-roles/event.md)の「必須の記述」と「対応するテスト」）。
 - 外部ブローカーへ送るメッセージは、送信先のキューやトピック、操作、ペイロードのスキーマを AsyncAPI で定義し、Git で管理する。
 
 ## キューの一覧

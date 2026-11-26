@@ -359,7 +359,7 @@ Docker Compose の操作（サービスの起動、停止、状態確認、Keycl
 push 前には `task adr-check` が pre-push で走り、判断が絡む変更（依存、セキュリティ、DB、インフラ、ワークフロー、およびテストと E2E と lint の fixture を除くフロントエンド）に `docs/adr/` の更新が伴わないとき注意喚起します。
 既定は非ブロッキングで、該当しない場合は `ADR_ACK=1 git push` で抑制できます。
 
-テストファイルの削除とテストケースの減少は、pre-push の `task test-weakening` が警告します。
+テストファイルの削除、テストケースの減少、過去のイベントの fixture（`backend/src/test/resources/events/`）の変更と削除は、pre-push の `task test-weakening` が警告します。
 非ブロッキングで、意図した変更なら `TESTS_ACK=1 git push` で抑制できます。
 
 <p align="right">(<a href="#top">トップへ</a>)</p>
