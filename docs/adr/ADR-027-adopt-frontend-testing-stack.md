@@ -12,6 +12,7 @@ tags: [adr, frontend, testing]
 Proposed
 
 coverage の下限（全体の branch 85% だけ）は [ADR-076](ADR-076-run-mutation-tests-per-change-and-tighten-coverage-gates.md) で、全体とファイルごとの branch と line の下限に改める。
+axe を追加しないこと（Consequences の Neutral）は [ADR-142](ADR-142-check-accessibility-with-axe-in-playwright-e2e.md) で、Playwright の E2E だけに入れることに改める。
 
 ## Date
 

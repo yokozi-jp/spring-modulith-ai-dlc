@@ -1,5 +1,6 @@
 import { chooseSeededTenant, logIn, sessionCookieName, webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
+import { sessionExpiredHeading } from "./pages";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -16,9 +17,7 @@ test("API が成功した後に操作が 401 になると /session-expired で�
   await orderListPage.statusLink("確定済み").click();
 
   await expect(page).toHaveURL(`${webOrigin}/session-expired`);
-  await expect(
-    page.getByRole("heading", { level: 1, name: "ログインの有効期限が切れました" }),
-  ).toBeVisible();
+  await expect(sessionExpiredHeading(page)).toBeVisible();
 
   await page.getByRole("link", { name: "もう一度ログイン" }).click();
   await chooseSeededTenant(page);

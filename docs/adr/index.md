@@ -141,3 +141,4 @@
 - [ADR-139: I/F のファイル定義書を ODCS v3.2.0 の YAML で書き、リポジトリのルートの interfaces/ に置く](ADR-139-write-interface-file-definitions-in-odcs.md)（Proposed, 2026-11-26）
 - [ADR-140: 送信の HTTP の span の URL からクエリを発生源と Collector で落とす](ADR-140-drop-query-from-outbound-http-spans-at-source-and-collector.md)（Proposed, 2026-11-26）
 - [ADR-141: リスナーの同時実行数に上限を置かず、DB の接続の pool を唯一の制限にし、再投入の 1 回の件数を pool の半分以下に絞る](ADR-141-limit-listener-concurrency-by-connection-pool-only.md)（Proposed, 2026-11-26）
+- [ADR-142: アクセシビリティの違反を Playwright の E2E で axe に検査させる](ADR-142-check-accessibility-with-axe-in-playwright-e2e.md)（Proposed, 2026-11-26）

@@ -45,7 +45,7 @@ export const CustomerOrderCodeField = withFieldGroup({
                 }}
                 {...(error === undefined
                   ? {}
-                  : { "aria-invalid": true, "aria-errormessage": errorId })}
+                  : { "aria-invalid": true, "aria-describedby": errorId })}
               />
               {error === undefined ? undefined : (
                 <p id={errorId} className="text-sm text-destructive">

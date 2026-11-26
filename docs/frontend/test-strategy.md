@@ -59,7 +59,8 @@ E2E testの書き方と実行環境は[E2Eテストの方針と書き方](../e2e
 
 ## アクセシビリティの自動検査
 
-- axe-coreなどの自動検査は、ADR-027のとおり要件が生じた時点で導入し、component testとE2E testに組み込む。
+- axe-coreの自動検査は、component test（jsdom）では流さず、PlaywrightのE2E testで画面ごとに、ライトとダークの配色で流す（[ADR-142](../adr/ADR-142-check-accessibility-with-axe-in-playwright-e2e.md)）。
+  対象の画面、規則のタグ、補助の使い方は[E2Eテストの方針と書き方](../e2e/testing-strategy.md#アクセシビリティの検査)に従う。
 - 自動検査が検出できるのはWCAG違反の一部であるため、すべての観点の自動化を目標にしない。
 - keyboard操作とscreen readerでの読み上げは、手動でも確認する。
 

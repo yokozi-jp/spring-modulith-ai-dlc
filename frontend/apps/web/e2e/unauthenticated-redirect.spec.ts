@@ -1,6 +1,6 @@
 import { sessionCookieName, signInOnKeycloak, webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
-import { openExpectingLogin } from "./pages";
+import { openExpectingLogin, tenantsHeading } from "./pages";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -21,7 +21,7 @@ test("テナントを選ぶ操作がアプリのセッション切れで 401 に
 }) => {
   await page.goto("/oauth2/authorization/web");
   await signInOnKeycloak(page);
-  const heading = page.getByRole("heading", { level: 1, name: "テナントを選んでください" });
+  const heading = tenantsHeading(page);
   await expect(heading).toBeVisible();
 
   await context.clearCookies({ name: sessionCookieName });

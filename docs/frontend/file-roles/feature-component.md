@@ -44,7 +44,7 @@ UI primitive は `@frontend/ui` から使い、文言は catalog から引き、
 - Tailwind の class は完全な文字列で書く。
 - 表は `<th scope="col">`、絞り込みの link は `<nav aria-label>` と `aria-current` のように、native の要素と属性で意味を表す。
 - 入力欄は `<label htmlFor>` で名前を付け、`required`、`maxLength`、`min`、`max` を入力の条件に合わせる。
-  誤りがある欄には `aria-invalid` と `aria-errormessage` を付け、文言を欄の直下に出す（[フォームの入力検証](../form-validation.md)）。
+  誤りがある欄には `aria-invalid` を付け、`aria-describedby` で文言を指し、文言を欄の直下に出す（[フォームの入力検証](../form-validation.md)）。
 - 入力欄の id は、画面か form の `useId()` を `idPrefix` として受けて組む。
 - 状態の変化を読み上げる領域には `<output>` を使い、最初の描画から置く。
 
@@ -121,7 +121,7 @@ export const CustomerOrderCodeField = withFieldGroup({
                 }}
                 {...(error === undefined
                   ? {}
-                  : { "aria-invalid": true, "aria-errormessage": errorId })}
+                  : { "aria-invalid": true, "aria-describedby": errorId })}
               />
               {error === undefined ? undefined : (
                 <p id={errorId} className="text-sm text-destructive">
@@ -194,7 +194,7 @@ coverage のファイルごとの下限は component にもかかる（[coverage
 - [ ] link と button を入れ子にしない。［Oxlint で検査：ui-composition/no-button-in-link］
 - [ ] class 名を値から組み立てない。［Oxlint で検査：tailwind-classes/no-dynamic-class-name］
 - [ ] `@frontend/ui` の部品に、部品が持つ見た目の class を渡さない。［Oxlint で検査：shadcn/no-restyle］
-- [ ] native の要素と属性で意味を表し、入力欄に `label`、入力の条件の属性、`aria-invalid` と `aria-errormessage` を付ける。［自分で点検］
+- [ ] native の要素と属性で意味を表し、入力欄に `label`、入力の条件の属性、`aria-invalid` と `aria-describedby` を付ける。［自分で点検］
 - [ ] Effect を使わない。［Oxlint で検査：react-rules/no-effect］
 - [ ] route、Base UI、テスト用の部品、テレメトリの SDK を import しない。［Oxlint で検査：no-restricted-imports］
 - [ ] 他の feature を import しない。［Oxlint で検査：feature-boundaries/no-cross-feature-import］

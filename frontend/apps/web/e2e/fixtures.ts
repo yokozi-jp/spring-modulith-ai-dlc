@@ -1,11 +1,13 @@
+import { AxeBuilder } from "@axe-core/playwright";
 import { idempotencyKeyHeaders } from "@frontend/api/idempotency-key";
-import { test as base } from "@playwright/test";
+import { expect, test as base } from "@playwright/test";
 import type { Page } from "@playwright/test";
 
 import { findCookie } from "./environment.ts";
 import { OrderCreatePage } from "./order-create-page.ts";
 import { OrderDetailPage } from "./order-detail-page.ts";
 import { OrderListPage } from "./order-list-page.ts";
+import type { OrderStatusLabel } from "./order-status.ts";
 
 export interface Product {
   productId: string;
@@ -46,6 +48,28 @@ async function createProduct(
   return { productId, productCode, productName, unitPrice, onSale };
 }
 
+interface OrderOptions {
+  status?: OrderStatusLabel;
+  prefix?: string;
+  product?: Product;
+}
+
+interface CreatedOrder {
+  orderId: string;
+  code: string;
+}
+
+export interface App {
+  page: Page;
+  orderCreatePage: OrderCreatePage;
+  orderListPage: OrderListPage;
+  orderDetailPage: OrderDetailPage;
+  createOrder: (options?: OrderOptions) => Promise<CreatedOrder>;
+}
+
+// WCAG 2.2 の AA までの規則と best-practice の規則で検査する（ADR-142）。
+const axeTags = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
+
 // task e2e は Faro を有効にしてビルドする（ADR-068）が、Collector は起動しないので、/collect を既定で 202 で返す。
 // page.route は context.route より優先されるので、spec ごとに上書きできる。
 export const test = base.extend<{
@@ -53,6 +77,12 @@ export const test = base.extend<{
   orderCreatePage: OrderCreatePage;
   orderListPage: OrderListPage;
   orderDetailPage: OrderDetailPage;
+  // 注文を画面で作り、詳細の画面を開いたままにする（ADR-130）。商品を渡さなければ新しく作る。
+  createOrder: App["createOrder"];
+  app: App;
+  makeAxeBuilder: () => AxeBuilder;
+  // 今の画面の screenshot と、axe の結果の全体（incomplete を含む）を report に添付し、違反があれば失敗する。
+  expectNoA11yViolations: (name: string) => Promise<void>;
 }>({
   context: async ({ context }, provide) => {
     await context.route("**/collect", (route) => route.fulfill({ status: 202 }));
@@ -69,6 +99,47 @@ export const test = base.extend<{
   },
   orderDetailPage: async ({ page }, provide) => {
     await provide(new OrderDetailPage(page));
+  },
+  createOrder: async ({ orderCreatePage, orderDetailPage, productFactory }, provide) => {
+    await provide(async ({ status = "下書き", prefix = "E2E-ORDER", product } = {}) => {
+      const code = uniqueCode(prefix);
+      const { productName } = product ?? (await productFactory());
+      const orderId = await orderCreatePage.create({ code, productName, quantity: 1 });
+      if (status === "確定済み") {
+        await orderDetailPage.confirmButton.click();
+        await expect(orderDetailPage.confirmedNotice).toBeVisible();
+      } else if (status === "取消済み") {
+        await orderDetailPage.cancelButton.click();
+        await expect(orderDetailPage.cancelledNotice).toBeVisible();
+      }
+      return { orderId, code };
+    });
+  },
+  app: async ({ page, orderCreatePage, orderListPage, orderDetailPage, createOrder }, provide) => {
+    await provide({ page, orderCreatePage, orderListPage, orderDetailPage, createOrder });
+  },
+  makeAxeBuilder: async ({ page }, provide) => {
+    await provide(() => new AxeBuilder({ page }).withTags(axeTags));
+  },
+  expectNoA11yViolations: async ({ page, makeAxeBuilder }, provide, testInfo) => {
+    await provide((name) =>
+      base.step(`axe: ${name}`, async () => {
+        // 前の操作の hover が残ると色が変わり結果が揺れるので、操作できる要素のない左上へ動かす。
+        await page.mouse.move(0, 0);
+        await testInfo.attach(name, { body: await page.screenshot(), contentType: "image/png" });
+        const results = await makeAxeBuilder().analyze();
+        await testInfo.attach(`axe-${name}`, {
+          body: JSON.stringify(results, undefined, 2),
+          contentType: "application/json",
+        });
+        const violations = results.violations.map(({ id, nodes, helpUrl }) => ({
+          id,
+          targets: nodes.map(({ target }) => target.join(" ")),
+          helpUrl,
+        }));
+        expect(violations, `${name} の axe の違反`).toEqual([]);
+      }),
+    );
   },
 });
 export { expect } from "@playwright/test";

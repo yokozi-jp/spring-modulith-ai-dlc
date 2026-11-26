@@ -74,14 +74,6 @@ function notice() {
   return screen.getByRole("status");
 }
 
-/** aria-errormessage が指す要素の文言。誤りがなければ undefined。 */
-function errorMessageOf(element: HTMLElement): string | undefined {
-  const id = element.getAttribute("aria-errormessage");
-  return id === null
-    ? undefined
-    : (document.querySelector(`[id="${id}"]`)?.textContent ?? undefined);
-}
-
 // oxlint-disable-next-line max-statements -- 注文の作成の画面のテストを 1 つの describe に置き、準備を共有する。
 describe("注文の作成の画面", () => {
   beforeEach(() => {
@@ -180,13 +172,11 @@ describe("注文の作成の画面", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("客先注文番号").getAttribute("aria-invalid")).toBe("true");
     });
-    expect(
-      ["客先注文番号", "商品", "数量"].map((label) => errorMessageOf(screen.getByLabelText(label))),
-    ).toStrictEqual([
+    expect(screen.getByLabelText("客先注文番号")).toHaveAccessibleDescription(
       "客先注文番号を入力してください。",
-      "商品を選んでください。",
-      "数量を入力してください。",
-    ]);
+    );
+    expect(screen.getByLabelText("商品")).toHaveAccessibleDescription("商品を選んでください。");
+    expect(screen.getByLabelText("数量")).toHaveAccessibleDescription("数量を入力してください。");
     expect(sent).toHaveLength(0);
   });
 
@@ -208,11 +198,11 @@ describe("注文の作成の画面", () => {
       await submitFilledForm();
 
       await waitFor(() => {
-        expect(errorMessageOf(screen.getByLabelText("客先注文番号"))).toBe(
+        expect(screen.getByLabelText("客先注文番号")).toHaveAccessibleDescription(
           "客先注文番号の形式が正しくありません",
         );
       });
-      expect(errorMessageOf(screen.getByLabelText("数量"))).toBe("数量が大きすぎます");
+      expect(screen.getByLabelText("数量")).toHaveAccessibleDescription("数量が大きすぎます");
       expect(within(notice()).getByText("入力が正しくありません")).toBeTruthy();
       expect(within(notice()).getByText("ほかの誤り")).toBeTruthy();
     });
@@ -227,7 +217,7 @@ describe("注文の作成の画面", () => {
       await user.type(code, "X");
 
       expect(code.getAttribute("aria-invalid")).toBeNull();
-      expect(errorMessageOf(screen.getByLabelText("数量"))).toBe("数量が大きすぎます");
+      expect(screen.getByLabelText("数量")).toHaveAccessibleDescription("数量が大きすぎます");
     });
   });
 
