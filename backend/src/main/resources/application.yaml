@@ -128,6 +128,8 @@ spring:
       redirects: dont-follow
   # Jackson（JSON シリアライズ/デシリアライズ）: Spring Boot 4 のデフォルトである Jackson 3 を使う。
   # 自動構成された JsonMapper をプロパティで調整する（独自 Bean で丸ごと差し替えない）。
+  # Spring Modulith もこの JsonMapper でイベントを JSON にし、modulith.event_publication.serialized_event に保存する。
+  # 設定を変えると保存済みの出版を読めなくなりうるため、EventContractTest が過去の形の fixture で止める。
   jackson:
     # Jackson の日時フォーマット時に使用するコンテキスト TZ を UTC に固定する
     # 絶対時刻の API モデルには原則 Instant を使用する

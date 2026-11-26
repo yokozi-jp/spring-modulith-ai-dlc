@@ -136,4 +136,5 @@
 - [ADR-134: HTTP のアクセスログを出さず、要求の記録をトレースと指標で読む](ADR-134-read-http-requests-from-traces-and-metrics-without-access-log.md)（Proposed, 2026-11-26）
 - [ADR-135: セッションに 8 時間の最長の期間を足し、無操作の 30 分を明示する](ADR-135-add-absolute-session-lifetime-and-explicit-idle-timeout.md)（Proposed, 2026-11-26）
 - [ADR-136: 更新系の要求の Origin と Sec-Fetch-Site を CSRF のトークンの前に確かめる](ADR-136-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)（Proposed, 2026-11-26）
+- [ADR-137: イベントの変更を @Nullable の component の追加だけにし、過去の版の JSON を今の型で読めることを fixture のテストで確かめる](ADR-137-guard-event-json-compatibility-with-versioned-fixtures.md)（Proposed, 2026-11-26）
 - [ADR-138: 外部の利用者が現れる前に API を /api/v1 にし、バージョンの宣言を検査する](ADR-138-introduce-api-v1-with-spring-api-versioning.md)（Proposed, 2026-11-26）

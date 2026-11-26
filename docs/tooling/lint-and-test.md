@@ -235,8 +235,9 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
 - **`task adr-check`**：判断が絡む変更にADRが伴うかを確認する。
   `frontend/`の変更のうち、テストファイル（`*.test.*`、`*.spec.*`）、`frontend/apps/*/e2e/`、`frontend/lint/fixtures/`、`frontend/apps/*/src/testing/`は対象から外す。
   警告は止めず、`ADR_STRICT=1`で失敗にし、`ADR_ACK=1`で抑制する。
-- **`task test-weakening`**：`origin/main`とのmerge baseから`HEAD`までで、テストファイルの削除とテストケースの減少を警告する（[人が必ず読むPull Request](../pull-request/review-request-and-merge.md#人が必ず読むpull-request)の「テストを弱める」の目印にする）。
+- **`task test-weakening`**：`origin/main`とのmerge baseから`HEAD`までで、テストファイルの削除とテストケースの減少と、過去のイベントのfixtureの変更、削除、renameを警告する（[人が必ず読むPull Request](../pull-request/review-request-and-merge.md#人が必ず読むpull-request)の「テストを弱める」の目印にする）。
   対象のファイルと数え方は`tooling/test-weakening/check.sh`の冒頭が正である。数え方は概算で、renameは削除に数えず、テストでない名前へのrenameは削除に数える。
+  イベントのfixtureは`backend/src/test/resources/events/`の下のファイルで、追加は警告しない。fixtureを変えないことは`EventContractTest`では確かめられないため、この警告とレビューで守る（[ADR-137](../adr/ADR-137-guard-event-json-compatibility-with-versioned-fixtures.md)）。
   警告は標準エラーに出し、終了コードは常に0にする。`TESTS_ACK=1`で抑制し、比較の起点が無ければ理由を出して通す。
   `.skip`、`.only`、理由のない`@Disabled`、coverageの低下は別の検査が止めるので、ここでは扱わない。
   自己検査は`tooling/test-weakening/test.sh`で、`task test-weakening-test`で実行する。`task ci-gate-check`もCIで実行する。

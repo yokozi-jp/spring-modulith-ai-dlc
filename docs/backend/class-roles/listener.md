@@ -46,6 +46,8 @@ Listener は Infrastructure の Adapter でもない。
   理由は[アンチパターン](#アンチパターン)に示す。
   Spring Boot の起動の完了のようなフレームワークのイベントを受ける必要が出たら、先にこの規則と、`ClassRoleArchTest` の `eventListenersAreApplicationModuleListeners` と `applicationListenerIsNotImplemented` を変える。
 - `on` はイベントの値で [Command](command.md) を作り（`new ReserveStockCommand(event.orderId())`）、CommandHandler の `handle` を一回呼ぶ。
+- イベントに後から足した `@Nullable` の component は、足す前に保存した出版を再投入すると `null` で届く。
+  `on` と呼ぶ CommandHandler は、その component が `null` のイベントも処理する（[イベント](event.md)の「必須の記述」）。
 - `@Transactional` を付けない。
   `@ApplicationModuleListener` がトランザクションを開く。
 - 依存は呼ぶ CommandHandler 一つだけにし、package-private のコンストラクタで受け取る。
@@ -268,6 +270,7 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 - [ ] クラスに `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel］
 - [ ] 発行側のモジュールのルートのイベントだけを使い、内部パッケージの型を使わない。［Spring Modulith で検査：ApplicationModuleArchitectureTest］
 - [ ] 名前をイベントの名前に `Listener` を付けた形にし、イベントごとに一つ作る。［自分で点検］
+- [ ] イベントに後から足した `@Nullable` の component が `null` の出版も処理する。［自分で点検］
 - [ ] 他のクラスから呼ばず、interface も実装しない。［ArchUnit で検査：ClassRoleArchTest.listenersAreNotCalled、ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces］
 - [ ] 呼ぶ CommandHandler は、重複を DB が直列にする操作（`INSERT ... ON CONFLICT DO NOTHING`、`lock_no` を WHERE に書く `TableWriter.update`、`SELECT ... FOR UPDATE` の後の判定）で判定し、重複を処理済みとして正常に終える（`TableWriter.update` の 0 件の更新は、種類 `version` の `ConflictException` だけを catch して読み直す）。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] 同じイベントの 2 回目の配信は、外部システムを呼ばないか、1 回目と同じ引数で呼ぶ。［結合テストで検査：ListenerIdempotencyTest］
