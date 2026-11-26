@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 注文の HTTP API。 */
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping(path = "/api/v{version}/orders", version = "1")
 class OrderController {
 
   /** 注文を受け付ける CommandHandler。 */
@@ -45,7 +45,7 @@ class OrderController {
   /* package */ ResponseEntity<Void> place(
       final IdempotencyKey idempotencyKey, @Valid @RequestBody final PlaceOrderRequest request) {
     final PlaceOrderResult result = placeOrder.handle(request.toCommand(idempotencyKey));
-    return ResponseEntity.created(URI.create("/api/orders/" + result.orderId())).build();
+    return ResponseEntity.created(URI.create("/api/v1/orders/" + result.orderId())).build();
   }
 
   /** キーを求めない印を付けた操作。Idempotency-Key の規則の対象にならない。 */

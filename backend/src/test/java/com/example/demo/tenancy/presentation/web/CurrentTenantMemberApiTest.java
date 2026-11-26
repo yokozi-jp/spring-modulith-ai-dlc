@@ -52,7 +52,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 class CurrentTenantMemberApiTest {
 
   /** 選んだテナントの所属の API。 */
-  private static final String MEMBERS = "/api/current-tenant/members";
+  private static final String MEMBERS = "/api/v1/current-tenant/members";
 
   /** 管理者でない利用者への 403 の type。専用の type を持たない。 */
   private static final String ABOUT_BLANK = "about:blank";

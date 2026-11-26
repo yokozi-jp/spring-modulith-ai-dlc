@@ -90,7 +90,7 @@ test("確定の競合は、最新の内容を表示して下書きのまま残�
   await expect(orderDetailPage.firstLineQuantity).toHaveText("2");
   await expect(orderDetailPage.discardChangesButton).toHaveCount(0);
   const order = await readJson<{ status: string }>(
-    await page.request.get(`/api/orders/${orderId}`),
+    await page.request.get(`/api/v1/orders/${orderId}`),
   );
   expect(order.status, `orderId=${orderId} の状態`).toBe("DRAFT");
 });

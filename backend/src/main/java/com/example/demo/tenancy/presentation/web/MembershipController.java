@@ -11,12 +11,16 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** ログインした利用者の所属の HTTP API。 */
 @RestController
-@RequestMapping(MembershipController.PATH)
+@RequestMapping(path = MembershipController.PATH, version = "1")
 @Tag(name = "tenancy", description = "テナントと所属の API")
 class MembershipController {
 
-  /** 所属の一覧のパス。テナントを選ぶ前にも呼べる。 */
-  /* package */ static final String PATH = "/api/memberships";
+  /**
+   * 所属の一覧のパス。テナントを選ぶ前にも呼べる。
+   *
+   * <p>mapping と {@code requestMatchers} に渡すパスのテンプレートで、URL ではない。
+   */
+  /* package */ static final String PATH = "/api/v{version}/memberships";
 
   /** 利用者の所属の参照。 */
   private final TenancyQueries tenancyQueries;

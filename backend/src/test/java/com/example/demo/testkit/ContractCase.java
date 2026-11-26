@@ -26,7 +26,7 @@ public @interface ContractCase {
   RequestMethod method();
 
   /**
-   * OpenAPI の path の形（{@code /api/orders/{orderId}}）。
+   * OpenAPI の path の形（{@code /api/v1/orders/{orderId}}）。
    *
    * @return path の形
    */

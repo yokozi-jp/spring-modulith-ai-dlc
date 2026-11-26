@@ -21,7 +21,7 @@ export default async function ({ page, expect, step, sql, helpers, screensOf, re
   // create-validation
   const posts = [];
   page.on("request", (request) => {
-    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/orders") posts.push(request.url());
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/v1/orders") posts.push(request.url());
   });
   await create.submitButton.click();
   await expect(page.getByText("客先注文番号を入力してください。")).toBeVisible();
@@ -33,7 +33,7 @@ export default async function ({ page, expect, step, sql, helpers, screensOf, re
   await expect(page.getByText(/^数量は .* 以上 .* 以下の整数にしてください。$/u)).toBeVisible();
   await expect(page).toHaveURL(/\/orders\/new$/u);
   const validationPosts = [...posts];
-  expect(validationPosts, "入力の誤りでは POST /api/orders を送らない").toEqual([]);
+  expect(validationPosts, "入力の誤りでは POST /api/v1/orders を送らない").toEqual([]);
   await step("validation");
 
   // create-duplicate
@@ -70,10 +70,10 @@ export default async function ({ page, expect, step, sql, helpers, screensOf, re
 
   // create-csrf
   const csrfCode = helpers.uniqueCode("VERIFY");
-  const rejected = await page.request.post("/api/orders", {
+  const rejected = await page.request.post("/api/v1/orders", {
     data: { customerOrderCode: csrfCode, lines: [{ productId: onSale[0].productId, quantity: 1 }] },
   });
-  expect(rejected.status(), "token のない POST /api/orders").toBe(403);
+  expect(rejected.status(), "token のない POST /api/v1/orders").toBe(403);
   const stored = sql("select count(*) from ordering.t_order where customer_order_code = :'code'", { code: csrfCode });
   expect(stored).toBe("0");
   record("proof", { orderId, code, status, csrfStatus: rejected.status(), validationPosts });

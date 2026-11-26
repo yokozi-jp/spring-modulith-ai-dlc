@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 決済記録の HTTP API。 */
 @RestController
-@RequestMapping("/api/payments")
+@RequestMapping(path = "/api/v{version}/payments", version = "1")
 @Tag(name = "payment", description = "決済の API")
 class PaymentController {
 

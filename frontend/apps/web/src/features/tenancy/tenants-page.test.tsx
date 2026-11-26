@@ -18,7 +18,7 @@ async function selectTenantFailingWith502() {
   let requests = 0;
   server.use(
     getListMembershipsMockHandler({ items: [tradingTenant] }),
-    http.put("*/api/current-tenant", () => {
+    http.put("*/api/v1/current-tenant", () => {
       requests += 1;
       return new HttpResponse("Bad Gateway", { status: 502 });
     }),
@@ -71,7 +71,7 @@ describe("テナントを選ぶ画面", () => {
   it("選べなかったときは、backend の title を出して画面に残る", async () => {
     server.use(
       getListMembershipsMockHandler({ items: [tradingTenant] }),
-      http.put("*/api/current-tenant", () =>
+      http.put("*/api/v1/current-tenant", () =>
         problemResponse(422, "テナントに所属していません", {
           type: "/problems/tenancy/not-tenant-member",
         }),
@@ -108,7 +108,7 @@ describe("業務の画面のテナント", () => {
 
   it("テナントを選ぶ前に業務の画面を開くと、テナントを選ぶ画面へ移る", async () => {
     server.use(
-      http.get("*/api/current-tenant", tenantNotSelected),
+      http.get("*/api/v1/current-tenant", tenantNotSelected),
       getListMembershipsMockHandler({ items: [tradingTenant, goodsTenant] }),
     );
     const { router } = await renderRoute("/orders");
@@ -120,7 +120,9 @@ describe("業務の画面のテナント", () => {
   });
 
   it("選んだテナントを読めなければ、再試行できる一般のエラーを出す", async () => {
-    server.use(http.get("*/api/current-tenant", () => problemResponse(500, "サーバー内部エラー")));
+    server.use(
+      http.get("*/api/v1/current-tenant", () => problemResponse(500, "サーバー内部エラー")),
+    );
     await renderRoute("/");
 
     await expect(screen.findByRole("button", { name: "再試行" })).resolves.toBeTruthy();
@@ -128,7 +130,7 @@ describe("業務の画面のテナント", () => {
   });
 
   it("業務の API がテナントを選ぶ前の 403 を返したら、backend の title とテナントを選ぶ画面へのリンクを出す", async () => {
-    server.use(http.get("*/api/products", tenantNotSelected));
+    server.use(http.get("*/api/v1/products", tenantNotSelected));
     await renderRoute("/orders/new");
 
     const alert = await screen.findByRole("alert");
@@ -141,7 +143,9 @@ describe("業務の画面のテナント", () => {
   });
 
   it("業務の API が権限不足の 403 を返したら、再試行できる一般のエラーを出す", async () => {
-    server.use(http.get("*/api/products", () => problemResponse(403, "アクセス権限がありません")));
+    server.use(
+      http.get("*/api/v1/products", () => problemResponse(403, "アクセス権限がありません")),
+    );
     await renderRoute("/orders/new");
 
     await expect(screen.findByRole("button", { name: "再試行" })).resolves.toBeTruthy();

@@ -26,7 +26,7 @@ export const getFindProductByIdResponseMock = (overrideResponse: Partial<Extract
 
 
 export const getListProductsMockHandler = (overrideResponse?: ProductSummaryListResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<ProductSummaryListResponse> | ProductSummaryListResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/api/products', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+  return http.get('*/api/v1/products', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -38,7 +38,7 @@ export const getListProductsMockHandler = (overrideResponse?: ProductSummaryList
 }
 
 export const getRegisterProductMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
-  return http.post('*/api/products', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+  return http.post('*/api/v1/products', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,
@@ -48,7 +48,7 @@ export const getRegisterProductMockHandler = (overrideResponse?: void | ((info: 
 }
 
 export const getFindProductByIdMockHandler = (overrideResponse?: ProductSummaryResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<ProductSummaryResponse> | ProductSummaryResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/api/products/:productId', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+  return http.get('*/api/v1/products/:productId', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined

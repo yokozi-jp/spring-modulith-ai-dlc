@@ -56,7 +56,7 @@ class ProductApiTest {
 
   /** 登録した商品の Location の形。 */
   private static final String LOCATION_PATTERN =
-      "^http://localhost/api/products/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
+      "^http://localhost/api/v1/products/[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$";
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
@@ -66,14 +66,14 @@ class ProductApiTest {
 
   @Test
   @DisplayName("商品の一覧を商品コードの昇順で items に入れて返す")
-  @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 200)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/products", status = 200)
   void listsProductsOrderedByCode() throws Exception {
     final String base = UniqueCodes.next("P");
     final UUID pen = TestProducts.onSale(dsl, base + "B", "120.00");
     final UUID eraser = TestProducts.discontinued(dsl, base + "A", "80.00");
 
     mockMvc
-        .perform(get("/api/products").with(oidcLogin()))
+        .perform(get("/api/v1/products").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items.length()").value(2))
         .andExpect(jsonPath("$.items[0].productId").value(eraser.toString()))
@@ -90,21 +90,21 @@ class ProductApiTest {
   @DisplayName("商品がなければ空の items を 200 で返す")
   void listsNoProducts() throws Exception {
     mockMvc
-        .perform(get("/api/products").with(oidcLogin()))
+        .perform(get("/api/v1/products").with(oidcLogin()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items.length()").value(0));
   }
 
   @Test
   @DisplayName("商品を登録すると 201 を返し、Location で登録した値の商品を読める")
-  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 201)
-  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 200)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/products", status = 201)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/products/{productId}", status = 200)
   void registerReturnsLocationOfRegisteredProduct() throws Exception {
     final String productCode = UniqueCodes.next("P");
 
     final String location = location(register(productCode, "120.50", "DISCONTINUED"));
 
-    assertThat(location).as("POST /api/products の Location").matches(LOCATION_PATTERN);
+    assertThat(location).as("POST /api/v1/products の Location").matches(LOCATION_PATTERN);
     mockMvc
         .perform(get(location).with(oidcLogin()))
         .andExpect(status().isOk())
@@ -148,7 +148,7 @@ class ProductApiTest {
 
     assertThat(replayed).as("key=%s の再送の Location", key.value()).isEqualTo(first);
     mockMvc
-        .perform(get("/api/products").with(oidcLogin()))
+        .perform(get("/api/v1/products").with(oidcLogin()))
         .andExpect(jsonPath("$.items.length()").value(1));
   }
 
@@ -163,7 +163,7 @@ class ProductApiTest {
         .andExpect(jsonPath("$.type").value("/problems/idempotency-key-payload-mismatch"))
         .andExpect(jsonPath("$.detail").doesNotExist());
     mockMvc
-        .perform(get("/api/products").with(oidcLogin()))
+        .perform(get("/api/v1/products").with(oidcLogin()))
         .andExpect(jsonPath("$.items.length()").value(1));
   }
 
@@ -172,7 +172,7 @@ class ProductApiTest {
   void missingKeyReturnsBadRequest() throws Exception {
     mockMvc
         .perform(
-            post("/api/products")
+            post("/api/v1/products")
                 .with(oidcLogin())
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -191,11 +191,11 @@ class ProductApiTest {
     final String otherLocation = location(register(otherTenant, productCode, "80.00", "ON_SALE"));
 
     mockMvc
-        .perform(get("/api/products").with(oidcLogin()))
+        .perform(get("/api/v1/products").with(oidcLogin()))
         .andExpect(jsonPath("$.items.length()").value(1))
         .andExpect(jsonPath("$.items[0].unitPrice").value(120.00));
     mockMvc
-        .perform(get("/api/products").with(otherTenant))
+        .perform(get("/api/v1/products").with(otherTenant))
         .andExpect(jsonPath("$.items.length()").value(1))
         .andExpect(jsonPath("$.items[0].unitPrice").value(80.00));
     mockMvc.perform(get(location).with(otherTenant)).andExpect(status().isNotFound());
@@ -207,27 +207,27 @@ class ProductApiTest {
 
   @Test
   @DisplayName("存在しない商品は 404 を返す")
-  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 404)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/products/{productId}", status = 404)
   void missingProductReturnsNotFound() throws Exception {
     mockMvc
-        .perform(get("/api/products/" + UUID.randomUUID()).with(oidcLogin()))
+        .perform(get("/api/v1/products/" + UUID.randomUUID()).with(oidcLogin()))
         .andExpect(status().isNotFound())
         .andExpect(jsonPath("$.type").value("about:blank"));
   }
 
   @Test
   @DisplayName("UUID でない商品 ID は about:blank の 400 を返す")
-  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 400)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/products/{productId}", status = 400)
   void malformedProductIdReturnsBadRequest() throws Exception {
     mockMvc
-        .perform(get("/api/products/not-a-uuid").with(oidcLogin()))
+        .perform(get("/api/v1/products/not-a-uuid").with(oidcLogin()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.type").value("about:blank"));
   }
 
   @Test
   @DisplayName("同じ商品コードの商品を登録すると 409 を返し、先の商品だけが残る")
-  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 409)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/products", status = 409)
   void duplicateProductCodeReturnsConflict() throws Exception {
     final String productCode = UniqueCodes.next("P");
     location(register(productCode, "120.00", "ON_SALE"));
@@ -237,7 +237,7 @@ class ProductApiTest {
         .andExpect(jsonPath("$.type").value("/problems/unique-violation"))
         .andExpect(jsonPath("$.detail").doesNotExist());
     mockMvc
-        .perform(get("/api/products").with(oidcLogin()))
+        .perform(get("/api/v1/products").with(oidcLogin()))
         .andExpect(jsonPath("$.items.length()").value(1))
         .andExpect(jsonPath("$.items[0].unitPrice").value(120.00));
   }
@@ -251,7 +251,7 @@ class ProductApiTest {
     "定義にない販売の状態, P-0001, 120.00, on_sale"
   })
   @DisplayName("本文の形式の誤りは、検証の 400 を返し、商品を登録しない")
-  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 400)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/products", status = 400)
   void invalidProductReturnsValidationProblem(
       final String name, final String productCode, final String unitPrice, final String salesStatus)
       throws Exception {
@@ -259,7 +259,7 @@ class ProductApiTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.type").value("/problems/validation-error"));
     mockMvc
-        .perform(get("/api/products").with(oidcLogin()))
+        .perform(get("/api/v1/products").with(oidcLogin()))
         .andExpect(jsonPath("$.items.length()").value(0));
   }
 
@@ -285,7 +285,7 @@ class ProductApiTest {
       final String salesStatus)
       throws Exception {
     return mockMvc.perform(
-        post("/api/products")
+        post("/api/v1/products")
             .with(user)
             .with(csrf())
             .with(IdempotencyKeys.header(key))

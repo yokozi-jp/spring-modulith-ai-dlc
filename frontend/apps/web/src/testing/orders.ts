@@ -108,7 +108,7 @@ export function serveDetail(initial: OrderDetailsResponse) {
 export function serveUpdate(method: "put" | "post", path: string, respond: () => Response) {
   const bodies: unknown[] = [];
   server.use(
-    http[method](`*/api/orders/:orderId/${path}`, async ({ request }) => {
+    http[method](`*/api/v1/orders/:orderId/${path}`, async ({ request }) => {
       bodies.push(await request.json());
       return respond();
     }),
@@ -141,7 +141,7 @@ export function notice() {
 export function serveDetailFailingRefetch(order: OrderDetailsResponse): void {
   let requests = 0;
   server.use(
-    http.get("*/api/orders/:orderId", () => {
+    http.get("*/api/v1/orders/:orderId", () => {
       requests += 1;
       return requests === 1
         ? HttpResponse.json(order)

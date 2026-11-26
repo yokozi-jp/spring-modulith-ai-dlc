@@ -79,9 +79,11 @@ class ProblemDetailsTraceIdContractTest {
   private static Stream<Arguments> mvcProblems() {
     return Stream.of(
         Arguments.of(
-            "advice の 405", delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()), 405),
-        Arguments.of("Spring Security の 401", get("/api/orders"), 401),
-        Arguments.of("CSRF トークンのない更新の 403", post("/api/orders").with(oidcLogin()), 403));
+            "advice の 405",
+            delete("/api/v1/error-fixture/items").with(oidcLogin()).with(csrf()),
+            405),
+        Arguments.of("Spring Security の 401", get("/api/v1/orders"), 401),
+        Arguments.of("CSRF トークンのない更新の 403", post("/api/v1/orders").with(oidcLogin()), 403));
   }
 
   @ParameterizedTest(name = "{0}")
@@ -114,7 +116,7 @@ class ProblemDetailsTraceIdContractTest {
       final String name, final String method, final int expectedStatus) throws Exception {
     final String traceId = newTraceId();
     final HttpRequest request =
-        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/orders"))
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/orders"))
             .method(method, HttpRequest.BodyPublishers.noBody())
             .header(TRACEPARENT, unsampledTraceparent(traceId))
             .build();

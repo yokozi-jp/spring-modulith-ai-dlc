@@ -27,7 +27,7 @@ test("テナントを選ぶ操作がアプリのセッション切れで 401 に
   // 401 を受けた元の文書も一覧を取り直して 401 になるため、200 は読み込み直した文書だけが返す。
   const reloaded = page.waitForResponse(
     (response) =>
-      new URL(response.url()).pathname === "/api/memberships" && response.status() === 200,
+      new URL(response.url()).pathname === "/api/v1/memberships" && response.status() === 200,
   );
   await page.getByRole("button", { name: "サンプル商事" }).click();
   await reloaded;

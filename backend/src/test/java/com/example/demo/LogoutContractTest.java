@@ -79,7 +79,7 @@ class LogoutContractTest {
 
     // 準備したセッションで認証済みになることを先に示す。Base64 の前提が崩れると、ここで 401 になる。
     // ログアウトはテナントによらないので、テナントを選ぶ前にも呼べる所属の一覧で確かめる。
-    mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
   // JdbcIndexedSessionRepository のセッションの型は公開されていないため、型変数で受けて Session として扱う。
@@ -105,7 +105,7 @@ class LogoutContractTest {
     assertNotNull(
         sessionRepository.findById(sessionId),
         () -> "POST /logout（CSRF トークンなし）の後にセッションが消えた: sessionId=" + sessionId);
-    mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
   @Test
@@ -150,7 +150,7 @@ class LogoutContractTest {
     assertNotNull(
         sessionRepository.findById(sessionId),
         () -> "POST /logout（誤った CSRF トークン）の後にセッションが消えた: sessionId=" + sessionId);
-    mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
   @Test
@@ -191,7 +191,7 @@ class LogoutContractTest {
     assertNotNull(
         sessionRepository.findById(sessionId),
         () -> "GET /logout の後にセッションが消えた: sessionId=" + sessionId);
-    mockMvc.perform(get("/api/memberships").cookie(sessionCookie)).andExpect(status().isOk());
+    mockMvc.perform(get("/api/v1/memberships").cookie(sessionCookie)).andExpect(status().isOk());
   }
 
   @Test

@@ -27,7 +27,7 @@ CommandHandler に Request を渡さず、Request に業務の不変条件を書
 - `com.example.demo.<feature>.presentation.web` に置く。
 - 名前は Command と同じ `<UseCase>` に `Request` を付ける（`PlaceOrderRequest`、`ConfirmOrderRequest`、`CancelOrderRequest`）。
 - 状態を変える操作ごとに作る。
-  既存の集約を変える操作（`POST /api/orders/{orderId}/confirm`、`POST /api/orders/{orderId}/cancel`）は、ロック番号だけを持つ Request を受ける。
+  既存の集約を変える操作（`POST /api/v1/orders/{orderId}/confirm`、`POST /api/v1/orders/{orderId}/cancel`）は、ロック番号だけを持つ Request を受ける。
 - 繰り返す項目は、ネストした record `Line` にする（`PlaceOrderRequest.Line`）。
 - component の名前は Command と同じ camelCase にする。
 

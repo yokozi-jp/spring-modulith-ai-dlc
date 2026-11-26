@@ -12,7 +12,7 @@ test("CSRF の Cookie を失った状態で注文を作成すると、403 の後
   page.on("response", (response) => {
     if (
       response.request().method() === "POST" &&
-      new URL(response.url()).pathname === "/api/orders"
+      new URL(response.url()).pathname === "/api/v1/orders"
     ) {
       statuses.push(response.status());
     }

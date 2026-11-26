@@ -45,7 +45,7 @@ function uniqueViolation() {
 function serveDraftOrder(respond: () => Response) {
   const sent: SentRequest[] = [];
   server.use(
-    http.post("*/api/orders", async ({ request }) => {
+    http.post("*/api/v1/orders", async ({ request }) => {
       sent.push({
         csrf: request.headers.get("X-XSRF-TOKEN"),
         idempotencyKey: request.headers.get("Idempotency-Key"),
@@ -88,7 +88,7 @@ describe("注文の作成の画面", () => {
       () =>
         new HttpResponse(undefined, {
           status: 201,
-          headers: { Location: `${globalThis.location.origin}/api/orders/${orderId}` },
+          headers: { Location: `${globalThis.location.origin}/api/v1/orders/${orderId}` },
         }),
     );
     server.use(
@@ -130,7 +130,7 @@ describe("注文の作成の画面", () => {
   });
 
   it.each([
-    ["別の origin", { Location: `https://other.example/api/orders/${orderId}` }],
+    ["別の origin", { Location: `https://other.example/api/v1/orders/${orderId}` }],
     ["ない", {}],
   ] as const)("Location が%sなら一覧へ遷移する", async (_case, headers) => {
     serveDraftOrder(() => new HttpResponse(undefined, { status: 201, headers }));
@@ -144,7 +144,7 @@ describe("注文の作成の画面", () => {
   it("送信中は 2 回目を送らず、送信中であることを通知する", async () => {
     const create = createGate();
     const sent = serveDraftOrder(() => uniqueViolation());
-    server.use(http.post("*/api/orders", () => create.promise, { once: true }));
+    server.use(http.post("*/api/v1/orders", () => create.promise, { once: true }));
     const user = await submitFilledForm();
     await expect(within(notice()).findByText("送信しています")).resolves.toBeTruthy();
 

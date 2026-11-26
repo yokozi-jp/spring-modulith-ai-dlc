@@ -55,7 +55,7 @@ class ApiContractCoverageTest {
           "* 500",
           "operation に依らない ApiExceptionHandler の catch-all が返す。"
               + "ApiErrorContractTest の未処理例外と JDK の例外の case で確かめる。",
-          "GET /api/memberships 403",
+          "GET /api/v1/memberships 403",
           "所属の一覧はテナントを選ぶ前にも呼べ、GET は CSRF の検査の対象外なので、403 を起こす経路がない。"
               + "権限の規則を加えたら、この除外を消して case を足す。");
 

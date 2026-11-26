@@ -110,6 +110,6 @@ class UserIdMdcFilterTest {
 
   private void doFilter(final FilterChain chain) throws IOException, ServletException {
     filter.doFilter(
-        new MockHttpServletRequest("GET", "/api/orders"), new MockHttpServletResponse(), chain);
+        new MockHttpServletRequest("GET", "/api/v1/orders"), new MockHttpServletResponse(), chain);
   }
 }
