@@ -28,7 +28,7 @@ Accepted
 [ADR-089](ADR-089-keep-primary-keys-inside-modules-and-expose-public-ids.md) は、スキーマをまたぐ外部キーを作らないと決め、同じモジュールの中の外部キーの扱いを [issue #369](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/369) の別の判断に残した。
 
 [ADR-107](ADR-107-isolate-tenants-with-rls-set-per-transaction.md) は、業務テーブルを RLS でテナントごとに分ける。
-PostgreSQL では、外部キーの検査は RLS を受けない。
+PostgreSQL では、外部キーの検査は RLS を受けない（[Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)）。
 外部キーがないか、参照先の主キーだけの外部キーでは、あるテナントの注文明細が別のテナントの注文を指しても、DB は止めない。
 注文の主キーはテナントをまたいで一意なので、主キーの一致だけではテナントの一致を確かめられないからである。
 参照元と参照先のテナントの一致を DB で止めるには、テナントを含む複合の外部キーが要る。
@@ -49,10 +49,10 @@ RLS の外に置く `tenancy` の表にも、同じモジュールの中の参�
 ### Accepted にした理由
 
 [issue #611](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/611) で、複合の外部キーの索引のコストを減らせる案（選択肢4から6）を比べた。
-2026-11-26 に、手書きの SQL とマイグレーションの書き込みも DB で止める事故の範囲に含めると決めた。
+2026-11-26 に、リポジトリの所有者が、手書きの SQL とマイグレーションの書き込みも DB で止める範囲に含めると確認した。
 この範囲を止められるのは、複合の外部キーとトリガーだけである。
-トリガーは保守の対象が増えるので、Decision は変えず、Status を Accepted にした。
-外部キーの検査が RLS を迂回することは、[PostgreSQL の Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)に書かれている。
+トリガーは保守の対象が増える。
+そのため外部キーの方針は変えず、外部キーの列を NOT NULL にする規則だけを Decision に足して、Status を Accepted にした。
 
 ### 比較に使う実装の事実
 
@@ -103,9 +103,6 @@ ADR-089 の Neutral に残していた「同じモジュールの中の外部キ
   動作を付けた changeset は、changeset の lint が止める。
 
 ### Neutral
-
-- 親の表が増えて、書き込みの遅延を計測して問題が出たときは、この判断を見直す。
-  計測する前に、ユニークインデックスの数だけを理由にして外部キーを単独の列へ戻さない。
 
 - 別のモジュールの行は、これまでどおり外部キーで参照の整合性を保てず、参照先が消えた行はアプリケーションで扱う（ADR-089）。
 - 新しいモジュールの表を足すときも、同じモジュールの中の参照には外部キーを作る。
@@ -173,8 +170,9 @@ ADR-089 の Neutral に残していた「同じモジュールの中の外部キ
 
 親の表が一つの今は、複合の外部キーの追加のコストは索引一つである。
 他の案の保守の負担は測っておらず、この比較は定性的である。
-手書きの SQL とマイグレーションを DB で止める範囲に含めるので、Decision を変えない。
-選択肢6を採るなら、規則 K1（`SchemaTenantConventionsTest`）、`AggregateDeclarationConventionsTest`、[PostgreSQLの制約とインデックス](../database/postgresql-constraints-and-indexes.md)の外部キーの節も同じ変更で改める必要があった。
+手書きの SQL とマイグレーションを DB で止める範囲に含めるので、外部キーの方針を変えない。
+親の表が増えて、書き込みの遅延を計測して問題が出たときは、この判断を見直す。
+計測する前に、ユニークインデックスの数だけを理由にして外部キーを単独の列へ戻さない。
 
 ## References
 

@@ -154,12 +154,14 @@ final class SchemaTenantConventions {
    * <p>参照の列は、{@link
    * SchemaTableConventions#references}（P3）と同じく、同じスキーマのほかのテーブルの主キーと同じ名前の列とする。スキーマをまたぐ外部キーはP4が拒否する。
    *
-   * <p>{@code archived_at}を持つ履歴の表は、参照先の行が消えても残すため、外部キーのない参照の列を判定しない。
+   * <p>外部キーの列は、NULLを許さない。列の一つがNULLだと、外部キーは参照先を検査しない。
+   *
+   * <p>{@code archived_at}を持つ履歴の表は、参照先の行が消えても残すため、外部キーのない参照の列を判定しない。外部キーを持たないので、NULLの判定にも入らない。
    *
    * @param relations テーブルとビュー
    * @param columns カラム
    * @param constraints 制約
-   * @return 外部キーのない参照の列と、形の違う外部キーの違反
+   * @return 外部キーのない参照の列、形の違う外部キー、NULLを許す外部キーの列の違反
    */
   /* package */ static List<ConventionViolation> foreignKeys(
       final List<RelationRow> relations,
@@ -194,6 +196,11 @@ final class SchemaTenantConventions {
                         + "の外部キーにし、参照先に同じ組のユニークインデックスを作る（"
                         + CONSTRAINTS_DOC
                         + "）。"));
+    final Set<String> foreignKeyColumns =
+        foreignKeys.stream()
+            .flatMap(fk ->
+                fk.columns().stream().map(column -> fk.schema() + "." + fk.table() + "." + column))
+            .collect(Collectors.toSet());
     final Set<String> archiveTables =
         columns.stream()
             .filter(row -> row.table().startsWith(ArchiveDeclarationConventions.PREFIX))
@@ -205,16 +212,11 @@ final class SchemaTenantConventions {
             .filter(row -> !archiveTables.contains(row.schema() + "." + row.table()))
             .filter(row -> primaryKeyColumns.contains(row.schema() + "." + row.column()))
             .filter(row -> !row.column().equals(primaryKeys.get(row.schema() + "." + row.table())))
-            .filter(row ->
-                foreignKeys.stream()
-                    .noneMatch(fk ->
-                        fk.schema().equals(row.schema())
-                            && fk.table().equals(row.table())
-                            && fk.columns().contains(row.column())))
+            .filter(row -> !foreignKeyColumns.contains(columnKey(row)))
             .map(row ->
                 new ConventionViolation(
                     "K1",
-                    row.schema() + "." + row.table() + "." + row.column(),
+                    columnKey(row),
                     "同じモジュールの表を指す列に、"
                         + TenantIsolation.foreignKeyShape(row.schema())
                         + "の外部キーを作る（"
@@ -223,18 +225,17 @@ final class SchemaTenantConventions {
     final Stream<ConventionViolation> nullable =
         columns.stream()
             .filter(row -> !row.notNull())
-            .filter(row ->
-                foreignKeys.stream()
-                    .anyMatch(fk ->
-                        fk.schema().equals(row.schema())
-                            && fk.table().equals(row.table())
-                            && fk.columns().contains(row.column())))
+            .filter(row -> foreignKeyColumns.contains(columnKey(row)))
             .map(row ->
                 new ConventionViolation(
                     "K1",
-                    row.schema() + "." + row.table() + "." + row.column(),
+                    columnKey(row),
                     "外部キーの列をNOT NULLにする。列の一つがNULLだと、外部キーは検査しない（" + CONSTRAINTS_DOC + "）。"));
     return Stream.of(misshaped, missing, nullable).flatMap(Function.identity()).toList();
+  }
+
+  private static String columnKey(final ColumnRow row) {
+    return row.schema() + "." + row.table() + "." + row.column();
   }
 
   private static boolean hasExpectedShape(
