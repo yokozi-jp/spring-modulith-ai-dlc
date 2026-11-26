@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.0.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.17.0...v1.0.0) (2026-11-26)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** 全業務 api を /api/v1 に移し、バージョンの宣言を検査する ([#781](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/781))
+
+### Features
+
+* **api:** 全業務 api を /api/v1 に移し、バージョンの宣言を検査する ([#781](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/781)) ([e98bc81](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/e98bc8106fc1ad5de36b9b50e67576955392d75b))
+
 ## [0.17.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.16.0...v0.17.0) (2026-11-26)
 
 
