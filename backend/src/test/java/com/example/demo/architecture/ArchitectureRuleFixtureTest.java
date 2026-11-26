@@ -15,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.example.demo.architecture.ViolatingFixtures.FixtureRow;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
@@ -70,7 +71,7 @@ class ArchitectureRuleFixtureTest {
       "ordering.infrastructure.persistence.RoleBypassingOrderAccess";
 
   /** モジュールのロールの規則が、違反フィクスチャの各メソッドを検出することを確かめる行。 */
-  private static final List<Arguments> MODULE_ROLE_ROWS =
+  private static final List<FixtureRow> MODULE_ROLE_ROWS =
       List.of(
           row(
               "persistenceAdaptersUseOnlyOwnGeneratedSchema",
@@ -112,7 +113,7 @@ class ArchitectureRuleFixtureTest {
               ROLE_BYPASS + ".dslConnectionResult("));
 
   /** 数値の ID の規則が、違反フィクスチャの各パッケージの違反を検出することを確かめる行。 */
-  private static final List<Arguments> PUBLIC_ID_ROWS =
+  private static final List<FixtureRow> PUBLIC_ID_ROWS =
       List.of(
           row(
               "numericIdsDoNotLeaveModules: event",
@@ -172,7 +173,7 @@ class ArchitectureRuleFixtureTest {
   private static final String STALE_LOCK_SWEEPER = "shared.persistence.StaleLockSweeper";
 
   /** {@link ProxyRulesArchTest} の規則が、違反フィクスチャの各メソッドを検出することを確かめる行。 */
-  private static final List<Arguments> PROXY_ROWS =
+  private static final List<FixtureRow> PROXY_ROWS =
       List.of(
           row(
               "proxiedMethodsAreNotCalledFromSameClass: 直接の呼び出し",
@@ -266,8 +267,10 @@ class ArchitectureRuleFixtureTest {
 
     final Map<String, ArchRule> rules = ConformingRules.rulesFor(CONFORMING);
 
-    for (final String name : rules.keySet()) {
-      assertThatCode(() -> rules.get(name).check(conforming)).as(name).doesNotThrowAnyException();
+    for (final Map.Entry<String, ArchRule> rule : rules.entrySet()) {
+      assertThatCode(() -> rule.getValue().check(conforming))
+          .as(rule.getKey())
+          .doesNotThrowAnyException();
     }
   }
 
@@ -282,9 +285,7 @@ class ArchitectureRuleFixtureTest {
                     TreeMap::new,
                     mapping(ArchTestFields.RuleField::owner, toList())));
     final Set<String> violating =
-        eachRuleDetectsItsViolatingFixture()
-            .map(row -> ((String) row.get()[0]).split(":", 2)[0])
-            .collect(toSet());
+        eachRuleDetectsItsViolatingFixture().map(FixtureRow::ruleName).collect(toSet());
     final Map<String, Set<String>> registrations =
         Map.of(
             "eachRuleDetectsItsViolatingFixture の行",
@@ -360,7 +361,7 @@ class ArchitectureRuleFixtureTest {
         .hasMessageContaining(violatingClass);
   }
 
-  private static Stream<Arguments> eachRuleDetectsItsViolatingFixture() {
+  private static Stream<FixtureRow> eachRuleDetectsItsViolatingFixture() {
     return Stream.of(
             ClassRoleFixtureRows.rows(),
             tableWriterRows(),
@@ -371,7 +372,7 @@ class ArchitectureRuleFixtureTest {
   }
 
   /** TableWriter の規則（H3、H6、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
-  private static Stream<Arguments> tableWriterRows() {
+  private static Stream<FixtureRow> tableWriterRows() {
     return Stream.of(
         row(
             "repositoryUpdateCallsVersionedEntryPoint",
