@@ -297,36 +297,6 @@ resilience4j:
         base-config: default
         # スロットリング以外の 4xx は SES の不調ではないので失敗として数えない（docs/mail/sending.md の「結果と失敗の扱い」）。
         ignore-exception-predicate: com.example.demo.mail.infrastructure.client.IgnoredSesClientErrorPredicate
-  retry:
-    configs:
-      # 非冪等処理を重複実行しないよう、明示しない retry は無効にする。
-      default:
-        max-attempts: 1
-      # GET などの冪等な操作だけ、名前付き instance から base-config として継承する。
-      idempotent:
-        max-attempts: 3
-        wait-duration: 200ms
-        enable-exponential-backoff: true
-        exponential-backoff-multiplier: 2
-        # 再試行は ADR-019 の一時障害（接続の失敗とタイムアウト、429、502、503、504）に限る（ADR-072）。
-        retry-exceptions:
-          - org.springframework.web.client.ResourceAccessException
-          - org.springframework.web.client.HttpClientErrorException$TooManyRequests
-          - org.springframework.web.client.HttpServerErrorException$BadGateway
-          - org.springframework.web.client.HttpServerErrorException$ServiceUnavailable
-          - org.springframework.web.client.HttpServerErrorException$GatewayTimeout
-    instances:
-      # 冪等キーを渡すが、CommandHandler のトランザクションの中で呼ぶため default（試行 1 回）を継承する。
-      payment-gateway:
-        base-config: default
-      # SES の SendEmail には冪等キーがないため、default（試行 1 回）を継承する。SDK の再試行も止める（ADR-125）。
-      mail-sender:
-        base-config: default
-  timelimiter:
-    configs:
-      default:
-        timeout-duration: 2s
-        cancel-running-future: true
 
 # 組み込みサーバ（Tomcat）
 server:

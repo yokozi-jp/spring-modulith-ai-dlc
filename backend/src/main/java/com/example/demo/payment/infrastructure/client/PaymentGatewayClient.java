@@ -6,7 +6,6 @@ import com.example.demo.payment.domain.model.Money;
 import com.example.demo.payment.domain.model.OrderId;
 import com.example.demo.payment.domain.model.PaymentGateway;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import java.math.BigDecimal;
 import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
@@ -28,9 +27,9 @@ import org.springframework.web.client.UnknownContentTypeException;
 /**
  * 決済代行の HTTP API で、注文 ID を冪等性キーにして注文の代金を請求する。
  *
- * <p>タイムアウト（application.yaml の {@code payment-gateway}）、circuit breaker、retry は ADR-019
- * の既定値のままにする。決済代行の SLO がまだないため、値を変える根拠がない。retry は {@code ChargeOrderCommandHandler}
- * のトランザクションの中で呼ぶため default を継承して試行 1 回にし、失敗した請求はイベント出版の再投入でやり直す。 再投入で同じ注文をもう一度請求しても、冪等性キーで二重の請求を防ぐ。
+ * <p>タイムアウト（application.yaml の {@code payment-gateway}）と circuit breaker は ADR-019 の既定値のままにする。決済代行の
+ * SLO がまだないため、値を変える根拠がない。{@code ChargeOrderCommandHandler} のトランザクションの中で呼ぶため、この Client は再試行せず 1
+ * 回だけ呼び、失敗した請求はイベント出版の再投入でやり直す（ADR-079）。 再投入で同じ注文をもう一度請求しても、冪等性キーで二重の請求を防ぐ。
  *
  * <p>結果は ADR-072 の四つの分類に分ける。拒否（{@code DECLINED}）と契約の不備は結果で返し、呼び出し元が業務の状態に記録する。 契約の不備は、401、403、429
  * 以外の 4xx と、契約に合わない応答である。契約に合う応答は、201 で、JSON の本文に空でない {@code chargeId} と {@code SUCCEEDED} か {@code
@@ -86,7 +85,6 @@ class PaymentGatewayClient implements PaymentGateway {
    * <p>契約に合わない応答は、成功していない請求を支払い済みとして記録しないよう、契約の不備の結果にする。
    */
   @CircuitBreaker(name = "payment-gateway")
-  @Retry(name = "payment-gateway")
   @Override
   public ChargeOutcome charge(final OrderId orderId, final Money amount) {
     final String key = orderId.value().toString();

@@ -13,13 +13,6 @@ import com.zaxxer.hikari.HikariDataSource;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.core.IntervalBiFunction;
-import io.github.resilience4j.core.functions.Either;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.retry.RetryConfig;
-import io.github.resilience4j.retry.RetryRegistry;
-import io.github.resilience4j.timelimiter.TimeLimiterConfig;
-import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.math.BigDecimal;
@@ -29,11 +22,9 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Predicate;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -47,19 +38,15 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.HttpServerErrorException;
 
 /** アプリケーション起動時の日時、DB、耐障害性、OIDC 配線を検証する統合テスト。 */
-// 起動時の配線を設定ごとに一つのテストで検証するため、メソッドの数と結合する型の数の上限を外す。
-@SuppressWarnings({"PMD.TooManyMethods", "PMD.CouplingBetweenObjects"})
+// 起動時の配線を設定ごとに一つのテストで検証するため、メソッドの数の上限を外す。
+@SuppressWarnings("PMD.TooManyMethods")
 @SpringBootTest
 @Import(SharedTestConfiguration.class)
 class DemoApplicationTest {
@@ -81,12 +68,6 @@ class DemoApplicationTest {
 
   /** circuit breaker の実効既定値を検証する registry。 */
   @Autowired private CircuitBreakerRegistry circuitBreakerRegistry;
-
-  /** retry の実効既定値を検証する registry。 */
-  @Autowired private RetryRegistry retryRegistry;
-
-  /** time limiter の実効既定値を検証する registry。 */
-  @Autowired private TimeLimiterRegistry timeLimiterRegistry;
 
   /** 計測の記録先。 */
   @Autowired private MeterRegistry meterRegistry;
@@ -182,47 +163,12 @@ class DemoApplicationTest {
   }
 
   @Test
-  @DisplayName("retry は既定で無効かつ冪等操作だけ exponential backoff を使う")
-  void retryUsesFailSafeDefaults() {
-    final RetryConfig defaultConfig = retryRegistry.getDefaultConfig();
-    final RetryConfig idempotentConfig =
-        retryRegistry
-            .getConfiguration("idempotent")
-            .orElseThrow(() -> new AssertionError("retry config=idempotent が登録されていること"));
-    final IntervalBiFunction<Object> intervalFunction =
-        Objects.requireNonNull(
-            idempotentConfig.getIntervalBiFunction(), "idempotent retry の interval function");
-    final Either<Throwable, Object> retryableFailure =
-        Either.left(new IllegalStateException("一時障害のテスト入力"));
-    final long firstRetryDelay =
-        Objects.requireNonNull(intervalFunction.apply(1, retryableFailure), "一回目の retry 待機時間");
-    final long secondRetryDelay =
-        Objects.requireNonNull(intervalFunction.apply(2, retryableFailure), "二回目の retry 待機時間");
-
-    assertEquals(1, defaultConfig.getMaxAttempts(), "retry の既定試行回数が一回であること");
-    assertEquals(3, idempotentConfig.getMaxAttempts(), "冪等操作の最大試行回数が三回であること");
-    assertEquals(200L, firstRetryDelay, "冪等操作の初回 retry 待機が 200 ミリ秒であること");
-    assertEquals(400L, secondRetryDelay, "冪等操作の retry 待機が倍率 2 で増えること");
-    final Predicate<Throwable> retryable = idempotentConfig.getExceptionPredicate();
-    assertEquals(
-        Map.of(429, true, 503, true, 500, false, 400, false),
-        Map.of(
-            429, retryable.test(httpError(HttpStatus.TOO_MANY_REQUESTS)),
-            503, retryable.test(httpError(HttpStatus.SERVICE_UNAVAILABLE)),
-            500, retryable.test(httpError(HttpStatus.INTERNAL_SERVER_ERROR)),
-            400, retryable.test(httpError(HttpStatus.BAD_REQUEST))),
-        "冪等操作が ADR-019 の一時障害の 429 と 503 だけを再試行し、500 と 400 を再試行しないこと");
-  }
-
-  @Test
-  @DisplayName("決済代行の Client に payment-gateway の circuit breaker と retry が掛かる")
+  @DisplayName("決済代行の Client に payment-gateway の circuit breaker が掛かる")
   void paymentGatewayIsGuardedByResilience4j() {
     // YAML の instance は注釈がなくても registry に作られるため、呼び出しの件数の増加で aspect が掛かったことを確かめる。
     // 請求は、テストの JVM が起動する WireMock のコンテナ（InfrastructureContainers）のスタブが成功で返す。
     final CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(PAYMENT_GATEWAY);
-    final Retry retry = retryRegistry.retry(PAYMENT_GATEWAY);
     final long callsBefore = circuitBreaker.getMetrics().getNumberOfSuccessfulCalls();
-    final long retryBefore = retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt();
 
     paymentGateway.charge(new OrderId(UUID.randomUUID()), new Money(new BigDecimal("1.00")));
 
@@ -230,20 +176,6 @@ class DemoApplicationTest {
         callsBefore + 1,
         circuitBreaker.getMetrics().getNumberOfSuccessfulCalls(),
         "payment-gateway の circuit breaker が成功の呼び出しを 1 件数えること");
-    assertEquals(
-        retryBefore + 1,
-        retry.getMetrics().getNumberOfSuccessfulCallsWithoutRetryAttempt(),
-        "payment-gateway の retry が再試行なしの成功を 1 件数えること");
-  }
-
-  @ParameterizedTest
-  @ValueSource(strings = {PAYMENT_GATEWAY, MAIL_SENDER})
-  @DisplayName("外部システムの Client の retry の試行は 1 回で、トランザクションの中で同じ要求を重ねない")
-  void externalClientRetryIsSingleAttempt(final String instance) {
-    assertEquals(
-        1,
-        retryRegistry.retry(instance).getRetryConfig().getMaxAttempts(),
-        instance + " の retry の試行が 1 回であること");
   }
 
   @Test
@@ -292,7 +224,8 @@ class DemoApplicationTest {
   @DisplayName("外部システムの呼び出しの最悪の時間は、トランザクション中の待機の上限より短い")
   void externalClientWorstCaseFitsIdleInTransactionTimeout(final String instance) {
     // Listener はトランザクションの中で決済代行とメールの送信を呼ぶ（ADR-050）。待つ間に idle_in_transaction_session_timeout を超えると、
-    // PostgreSQL が接続を切り、結果を記録できない（ADR-055）。メールは SDK の呼び出し全体の上限が read-timeout なので、上の式は上限になる。
+    // PostgreSQL が接続を切り、結果を記録できない（ADR-055）。Client は再試行せず 1 回だけ呼ぶため（ADR-079）、最悪の時間は接続と読み取りの
+    // タイムアウトの和である。メールは SDK の呼び出し全体の上限が read-timeout なので、この和は上限になる。
     final Duration connectTimeout =
         applicationContext
             .getEnvironment()
@@ -301,21 +234,11 @@ class DemoApplicationTest {
         applicationContext
             .getEnvironment()
             .getRequiredProperty(instance + ".read-timeout", Duration.class);
-    final RetryConfig retryConfig = retryRegistry.retry(instance).getRetryConfig();
-    final IntervalBiFunction<Object> intervalFunction =
-        Objects.requireNonNull(
-            retryConfig.getIntervalBiFunction(), instance + " の retry の interval function");
-    final Either<Throwable, Object> failure = Either.left(new IllegalStateException("一時障害のテスト入力"));
-    final int attempts = retryConfig.getMaxAttempts();
-    long worstCaseMillis = attempts * (connectTimeout.toMillis() + readTimeout.toMillis());
-    for (int retry = 1; retry < attempts; retry++) {
-      worstCaseMillis += Objects.requireNonNull(intervalFunction.apply(retry, failure), "再試行の待ち");
-    }
     final long idleTimeoutMillis =
         applicationContext
             .getEnvironment()
             .getRequiredProperty("DB_IDLE_IN_TRANSACTION_TIMEOUT_MS", Long.class);
-    final long worstCase = worstCaseMillis;
+    final long worstCase = connectTimeout.toMillis() + readTimeout.toMillis();
 
     assertTrue(
         worstCase < idleTimeoutMillis,
@@ -344,15 +267,6 @@ class DemoApplicationTest {
   void sessionMaxLifetimeIsEightHours() {
     assertEquals(
         Duration.ofHours(8), sessionLifetime.maxLifetime(), "app.session.max-lifetime が 8 時間であること");
-  }
-
-  @Test
-  @DisplayName("time limiter は外部呼び出しを二秒で打ち切る")
-  void timeLimiterUsesProjectDefault() {
-    final TimeLimiterConfig config = timeLimiterRegistry.getDefaultConfig();
-
-    assertEquals(Duration.ofSeconds(2), config.getTimeoutDuration(), "time limiter の上限が二秒であること");
-    assertTrue(config.shouldCancelRunningFuture(), "timeout 時に実行中の Future を cancel すること");
   }
 
   @Test
@@ -444,12 +358,5 @@ class DemoApplicationTest {
     assertNotNull(
         authorizationRequest.getAttributes().get(PkceParameterNames.CODE_VERIFIER),
         "PKCE の code_verifier が保持されること");
-  }
-
-  /** 状態のコードに合う RestClient の HTTP の例外を作る。 */
-  private static RuntimeException httpError(final HttpStatus status) {
-    return status.is4xxClientError()
-        ? HttpClientErrorException.create(status, "", HttpHeaders.EMPTY, new byte[0], null)
-        : HttpServerErrorException.create(status, "", HttpHeaders.EMPTY, new byte[0], null);
   }
 }

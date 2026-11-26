@@ -28,6 +28,8 @@ import com.tngtech.archunit.lang.ArchCondition;
 import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
@@ -42,6 +44,7 @@ import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ApplicationEventMulticaster;
 import org.springframework.context.event.EventListener;
 import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.resilience.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,6 +88,20 @@ class ClassRoleArchTest {
   private static final String ADR_105 =
       "docs/adr/ADR-105-bind-tenant-to-request-and-event-context.md";
 
+  /** 耐障害性と容量の上限を決めた ADR のパス。 */
+  private static final String ADR_019 =
+      "docs/adr/ADR-019-define-resilience-and-capacity-guardrails.md";
+
+  /** 失敗したイベント出版を定期に再投入すると決めた ADR のパス。 */
+  private static final String ADR_079 =
+      "docs/adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md";
+
+  /** 外部システムの Client の規約のパス。 */
+  private static final String EXTERNAL_CLIENT_DOC = "docs/backend/class-roles/external-client.md";
+
+  /** 外部システムの Client のパッケージのパターン。 */
+  private static final String CLIENT_PACKAGE = "..infrastructure.client..";
+
   /** Application のパッケージのパターン。 */
   private static final String APPLICATION_PACKAGE = "..application..";
 
@@ -98,7 +115,7 @@ class ClassRoleArchTest {
 
   /** 外部システムのインタフェースを実装する、{@code infrastructure.client} のクラス。 */
   private static final DescribedPredicate<JavaClass> EXTERNAL_SYSTEM_CLIENT =
-      resideInAPackage("..infrastructure.client..").and(assignableTo(EXTERNAL_SYSTEM_INTERFACE));
+      resideInAPackage(CLIENT_PACKAGE).and(assignableTo(EXTERNAL_SYSTEM_INTERFACE));
 
   /** 外部システムのインタフェースを直接の依存に持つ、Application の {@code *CommandHandler}。 */
   private static final DescribedPredicate<JavaClass> COMMAND_HANDLER_USING_EXTERNAL_SYSTEM =
@@ -250,6 +267,64 @@ class ClassRoleArchTest {
                           COMMAND_HANDLER_DOC,
                           "docs/backend/class-roles/external-system-interface.md",
                           ADR_050));
+
+  /**
+   * Resilience4j の retry と TimeLimiter を使わない。
+   *
+   * <p>外部の呼び出しのやり直しはイベント出版の再投入だけが行い、タイムアウトは HTTP クライアントが持つ（ADR-019、ADR-079）。{@code @Retry}
+   * は名前に合う設定がないと Resilience4j の既定の 3 回で再試行するため、注釈を足すだけで再投入と重なる。
+   */
+  @ArchTest
+  /* package */ static final ArchRule resilience4jRetryAndTimeLimiterAreNotUsed =
+      noClasses()
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(
+              "io.github.resilience4j.retry..", "io.github.resilience4j.timelimiter..")
+          .allowEmptyShould(true)
+          .because(
+              "外部の呼び出しをやり直す層はイベント出版の再投入だけにし、タイムアウトは HTTP クライアントの接続と呼び出しに持つため。"
+                  + "Client の中で再試行すると、Listener のトランザクションの中で同じ要求を重ね、再投入の回数と掛け合わさる。"
+                  + "直し方：@Retry、@TimeLimiter、Retry と TimeLimiter の API を外し、失敗は例外で投げてイベント出版を FAILED に残し、"
+                  + "再投入でやり直す。タイムアウトは Client の connect-timeout と read-timeout で決める。"
+                  + conventions(EXTERNAL_CLIENT_DOC, ADR_019, ADR_079));
+
+  /** Spring の {@code @Retryable} を、外部システムを呼ぶ経路（Client、外部システムを呼ぶ CommandHandler、Listener）に付けない。 */
+  @ArchTest
+  /* package */ static final ArchRule retryableIsNotUsedOnExternalSystemPath =
+      classes()
+          .that(
+              resideInAPackage(CLIENT_PACKAGE)
+                  .or(COMMAND_HANDLER_USING_EXTERNAL_SYSTEM)
+                  .or(APPLICATION_LISTENER))
+          .should()
+          .notBeMetaAnnotatedWith(Retryable.class)
+          .andShould(notDeclareMethodsMetaAnnotatedWith(Retryable.class))
+          .allowEmptyShould(true)
+          .because(
+              "外部の呼び出しをやり直す層はイベント出版の再投入だけにするため。"
+                  + "@Retryable は @EnableResilientMethods がないと黙って効かず、有効にすると再投入と重なって同じ要求を重ねる。"
+                  + "直し方：@Retryable を外し、失敗は例外で投げてイベント出版を FAILED に残し、再投入でやり直す。"
+                  + conventions(EXTERNAL_CLIENT_DOC, LISTENER_DOC, ADR_019, ADR_079));
+
+  /**
+   * Resilience4j の {@code @CircuitBreaker} は、{@code infrastructure.client} の {@code *Client}
+   * にだけ付ける。
+   */
+  @ArchTest
+  /* package */ static final ArchRule circuitBreakerIsUsedOnlyOnClients =
+      classes()
+          .that(not(resideInAPackage(CLIENT_PACKAGE).and(simpleNameEndingWith("Client"))))
+          .should()
+          .notBeMetaAnnotatedWith(CircuitBreaker.class)
+          .andShould(notDeclareMethodsMetaAnnotatedWith(CircuitBreaker.class))
+          .allowEmptyShould(true)
+          .because(
+              "circuit breaker は外部システムを呼ぶ境界の Client で、依存先ごとの名前付きの instance で掛け、"
+                  + "依存先の不調だけを失敗に数えるため。"
+                  + "直し方：@CircuitBreaker を、外部システムを呼ぶ infrastructure.client の <System>Client の"
+                  + "メソッドへ移し、application.yaml の resilience4j.circuitbreaker.instances に依存先の名前の instance を書く。"
+                  + conventions(EXTERNAL_CLIENT_DOC, ADR_019));
 
   /**
    * イベントの発行は、application の CommandHandler だけが行う。
@@ -721,6 +796,23 @@ class ClassRoleArchTest {
                     item,
                     !component.getAnnotatedType().isAnnotationPresent(Nullable.class),
                     item.getName() + "." + component.getName() + " is @Nullable"))
+            .forEach(events::add);
+      }
+    };
+  }
+
+  /** アノテーションを直接かメタアノテーションとして持つメソッドを、クラスが宣言しない。 */
+  private static ArchCondition<JavaClass> notDeclareMethodsMetaAnnotatedWith(
+      final Class<? extends Annotation> annotation) {
+    final String name = "@" + annotation.getSimpleName();
+    return new ArchCondition<>("not declare methods meta-annotated with " + name) {
+      @Override
+      public void check(final JavaClass item, final ConditionEvents events) {
+        item.getMethods().stream()
+            .filter(method -> method.isMetaAnnotatedWith(annotation))
+            .map(method ->
+                SimpleConditionEvent.violated(
+                    method, method.getFullName() + " is meta-annotated with " + name))
             .forEach(events::add);
       }
     };

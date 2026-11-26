@@ -358,7 +358,7 @@ class PackageByFeatureOnionArchitectureTest {
           .resideInAPackage("..infrastructure.client..")
           .allowEmptyShould(true)
           .because(
-              "URL、JSON の形、タイムアウト、サーキットブレーカー、リトライを Client だけが扱い、"
+              "URL、JSON の形、タイムアウト、サーキットブレーカーを Client だけが扱い、"
                   + "CommandHandler が外部システムの HTTP の詳細を知らずに済むようにするため。"
                   + "直し方：外部システムのインタフェースの実装は infrastructure.client へ移し、"
                   + "<ExternalSystem>Client と命名する。"

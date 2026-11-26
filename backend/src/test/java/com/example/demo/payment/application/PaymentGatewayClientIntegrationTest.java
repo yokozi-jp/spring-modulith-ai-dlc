@@ -21,6 +21,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -49,17 +50,17 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 
 /**
- * 決済代行の Client を WireMock に向け、確定した注文の請求の成功と失敗、retry と circuit breaker を検証する。
+ * 決済代行の Client を WireMock に向け、確定した注文の請求の成功と失敗、1 回だけ呼ぶことと circuit breaker を検証する。
  *
  * <p>成功の応答は、compose の WireMock と同じ {@code docker/wiremock/mappings} のスタブで返し、Client
- * とスタブの契約が合うことを確かめる。 失敗は、注文 ID の冪等性キーに合う優先度の高いスタブをテストの中で足す。決済代行を差し替えず、Resilience4j の retry と
- * circuit breaker を通す。ADR-072 の四つの分類ごとに、出版の状態（拒否と契約の不備は COMPLETED、一時障害と資格情報の不備は FAILED）と決済記録を確かめる。
- * 429 以外の 4xx は circuit breaker が失敗として数えず、429 は数える。出版の状態を読む公開の入口も再投入の公開の入口も無く、定期の再投入（ADR-079）は
+ * とスタブの契約が合うことを確かめる。 失敗は、注文 ID の冪等性キーに合う優先度の高いスタブをテストの中で足す。決済代行を差し替えず、Resilience4j の circuit
+ * breaker を通す。ADR-072 の四つの分類ごとに、出版の状態（拒否と契約の不備は COMPLETED、一時障害と資格情報の不備は FAILED）と決済記録を確かめる。 429 以外の
+ * 4xx は circuit breaker が失敗として数えず、429 は数える。出版の状態を読む公開の入口も再投入の公開の入口も無く、定期の再投入（ADR-079）は
  * テストで無効にしているため、5xx とタイムアウトの FAILED から手での 1 回の再投入（{@link EventPublicationResubmitOnce}）で回復し、決済記録が 1
  * 件になることと、同じイベントの再配送で請求しないことを、本番の Client を通してここで確かめる（E2E は画面に見える状態だけを確かめる）。URL の設定の違いで {@link
  * OrderConfirmedListenerTest} とは別の Spring のコンテキストになる。
  */
-// 成功、拒否、契約に合わない応答、5xx、4xx、429、タイムアウト、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
+// 成功、拒否、契約に合わない応答、5xx、4xx、429、タイムアウト、接続の切断、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
 @SuppressWarnings("PMD.TooManyMethods")
 @ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
 @Import({SharedTestConfiguration.class, OrderConfirmedFixture.class})
@@ -193,6 +194,19 @@ class PaymentGatewayClientIntegrationTest {
   void timeoutLeavesPublicationFailed(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
     stubCharge(orderId, succeeded(orderId).withFixedDelay(3000));
+
+    fixture.confirmAndAwait(
+        scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
+
+    assertFailedOnce(orderId);
+  }
+
+  @Test
+  @DisplayName("接続が切られれば 1 回だけ呼ばれ、決済記録を作らず、出版は FAILED、attempts 1 で残る")
+  void connectionResetLeavesPublicationFailed(final Scenario scenario) {
+    // 接続の失敗は Client が投げ直す一時障害である。Client の中で再試行せず、やり直しはイベント出版の再投入だけが行う（ADR-079）。
+    final String orderId = fixture.draftedOrderId();
+    stubCharge(orderId, WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER));
 
     fixture.confirmAndAwait(
         scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));

@@ -45,7 +45,7 @@ import tools.jackson.databind.json.JsonMapper;
  * メールの送信の Client の SES v2 の API の呼び出しと、結果の分け方を、ループバックの HTTP サーバで検証する。
  *
  * <p>Client は本番と同じ {@link SesV2ClientConfig} の試行 1 回の SDK の Client
- * で呼び、接続先とダミーの資格情報を設定の値として渡す。Spring を起動しないため、circuit breaker と retry は働かない（WireMock の結合テストで確かめる）。
+ * で呼び、接続先とダミーの資格情報を設定の値として渡す。Spring を起動しないため、circuit breaker は働かない（WireMock の結合テストで確かめる）。
  */
 // 成功、拒否、契約に合わない応答、スロットリング、5xx、403、タイムアウト、設定を一つの HttpServer の文脈で確かめるため、メソッドが多い。
 // 起動の確認は ApplicationContextRunner の run の中の AssertJ で書く。

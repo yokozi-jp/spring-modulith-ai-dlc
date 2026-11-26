@@ -13,6 +13,10 @@ final class ClassRoleFixtureRows {
   private static final String REFLECTIVE_READER =
       "ordering.infrastructure.persistence.ReflectiveOrderReader";
 
+  /** Resilience4j の retry と TimeLimiter を使う違反フィクスチャのクラス名。 */
+  private static final String RETRYING_CLIENT =
+      "ordering.infrastructure.client.RetryingPaymentClient";
+
   /** 例外を Problem Details へ変える違反フィクスチャのクラス名。 */
   private static final String ERROR_ADVICE = "ordering.presentation.web.OrderErrorAdvice";
 
@@ -274,6 +278,34 @@ final class ClassRoleFixtureRows {
             "externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients: 補助のクラス",
             ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
             "ordering.application.OrderPaymentCharger"),
+        row(
+            "resilience4jRetryAndTimeLimiterAreNotUsed: @Retry",
+            ClassRoleArchTest.resilience4jRetryAndTimeLimiterAreNotUsed,
+            RETRYING_CLIENT + ".charge("),
+        row(
+            "resilience4jRetryAndTimeLimiterAreNotUsed: @TimeLimiter",
+            ClassRoleArchTest.resilience4jRetryAndTimeLimiterAreNotUsed,
+            RETRYING_CLIENT + ".quote("),
+        row(
+            "retryableIsNotUsedOnExternalSystemPath: Client",
+            ClassRoleArchTest.retryableIsNotUsedOnExternalSystemPath,
+            "ordering.infrastructure.client.RetryablePaymentClient.charge("),
+        row(
+            "retryableIsNotUsedOnExternalSystemPath: 外部システムを呼ぶ CommandHandler のクラス",
+            ClassRoleArchTest.retryableIsNotUsedOnExternalSystemPath,
+            "ordering.application.RetryableChargeOrderCommandHandler"),
+        row(
+            "retryableIsNotUsedOnExternalSystemPath: Listener",
+            ClassRoleArchTest.retryableIsNotUsedOnExternalSystemPath,
+            "ordering.application.OrderRefundedListener.on("),
+        row(
+            "circuitBreakerIsUsedOnlyOnClients: CommandHandler のメソッド",
+            ClassRoleArchTest.circuitBreakerIsUsedOnlyOnClients,
+            "ordering.application.GuardedChargeOrderCommandHandler.handle("),
+        row(
+            "circuitBreakerIsUsedOnlyOnClients: Client でないクラス",
+            ClassRoleArchTest.circuitBreakerIsUsedOnlyOnClients,
+            "ordering.infrastructure.client.PaymentGatewayBreaker"),
         row(
             "eventPublisherIsUsedOnlyByCommandHandlers: Controller",
             ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers,

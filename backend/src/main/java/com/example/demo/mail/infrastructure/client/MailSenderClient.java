@@ -7,7 +7,6 @@ import com.example.demo.mail.domain.model.MailRecipient;
 import com.example.demo.mail.domain.model.MailSender;
 import com.example.demo.mail.domain.model.MailSubject;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
-import io.github.resilience4j.retry.annotation.Retry;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +26,7 @@ import software.amazon.awssdk.services.sesv2.model.SesV2Exception;
  * SES v2 の {@code SendEmail} で、1 人の宛先へプレーンテキストのメールを送る。
  *
  * <p>本番もローカルもテストも、この Client で送る。ローカルとテストは、{@link SesV2ClientConfig} が Spring の設定の接続先と資格情報で WireMock
- * に向ける（ADR-125）。タイムアウトと試行 1 回の設定は {@link SesV2ClientConfig} が持ち、circuit breaker と retry は ADR-019
+ * に向ける（ADR-125）。タイムアウトと試行 1 回の設定は {@link SesV2ClientConfig} が持ち、circuit breaker は ADR-019
  * の既定値のままにする。SES の SLO から値を変える根拠がまだないためである。
  *
  * <p>許可の外の宛先（{@link AllowedRecipients}）、{@code MessageRejected}、{@code BadRequestException}、{@code
@@ -104,7 +103,6 @@ class MailSenderClient implements MailSender {
    * の例外で投げる。
    */
   @CircuitBreaker(name = "mail-sender")
-  @Retry(name = "mail-sender")
   @Override
   public MailOutcome send(final MailRecipient to, final MailSubject subject, final MailBody body) {
     if (!allowedRecipients.allows(to)) {
