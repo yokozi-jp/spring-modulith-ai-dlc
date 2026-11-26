@@ -11,6 +11,7 @@ test("認可リクエストのないログインのコールバックを開く�
 
   const callback = await response?.request().redirectedFrom()?.response();
   expect(callback?.url()).toBe(`${webOrigin}/login/oauth2/code/web?code=x&state=y`);
+  // vite preview は X-Forwarded-* を付けないので、ForwardedHeaderFilter の 303 にならない。
   expect(callback?.status()).toBe(302);
   await expect(page).toHaveURL(`${webOrigin}/login-failed`);
   await expect(
