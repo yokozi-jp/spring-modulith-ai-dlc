@@ -20,7 +20,7 @@ zizmor = "1.32.0"
 # Kiro CLI は mise の registry に無いので、http backend で公式の zip を取る（ADR-090）。
 # 各版の sha256 は公式の index.json（versions[].packages[].download と sha256）にあり、mise.lock が記録する。
 [tools."http:kiro-cli"]
-version = "3.5.0"
+version = "3.6.2"
 bin_path = "kirocli/bin"
 checksum_url = "https://prod.download.cli.kiro.dev/stable/index.json"
 checksum_expr = '"sha256:" + filter(filter(fromJSON(body).versions, { #.version == version })[0].packages, { #.download == version + "/" + filename })[0].sha256'
