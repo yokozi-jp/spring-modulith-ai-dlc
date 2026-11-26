@@ -560,9 +560,7 @@ class EventPublicationResubmissionConfigTest {
         .withConfiguration(
             AutoConfigurations.of(
                 TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
-        .withPropertyValues(
-            ENABLE_SCHEDULING,
-            "spring.threads.virtual.enabled=true")
+        .withPropertyValues(ENABLE_SCHEDULING, "spring.threads.virtual.enabled=true")
         .run(context -> {
           assertThat(context).hasSingleBean(TaskScheduler.class);
           // Spring Boot 4.1 は taskExecutor の別名を作らず、@Async の executor を AsyncConfigurer で渡す。
