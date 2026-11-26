@@ -169,7 +169,7 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
   `resubmitted` は、再投入して `RESUBMITTED` へ進んだ出版の数である。選ばれても進まなかった出版は、どの属性にも数えない。
 - **発生原因**：原因が直っておらずリスナーがまた失敗した（`incomplete`）。
   リスナーが `completion-timeout`（10 分）を過ぎても終わらない（`incomplete`）。
-  対象が `max-per-run`（100 件）より多い（`remaining`）。
+  対象が `max-per-run` より多い（`remaining`）。`max-per-run` は小さい（`application.yaml`）ので、障害の後の手での再投入では、この WARN は想定の範囲である。`remaining` が 0 になるまで繰り返す。
 - **対応**：`incomplete` が 0 でなければ、リスナーの ERROR で原因を確かめ、直してから起動し直す。
   リスナーの ERROR がなければ、archive の表のその出版の `id` の `status` を確かめる。
   `COMPLETED` なら完了しており、`ABANDONED` なら回数の上限を超えてまた失敗した。
@@ -324,7 +324,7 @@ SELECT id, listener_id, event_type, serialized_event, publication_date,
 定期のジョブと同じロックを取るため、定期のジョブを止めずに起動してよい。
 ロックの中で、定期のジョブと同じく、対象によらず古い出版を `FAILED` に戻す。
 定期の実行を止めた環境でも、落ちたまま残った出版はこの起動で `FAILED` に戻り、対象に合えば同じ起動で再投入される。
-待ち時間を見ずに、対象の `FAILED` の出版を `max-per-run`（100 件）まで再投入し、リスナーの処理が終わるまで待ってから終わる。
+待ち時間を見ずに、対象の `FAILED` の出版を `max-per-run` 件まで再投入し、リスナーの処理が終わるまで待ってから終わる。
 すべて完了したら終了コード 0、それ以外は 1 である。
 定期のジョブと違い、時間の予算（次の節）は適用しない。
 運用者が完了を待つ入口であり、件数は `max-per-run` が抑える。
@@ -348,7 +348,7 @@ docker compose --env-file .env -f docker/compose.yml --profile backend run --rm 
 
 main の見積もりは次のとおりである。
 決済のリスナーの 1 件の最悪は、connect 1 秒 + read 2 秒の約 3 秒で、試行は 1 回である。
-`concurrency-limit` は 2 で、100 件（`max-per-run`）ではおよそ 2.5 分になり、`lock-at-most-for` の 10 分に収まる。
+executor に同時実行数の上限がないため、再投入は件数（`max-per-run`）を渡した時点で戻る。1 回の実行は数秒で、`lock-at-most-for` の 10 分に収まる。
 リスナーを増やした場合は、予算で止まった回が増えていないか、`failed.oldest.age{state=retrying}` で確かめる。
 
 ## 再投入しない出版の片付け
@@ -406,7 +406,7 @@ DELETE FROM modulith.event_publication
   ダッシュボードと警報はインスタンスの間の最大値（`max`）で集め、合計（`sum`）しない。
   合計すると、同じ出版をインスタンスの数だけ数える。
 - 定期の実行を無効にした環境では更新されず、0 のままである。
-- `failed{state=retrying}` は、`concurrency-limit` の空きを待つ間に古い出版として `FAILED` に戻した処理中の出版も数えうるため、実際の失敗より多く出ることがある。
+- `failed{state=retrying}` は、終わらないまま古い出版として `FAILED` に戻した処理中の出版も数えうるため、実際の失敗より多く出ることがある。
 - `failed{state=exhausted}` の件数は、残っている件数の表示と片付けたあとの確認に使い、警報にしない。
   archive の表の `ABANDONED` の行は、戻すか消すまで残り、数え続ける。
 - 上限に達した出版を知る主な通知は ERROR のログの監視である。
@@ -438,6 +438,9 @@ DELETE FROM modulith.event_publication
 
 本番の値（W = 5 分、I = 1 分、N = 5、`default` の m = 2、M = 1 時間）では、待ち時間が 5、10、20、40、60 分で計 135 分、間隔の遅れが 5 分で、およそ 140 分になる。
 閾値は余裕を見て 2 時間 30 分にし、方針の中で最も長いものに合わせる。
+この式は、期限が来た出版が 1 回の実行ですべて再投入されることを前提にする。
+再投入は 1 回の実行で `max-per-run` 件までなので、同時に期限が来た出版が K 件あれば、最後の 1 件まで `⌈K / max-per-run⌉ × I` かかる。
+K が大きい障害の後は、警報が回復の途中で出る。件数が減っていれば、回復中として扱う。
 警報が出たら、WARN の `unknown type` と次の SQL で古い型の出版を特定する。
 
 ```sql

@@ -139,3 +139,4 @@
 - [ADR-137: イベントの変更を @Nullable の component の追加だけにし、過去の版の JSON を今の型で読めることを fixture のテストで確かめる](ADR-137-guard-event-json-compatibility-with-versioned-fixtures.md)（Proposed, 2026-11-26）
 - [ADR-138: 外部の利用者が現れる前に API を /api/v1 にし、バージョンの宣言を検査する](ADR-138-introduce-api-v1-with-spring-api-versioning.md)（Proposed, 2026-11-26）
 - [ADR-139: I/F のファイル定義書を ODCS v3.2.0 の YAML で書き、リポジトリのルートの interfaces/ に置く](ADR-139-write-interface-file-definitions-in-odcs.md)（Proposed, 2026-11-26）
+- [ADR-141: リスナーの同時実行数に上限を置かず、DB の接続の pool を唯一の制限にし、再投入の 1 回の件数を pool の半分以下に絞る](ADR-141-limit-listener-concurrency-by-connection-pool-only.md)（Proposed, 2026-11-26）
