@@ -49,6 +49,8 @@ OWASP Session Management Cheat Sheet は、無操作の期限と最長の期限�
 - 利用者は、操作を続けていても 8 時間ごとにログインし直す。操作の途中で 401 になることがある。
 - IdP の SSO セッションが残っていれば、ログインし直すときに資格情報を求められない。資格情報なしで使い続けられる実際の上限は、IdP の SSO セッションの最長の期間（Keycloak と Cognito の設定）になる。
 - filter を自作するので、Spring Session の版を上げるときは、`getCreationTime()` が ID の作り直しで変わらないことを確かめ直す。
+- 最長の期間を過ぎた後にログアウトすると、filter が `LogoutFilter` より前にセッションを消すので、ログアウトの処理に認証が渡らない。`OidcClientInitiatedLogoutSuccessHandler` は IdP の end session endpoint ではなく `/` へ redirect し、IdP の SSO セッションは残る。無操作の期間を過ぎた後のログアウトも、今と同じく `/` へ redirect する（どちらも MockMvc で実測）。
+- 最初のデプロイの時点で作ってから 8 時間を過ぎているセッションは、最初のリクエストで 401 になり、ログインし直す。IdP の SSO セッションが残っていれば、資格情報を求められない。
 
 ### Neutral
 
