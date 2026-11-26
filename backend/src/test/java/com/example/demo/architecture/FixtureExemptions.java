@@ -7,8 +7,6 @@ import java.util.Map;
 /**
  * {@link ArchitectureRuleFixtureTest} の違反の行と {@code rulesFor()} の両方には載せない {@code @ArchTest}
  * の規則と、載せない理由。
- *
- * <p>理由が {@code TODO(#608):} で始まる行は、違反フィクスチャがまだない規則である。違反フィクスチャと行を足したら、この表から消す。
  */
 final class FixtureExemptions {
 
@@ -40,9 +38,9 @@ final class FixtureExemptions {
   private static final String REST_CLIENT_BYPASS =
       "GeneralCodingRulesArchTest の restClientFactoriesAreRejected が RestClientBypass で確かめるため";
 
-  /** ArchUnit の {@code GeneralCodingRules} の定数に because を付けただけの、違反フィクスチャがない規則の理由。 */
-  private static final String TODO_LIBRARY_RULE =
-      "TODO(#608): 違反フィクスチャがない。ArchUnit の GeneralCodingRules の定数に because を付けた規則である";
+  /** ArchUnit の {@code GeneralCodingRules} の定数に because を付けただけの規則の理由。 */
+  private static final String LIBRARY_RULE =
+      "ArchUnit の GeneralCodingRules の定数に because を付けただけの規則で、違反の検出は ArchUnit のテストが確かめるため";
 
   /** 規則の名前（{@code @ArchTest} のフィールドの名前）から、フィクスチャで確かめない理由への対応。 */
   /* package */ static final Map<String, String> REASONS =
@@ -69,14 +67,14 @@ final class FixtureExemptions {
           entry("currentTimeIsObtainedThroughInjectedClock", INJECTED_CLOCK_TESTS),
           entry("commonColumnsAreReferencedOnlyBySharedPersistence", COMMON_COLUMN_BYPASS),
           entry("restClientIsBuiltFromInjectedBuilder", REST_CLIENT_BYPASS),
-          entry("noClassesShouldAccessStandardStreams", TODO_LIBRARY_RULE),
-          entry("noClassesShouldThrowGenericExceptions", TODO_LIBRARY_RULE),
-          entry("noClassesShouldUseJavaUtilLogging", TODO_LIBRARY_RULE),
-          entry("noClassesShouldUseJodaTime", TODO_LIBRARY_RULE),
-          entry("noClassesShouldUseFieldInjection", TODO_LIBRARY_RULE),
-          entry("assertionsShouldHaveDetailMessage", TODO_LIBRARY_RULE),
-          entry("deprecatedApiShouldNotBeUsed", TODO_LIBRARY_RULE),
-          entry("oldDateAndTimeClassesShouldNotBeUsed", TODO_LIBRARY_RULE));
+          entry("noClassesShouldAccessStandardStreams", LIBRARY_RULE),
+          entry("noClassesShouldThrowGenericExceptions", LIBRARY_RULE),
+          entry("noClassesShouldUseJavaUtilLogging", LIBRARY_RULE),
+          entry("noClassesShouldUseJodaTime", LIBRARY_RULE),
+          entry("noClassesShouldUseFieldInjection", LIBRARY_RULE),
+          entry("assertionsShouldHaveDetailMessage", LIBRARY_RULE),
+          entry("deprecatedApiShouldNotBeUsed", LIBRARY_RULE),
+          entry("oldDateAndTimeClassesShouldNotBeUsed", LIBRARY_RULE));
 
   private FixtureExemptions() {}
 }

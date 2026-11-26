@@ -218,6 +218,9 @@ H3は、違反フィクスチャの`JooqOrderRepository`の`update`と`save`（`
 H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を受け取る）で確かめる。
 `allowedUsagesAreNotDetected`の一行は、対応づけの二つの規則が`convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`、`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`、`newRecord(Table)`を誤検出しないことを確かめる。
 `noSuchElementExceptionIsNotThrown`は、違反フィクスチャの`LegacyOrderFinder`の`notFound`（`NoSuchElementException`の生成）と`firstOrFail`（引数なしの`orElseThrow()`）で確かめる。
+`featureCodeUsesOnlySlf4jFacade`は、違反フィクスチャの`LogbackOrderAuditor`（Logbackの`Level`を使う）で確かめる。
+`autowiredMethodsAreNotUsed`は、違反フィクスチャの`SetterInjectedOrderMailer`（`setSender`に`@Autowired`を付ける）で確かめる。
+`legacyDateTimeTypesAreNotUsed`は、違反フィクスチャの`LegacyOrderTimestamp`（`java.util.Date`を返す）で確かめる。
 規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
 `allowedUsagesAreNotDetected`の別の一行は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
 `httpTypesAreNotUsedByInnerLayers`は、違反フィクスチャの`shared.persistence`の`ChildRowWriter`と`application`の`HttpStatusCommandHandler`が`ResponseStatusException`を投げること、`infrastructure.persistence`の`HttpStatusOrderReader`が`HttpStatus`を使うことを検出する。
@@ -234,9 +237,13 @@ MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`
 行の名前と`rulesFor()`のキーには、`@ArchTest`のフィールドの名前を使う。
 違反の種類ごとに行を分けるときは、`moduleCodeDoesNotUseJdbc: DataSource`のように名前の後に種類を足す。
 片方にだけ加えると、`everyRuleIsRegisteredOrExempted`が規則の名前を出して失敗する。
-テストコードを検査する規則と、別のテストが違反を確かめる規則は、`FixtureExemptions`に理由を付けて載せる。
-理由が`TODO(#608):`で始まる規則には、まだ違反フィクスチャがない。
-違反フィクスチャと行を足したら、`FixtureExemptions`から消す。
+次の規則は、違反の行と`rulesFor()`に載せず、`FixtureExemptions`に理由を付けて載せる。
+
+- テストコードを検査する規則
+- 別のテストが違反を確かめる規則
+- ArchUnitの`GeneralCodingRules`の定数に`.because(...)`を付けただけの規則（違反の検出はArchUnitのテストが確かめる）
+
+除外した規則に違反フィクスチャと行を足したら、`FixtureExemptions`から消す。
 注釈の属性の値で判定する規則では、属性を省いて既定値のままにした注釈も違反フィクスチャに置く。
 たとえば値を省いた`@Order`は`Ordered.LOWEST_PRECEDENCE`になり、明示した値だけを見る規則を通ってしまう。
 
