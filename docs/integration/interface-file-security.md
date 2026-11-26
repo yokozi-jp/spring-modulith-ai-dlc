@@ -26,7 +26,7 @@ tags: [convention, integration, interface, security, future-arch-guidelines]
 
 ## 機密情報を連携する場合の対策
 
-- ファイル定義書に、機密情報を含むかどうかを必ず書く（[連携の一覧と定義書](interface-documentation.md)）。
+- ファイル定義書で、機密情報の項目の `classification` を `confidential` にし、ファイルが機密情報を含むことを示す（[連携の一覧と定義書](interface-documentation.md)）。
 - ファイルを暗号化する。
   クラウド事業者やシステム管理者からも平文を見えなくする必要がある場合は、クライアントサイド暗号化を使う。
   サーバーサイド暗号化では、事業者が管理する鍵ではなく、利用者が管理する鍵を使う。
