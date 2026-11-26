@@ -4,7 +4,7 @@ import { getListProductsSuspenseQueryOptions } from "@frontend/api/endpoints/pro
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import { preloadQuery } from "@/api/preload-query";
-import { OrderDetailPage } from "@/features/orders/order-detail-page";
+import { OrderDetailPage } from "@/features/orders/pages/order-detail-page";
 
 export const Route = createFileRoute("/_authenticated/_tenant/orders/$orderId/")({
   loader: async ({ context, params }) => {

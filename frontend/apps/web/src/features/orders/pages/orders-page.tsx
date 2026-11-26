@@ -4,9 +4,9 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
-import { OrderStatusFilter } from "./components/order-status-filter";
-import { OrdersTable } from "./components/orders-table";
-import { listOrdersParams } from "./order-status";
+import { OrderStatusFilter } from "@/features/orders/components/order-status-filter";
+import { OrdersTable } from "@/features/orders/components/orders-table";
+import { listOrdersParams } from "@/features/orders/order-status";
 
 const routeApi = getRouteApi("/_authenticated/_tenant/orders/");
 

@@ -83,7 +83,7 @@ import { getListProductsSuspenseQueryOptions } from "@frontend/api/endpoints/pro
 import { createFileRoute } from "@tanstack/react-router";
 
 import { preloadQuery } from "@/api/preload-query";
-import { OrderNewPage } from "@/features/orders/order-new-page";
+import { OrderNewPage } from "@/features/orders/pages/order-new-page";
 
 export const Route = createFileRoute("/_authenticated/_tenant/orders/new")({
   loader: ({ context }) => preloadQuery(context.queryClient, getListProductsSuspenseQueryOptions()),
@@ -91,7 +91,7 @@ export const Route = createFileRoute("/_authenticated/_tenant/orders/new")({
 });
 ```
 
-component は同じ生成 query options を `useSuspenseQuery` で読む（`frontend/apps/web/src/features/tenancy/tenant-members-page.tsx`）。
+component は同じ生成 query options を `useSuspenseQuery` で読む（`frontend/apps/web/src/features/tenancy/pages/tenant-members-page.tsx`）。
 
 ```tsx
   const { data, error } = useSuspenseQuery(getListTenantMembersSuspenseQueryOptions());

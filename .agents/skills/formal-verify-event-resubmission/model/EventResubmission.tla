@@ -31,7 +31,7 @@ CONSTANTS
   \* comments in application.yaml and EventPublicationResubmissionConfig
   \* assume about the running system.
   ListenerMax,       \* longest listener run
-  QueueMax,          \* longest wait for a free thread (concurrency-limit)
+  QueueMax,          \* longest wait for a free DB connection (connection-timeout)
   RunMax,            \* longest resubmission run, its stale check included
   MaxCrashes,
   Horizon
@@ -183,7 +183,7 @@ StaleMark(i) ==
 \* .processFailedPublications -> findFailedPublications:
 \* SELECT ... WHERE status = 'FAILED'. The run keeps this snapshot while
 \* it handles the other publications of the list (up to max-per-run, each
-\* dispatch can wait for concurrency-limit).
+\* dispatch can wait for a DB connection).
 RunRead(i) ==
   /\ inst[i].up /\ inst[i].phase = "checked"
   /\ inst' = [inst EXCEPT ![i].phase = "read",
@@ -226,7 +226,7 @@ RunFinish(i) ==
 
 -----------------------------------------------------------------------------
 (* Listener deliveries: CompletionRegisteringMethodInterceptor around      *)
-(* the listener, on the executor (spring.task.execution, concurrency-limit).*)
+(* the listener, on the executor (spring.task.execution, no limit).         *)
 
 \* markProcessing: UPDATE SET status = 'PROCESSING' WHERE id = ? AND
 \* status != 'PROCESSING'.

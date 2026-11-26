@@ -5,10 +5,9 @@ import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ProblemNotice } from "@/components/problem-notice";
-
-import { CustomerOrderCodeField } from "./components/customer-order-code-field";
-import { OrderLinesFields } from "./components/order-lines-fields";
-import { useDraftOrderForm } from "./hooks/use-draft-order-form";
+import { CustomerOrderCodeField } from "@/features/orders/components/customer-order-code-field";
+import { OrderLinesFields } from "@/features/orders/components/order-lines-fields";
+import { useDraftOrderForm } from "@/features/orders/hooks/use-draft-order-form";
 
 export function OrderNewPage() {
   const { t } = useTranslation();

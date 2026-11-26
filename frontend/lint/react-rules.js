@@ -65,9 +65,31 @@ export const noEffect = {
   },
 };
 
+// func-style が宣言以外の関数を禁じるため、Hook の定義は関数宣言だけを見る。
+const hookName = /^use[A-Z]/u;
+
+export const noHookDefinition = {
+  meta: {
+    messages: {
+      hook: "Define custom Hooks only in features/<feature>/hooks/use-<name>.ts (docs/frontend/file-roles/feature-hook.md). Move this function there and import it.",
+    },
+    schema: [],
+  },
+  create(context) {
+    return {
+      FunctionDeclaration(node) {
+        const name = node.id?.name;
+        if (typeof name === "string" && hookName.test(name)) {
+          context.report({ node: node.id, messageId: "hook" });
+        }
+      },
+    };
+  },
+};
+
 const reactRules = {
   meta: { name: "react-rules" },
-  rules: { "no-effect": noEffect },
+  rules: { "no-effect": noEffect, "no-hook-definition": noHookDefinition },
 };
 
 export default reactRules;

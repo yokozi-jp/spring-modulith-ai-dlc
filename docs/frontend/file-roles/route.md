@@ -66,7 +66,7 @@ import { getListProductsSuspenseQueryOptions } from "@frontend/api/endpoints/pro
 import { createFileRoute } from "@tanstack/react-router";
 
 import { preloadQuery } from "@/api/preload-query";
-import { OrderNewPage } from "@/features/orders/order-new-page";
+import { OrderNewPage } from "@/features/orders/pages/order-new-page";
 
 export const Route = createFileRoute("/_authenticated/_tenant/orders/new")({
   loader: ({ context }) => preloadQuery(context.queryClient, getListProductsSuspenseQueryOptions()),
@@ -84,7 +84,7 @@ import { getListProductsSuspenseQueryOptions } from "@frontend/api/endpoints/pro
 import { createFileRoute, notFound } from "@tanstack/react-router";
 
 import { preloadQuery } from "@/api/preload-query";
-import { OrderDetailPage } from "@/features/orders/order-detail-page";
+import { OrderDetailPage } from "@/features/orders/pages/order-detail-page";
 
 export const Route = createFileRoute("/_authenticated/_tenant/orders/$orderId/")({
   loader: async ({ context, params }) => {
@@ -130,7 +130,7 @@ export const Route = createFileRoute("/_authenticated/_tenant")({
 
 業務機能の route は、[feature の画面](feature-page.md#対応するテスト)のテストが `renderRoute`（`src/testing/render-route.tsx`）で route ごと描画して確かめる。
 `renderRoute` は、`main.tsx` と同じ provider と `routerDefaults` で router を作り、最初の loader を終えてから描画する。
-loader の not found は `features/orders/order-detail-page.test.tsx` が、`beforeLoad` の移動は `features/tenancy/tenants-page.test.tsx` が確かめている。
+loader の not found は `features/orders/pages/order-detail-page.test.tsx` が、`beforeLoad` の移動は `features/tenancy/pages/tenants-page.test.tsx` が確かめている。
 
 業務機能に属さない route は、route の近くに `-` で始まるテストを置く（`routes/-logged-out.test.tsx`）。
 
