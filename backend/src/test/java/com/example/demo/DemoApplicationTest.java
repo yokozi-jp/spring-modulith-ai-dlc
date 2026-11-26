@@ -31,6 +31,7 @@ import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Predicate;
@@ -46,7 +47,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.task.AsyncTaskExecutor;
-import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -147,21 +147,38 @@ class DemoApplicationTest {
   }
 
   @Test
-  @DisplayName("アプリケーション executor は同時実行数に上限を置かず、DB の接続の pool が唯一の制限になる")
-  void applicationExecutorHasNoConcurrencyLimit() {
-    assertTrue(
-        applicationTaskExecutor instanceof SimpleAsyncTaskExecutor,
-        "仮想スレッドの executor が SimpleAsyncTaskExecutor であること");
-    // executor は Spring が閉じるため、ローカル変数に取らずに読む。
-    assertEquals(
-        SimpleAsyncTaskExecutor.UNBOUNDED_CONCURRENCY,
-        ((SimpleAsyncTaskExecutor) applicationTaskExecutor).getConcurrencyLimit(),
-        "同時実行数に上限がないこと。上限を足すと、リスナーを渡す要求のスレッドが空きを待つ（ADR-141）");
+  @DisplayName("アプリケーション executor は、DB の接続の pool より多いタスクを待たせずに同時に始める")
+  @SuppressWarnings("PMD.DoNotUseThreads") // executor へ渡すタスクを、止める側から外すために必要。
+  void applicationExecutorStartsMoreTasksThanPoolSize() throws InterruptedException {
+    final int tasks = hikariDataSource.getMaximumPoolSize() * 5;
+    final CountDownLatch started = new CountDownLatch(tasks);
+    final CountDownLatch release = new CountDownLatch(1);
+    // 上限があると execute が呼び出し側を止めるため、別のスレッドから渡し、止まったことをテストの失敗にする。
+    Thread.startVirtualThread(() -> {
+      for (int i = 0; i < tasks; i++) {
+        applicationTaskExecutor.execute(() -> {
+          started.countDown();
+          try {
+            release.await();
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+          }
+        });
+      }
+    });
+
+    try {
+      assertTrue(
+          started.await(5, SECONDS),
+          "上限があると、枠が空くまで execute が待たされ、リスナーを渡す要求のスレッドが接続を持ったまま止まる（ADR-141）");
+    } finally {
+      release.countDown();
+    }
   }
 
   @Test
-  @DisplayName("再投入の 1 回の件数は、DB の接続の pool の半分以下に制限する")
-  void resubmissionMaxPerRunLeavesConnectionsForRequests() {
+  @DisplayName("再投入の 1 回の件数は、テストの DB の接続の pool の半分以下にする")
+  void resubmissionMaxPerRunIsAtMostHalfOfPoolSize() {
     final int maxPerRun =
         applicationContext
             .getEnvironment()

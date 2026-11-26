@@ -41,7 +41,6 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
 import org.springframework.core.io.support.SpringFactoriesLoader;
-import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.core.task.TaskExecutor;
 import org.springframework.mock.env.MockEnvironment;
 import org.springframework.modulith.events.ApplicationModuleListener;
@@ -554,7 +553,7 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
-  @DisplayName("定期の実行を有効にしても、@Async の Listener は上限のない applicationTaskExecutor で動く")
+  @DisplayName("定期の実行を有効にしても、@Async の Listener は applicationTaskExecutor で動く")
   void schedulingKeepsAsyncListenersOnTheApplicationTaskExecutor() {
     runnerWithResubmitter()
         .withConfiguration(
@@ -566,10 +565,6 @@ class EventPublicationResubmissionConfigTest {
           // Spring Boot 4.1 は taskExecutor の別名を作らず、@Async の executor を AsyncConfigurer で渡す。
           assertThat(context.getBean(AsyncConfigurer.class).getAsyncExecutor())
               .isSameAs(context.getBean("applicationTaskExecutor"));
-          assertThat(
-                  ((SimpleAsyncTaskExecutor) context.getBean("applicationTaskExecutor"))
-                      .getConcurrencyLimit())
-              .isEqualTo(SimpleAsyncTaskExecutor.UNBOUNDED_CONCURRENCY);
         });
   }
 

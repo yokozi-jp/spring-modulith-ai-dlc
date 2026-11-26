@@ -36,13 +36,13 @@ tooling/formal-verify/mutants.py .agents/skills/formal-verify-event-resubmission
 
 | 設定                                  | 内容                                                                                                                                                                                     | 期待する結果                                                                    |
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `documented.cfg`                      | 起動時の検査を通る設定と、`application.yaml` の注記が置く前提（リスナーの処理が `wait-age` に収まる、空きの待ちが `wait-age` より短い、実行が `lock-at-most-for` より短い）。停止は 1 回 | pass（全不変条件）                                                              |
+| `documented.cfg`                      | 起動時の検査を通る設定と、`application.yaml` の注記が置く前提（リスナーの処理が `wait-age` に収まる、接続の待ち（`connection-timeout` で打ち切られる）が `wait-age` より短い、実行が `lock-at-most-for` より短い）。停止は 1 回 | pass（全不変条件）                                                              |
 | `run-overruns-lock.cfg`               | `documented.cfg` で、実行が `lock-at-most-for` より長引き、2 台が同時に動く                                                                                                              | pass（`OneDeliveryAtATime`、`ResubmissionsCapped`、`InFlightNeverMarkedStale`。時間の予算と、状態を確かめる更新が守る） |
 | `in-flight-fast-runs.cfg`             | 停止なし、各回の実行が時間の予算（`lock-at-most-for` の半分）のうちに出版へ届く                                                                                                          | pass（`InFlightNeverMarkedStale`）                                              |
 | `in-flight-slow-runs.cfg`             | 停止なし、実行が時間の予算を過ぎてから出版へ届くことがあり、再投入が何回も遅れる                                                                                                         | pass（`InFlightNeverMarkedStale`）                                              |
 | `listener-up-to-lock.cfg`             | 1 回の配信が `lock-at-most-for` まで続き、`wait-age` より長い。停止は 1 回                                                                                                               | pass（全不変条件）                                                              |
 | `policy-abandon-on-first.cfg`         | `documented.cfg` で、リスナーの方針の `abandon-after-attempts` を 1 にする。停止は 1 回で、最初の配信が処理中のまま残りうる                                                              | pass（全不変条件と `NoResubmissionWhenAbandonOnFirst`）                         |
-| `delivery-up-to-twice-lock.cfg`       | 停止なし、空きの待ちとリスナーの処理が、それぞれ `lock-at-most-for` まで続く（最初の配信の待ちは `wait-age` 未満）                                                                       | pass（全不変条件。起動時の検査が 1 倍なら `InFlightNeverMarkedStale` が破れる） |
+| `delivery-up-to-twice-lock.cfg`       | 停止なし、接続の待ちとリスナーの処理が、それぞれ `lock-at-most-for` まで続く（最初の配信の待ちは `wait-age` 未満）                                                                       | pass（全不変条件。起動時の検査が 1 倍なら `InFlightNeverMarkedStale` が破れる） |
 
 ## 切り分けの手がかり
 
@@ -97,7 +97,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 `MaxDue` は `ResubmissionPolicies.maxResubmissions` で、`isDue` が再投入する回数の上限である。
 Spring Modulith が最初の配信と 1 回目の再投入の失敗に同じ 1 を渡すため、`PolicyAbandon` が 1 なら 0、2 以上なら同じ値になる。
 `QueueMax <= LockAtMostFor` と `ListenerMax <= LockAtMostFor` は検査でなく前提で、ADR-079 が置いている。
-最初の配信の空きの待ちが `wait-age` を超えると、`PUBLISHED` の出版を処理中に `FAILED` に戻しうる。
+最初の配信の接続の待ちが `wait-age` を超えると、`PUBLISHED` の出版を処理中に `FAILED` に戻しうる。
 `application.yaml` の注記が既知としてリスナーの冪等性に頼っているため、どの設定も `QueueMax < WaitAge` にしている。
 `ListenerMax`、`QueueMax`、`RunMax` は設定ではなく、動いているシステムの時間の上限である。
 

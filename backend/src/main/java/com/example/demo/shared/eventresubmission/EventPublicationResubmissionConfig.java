@@ -315,8 +315,8 @@ class EventPublicationResubmissionConfig {
     /**
      * PROCESSING と RESUBMITTED の出版を FAILED に戻す閾値が、ロックを持つ上限の 2 倍より長いか（ADR-079）。
      *
-     * <p>古い出版を FAILED に戻す処理はロックの中で動くが、再投入した出版の executor の空きの待ちはその回の中で {@code lock-at-most-for}
-     * まで、リスナーの処理はロックを放した後も {@code lock-at-most-for} まで続きうる。 どちらも再投入の時刻から測るため、2 倍を超えるまでは処理中でありうる。
+     * <p>古い出版を FAILED に戻す処理はロックの中で動くが、リスナーの処理は、再投入の時刻から測って {@code lock-at-most-for}
+     * まで、ロックを放した後も続きうる。 2 倍を超えるまでは処理中でありうる。
      */
     @AssertTrue(
         message =

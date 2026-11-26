@@ -90,8 +90,7 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、`markStalePub
 Proposed の間に、`@Scheduled` を `EventPublicationResubmitter` から、`enabled` が真のときだけ作る構成へ移した（[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)）。
 期限を過ぎた冪等性キーの掃除のジョブ（[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）も `@EnableScheduling` を足し、`@EnableScheduling` はアプリのすべての `@Scheduled` を動かすので、ジョブのクラスに置いたままでは `enabled` を偽にしても再投入が動くためである。
 
-Proposed の間に、リスナーの同時実行数の上限（`spring.task.execution.simple.concurrency-limit`）を外し、`max-per-run` を 100 から 2 に下げた（[#791](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/791)、[ADR-141](ADR-141-limit-listener-concurrency-by-connection-pool-only.md)）。
-再投入した出版は同時に全件が DB の接続を取りに行くため、接続の pool の半分以下の件数に絞る。
+Proposed の間に、リスナーの同時実行数の上限を外し、`max-per-run` を下げた（[ADR-141](ADR-141-limit-listener-concurrency-by-connection-pool-only.md)）。
 
 ## Decision
 
@@ -278,7 +277,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   その後は `isDue` が再投入せず、件数の ERROR が知らせる。
 - 時間の予算（`lock-at-most-for / 2`）は、最悪の時間の見積もりに基づく。
   決済のリスナーの呼び出しは `payment-gateway` の retry が `base-config: default` で試行 1 回のため、1 件の最悪は connect 1 秒 + read 2 秒の約 3 秒である。
-  executor に同時実行数の上限がないため、再投入は件数（`max-per-run`、2 件）を渡した時点で戻る。
+  executor に同時実行数の上限がないため、再投入は件数（`max-per-run`）を渡した時点で戻る。
   1 回の実行は数秒で、`lock-at-most-for` の 10 分に十分な余裕がある。
   リスナーを増やした利用先では、この余裕は成り立たないことがあり、予算が次の回へ回す。
 - インスタンスが落ちてロックを放さないと、ロックを持つ上限（10 分）まで、再投入も古い出版を `FAILED` に戻す処理も止まる。

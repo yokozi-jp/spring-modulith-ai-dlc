@@ -8,7 +8,7 @@ tags: [convention, integration, async, performance, future-arch-guidelines]
 # 非同期処理の流量制御と性能
 
 流量はプロデューサーではなくコンシューマーの同時実行数で制限し、上限は設定値で明示する。
-DB を使うコンシューマーの同時実行数は、DB 接続の予算に収める。
+DB を使うコンシューマーの同時実行数は、DB 接続の予算に収める。このリポジトリのリスナーは、executor に上限を置かず、DB の接続の pool を上限にする。
 性能の改善はファンアウトとコンシューマーのスケーリングで行い、どちらでも依存先の保護をスケーリングより優先する。
 
 用語は[メッセージングの設計](async-messaging-design.md)の定義に従う。
@@ -22,6 +22,7 @@ DB を使うコンシューマーの同時実行数は、DB 接続の予算に�
 - 特定のタスクが資源を占有し、他のタスクが起動できなくなることを防ぐ。
 
 上限は設定値で明示し、ライブラリの既定値に任せない。
+このリポジトリのリスナーでは、DB の接続の pool の設定値（`DB_POOL_MAXIMUM_SIZE`）が上限である（次の節）。
 流量を守るために後段のキューを増やして緩衝にせず、同時実行数の設定で解決する。
 構成要素が増えるほど運用の費用が増えるためである。
 
@@ -31,16 +32,19 @@ Spring Modulith の非同期リスナーは、アプリケーションの task e
 このリポジトリは executor に同時実行数の上限を置かず、DB の接続の pool（`DB_POOL_MAXIMUM_SIZE`）を、リスナーの同時実行の唯一の制限にする（[ADR-141](../adr/ADR-141-limit-listener-concurrency-by-connection-pool-only.md)）。
 `spring.task.execution.simple.concurrency-limit` は書かない。
 上限があると、上限に達した間、コミットの後にリスナーを渡す要求のスレッドが、接続を持ったまま空きを待つためである。
-`DemoApplicationTest` は、executor に上限がないことを確かめる。
+`DemoApplicationTest` は、pool より多いタスクが同時に始まることを確かめる。
 
 接続を取れないリスナーは、`connection-timeout`（5 秒）で失敗する。
-出版は `FAILED` に戻り、再投入が拾う。失敗は再投入の回数（`abandon-after-attempts`）を 1 回消費する。
+出版を `PROCESSING` にする更新が失敗すると、リスナーは動かず、出版は `PUBLISHED` か `RESUBMITTED` のまま残り、古い出版として `FAILED` に戻る（`wait-age`、`in-flight-staleness`）まで再投入されない。
+リスナーの処理の中で失敗すると、出版は `FAILED` に戻り、再投入が拾う。
+再投入のリスナーの失敗は、再投入の回数（`abandon-after-attempts`）を消費する。
 リスナーが pool を使い切ると、同期リクエストの接続の取得も待たされ、5 秒を超えると失敗する。
 リスナーを渡す要求のスレッドが空きを待たない代わりに、この待ちを受け入れる。
+注文の集中への対応は [#795](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/795) で扱う。
 
 同期リクエストの接続を残す仕組みは、再投入の 1 回の件数（`max-per-run`）だけである。
 再投入した出版は同時に全件が接続を取りに行くので、値は最小の pool（テストの `DB_POOL_MAXIMUM_SIZE` の 4）の半分にする。
-`DemoApplicationTest` は、`max-per-run` が 1 以上で pool の半分以下であることを確かめる。
+`DemoApplicationTest` は、`max-per-run` が 1 以上でテストの pool の半分以下であることを確かめる。
 本番の pool の大きさを負荷試験で決めたら、値を見直す。
 再投入のジョブを Web と別のインスタンスで動かせば、この制限は外せる（[#792](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/792)）。
 

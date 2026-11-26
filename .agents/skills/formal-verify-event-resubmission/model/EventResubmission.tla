@@ -226,7 +226,7 @@ RunFinish(i) ==
 
 -----------------------------------------------------------------------------
 (* Listener deliveries: CompletionRegisteringMethodInterceptor around      *)
-(* the listener, on the executor (spring.task.execution, no concurrency limit).*)
+(* the listener, on the executor (spring.task.execution, no limit).         *)
 
 \* markProcessing: UPDATE SET status = 'PROCESSING' WHERE id = ? AND
 \* status != 'PROCESSING'.
