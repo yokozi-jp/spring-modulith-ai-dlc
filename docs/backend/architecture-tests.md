@@ -459,6 +459,7 @@ DBの規約のほかの検査は`backend/src/test/java/com/example/demo/persiste
 - S6：カタログのテナントで分ける業務テーブルの、主キー以外のユニークインデックスが`tenant_public_id`から始まる。
 - K1：カタログの同じスキーマのほかの表の主キーと同じ名前の列に、外部キーがある。
   外部キーは、テナントで分ける業務テーブルなら`(tenant_public_id, 参照先の主キー)`、`tenancy`の表なら参照先の主キーだけの形にし、形の違う外部キーも拒否する。
+  外部キーの列は、すべてNOT NULLにする。
 - K4：changesetの外部キーは`addForeignKeyConstraint`だけで作り、名前を`fk_{表}`か`fk_{連番}_{表}`にし、同じスキーマの表をK1と同じ列で参照し、`onDelete`、`onUpdate`、`deleteCascade`を付けない。
 
 表と列の論理名の規則は次のとおりである。

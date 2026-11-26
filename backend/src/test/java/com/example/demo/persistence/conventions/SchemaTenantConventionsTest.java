@@ -195,6 +195,9 @@ class SchemaTenantConventionsTest {
     /** 明細の表。 */
     private static final String T_ORDER_LINE = "t_order_line";
 
+    /** 明細から注文への外部キー。 */
+    private static final String FK_T_ORDER_LINE = "fk_t_order_line";
+
     /** ID連携の表。 */
     private static final String M_USER_IDENTITY = "m_user_identity";
 
@@ -221,7 +224,7 @@ class SchemaTenantConventionsTest {
               foreignKey(
                   ORDERING,
                   T_ORDER_LINE,
-                  "fk_t_order_line",
+                  FK_T_ORDER_LINE,
                   List.of(TENANT, ORDER_ID),
                   T_ORDER,
                   List.of(TENANT, ORDER_ID)),
@@ -261,7 +264,7 @@ class SchemaTenantConventionsTest {
               foreignKey(
                   ORDERING,
                   T_ORDER_LINE,
-                  "fk_t_order_line",
+                  FK_T_ORDER_LINE,
                   List.of(ORDER_ID),
                   T_ORDER,
                   List.of(ORDER_ID)),
@@ -276,6 +279,47 @@ class SchemaTenantConventionsTest {
       assertThat(keys(SchemaTenantConventions.foreignKeys(relations, columns, constraints)))
           .containsExactlyInAnyOrder(
               "K1 ordering.fk_t_order_line", "K1 tenancy.fk_m_user_identity");
+    }
+
+    @Test
+    @DisplayName("K1：複合の外部キーの、どちらの列にもNULLを許す表を拒否する")
+    void rejectsNullableForeignKeyColumns() {
+      final List<ColumnRow> nullable =
+          List.of(
+              new ColumnRow(ORDERING, T_ORDER_LINE, TENANT, UUID, "b", "", "", null, false),
+              new ColumnRow(ORDERING, T_ORDER_LINE, ORDER_ID, BIGINT, "b", "", "", null, false));
+      final List<ConstraintRow> constraints =
+          List.of(
+              foreignKey(
+                  ORDERING,
+                  T_ORDER_LINE,
+                  FK_T_ORDER_LINE,
+                  List.of(TENANT, ORDER_ID),
+                  T_ORDER,
+                  List.of(TENANT, ORDER_ID)));
+
+      assertThat(keys(SchemaTenantConventions.foreignKeys(relations, nullable, constraints)))
+          .containsExactlyInAnyOrder(
+              "K1 ordering.t_order_line.tenant_public_id", "K1 ordering.t_order_line.order_id");
+    }
+
+    @Test
+    @DisplayName("K1：列の順序を入れ替えた複合の外部キーを拒否する")
+    void rejectsSwappedColumnOrder() {
+      final List<ColumnRow> orderLine =
+          List.of(new ColumnRow(ORDERING, T_ORDER_LINE, ORDER_ID, BIGINT, "b", "", "", null, true));
+      final List<ConstraintRow> constraints =
+          List.of(
+              foreignKey(
+                  ORDERING,
+                  T_ORDER_LINE,
+                  FK_T_ORDER_LINE,
+                  List.of(ORDER_ID, TENANT),
+                  T_ORDER,
+                  List.of(TENANT, ORDER_ID)));
+
+      assertThat(keys(SchemaTenantConventions.foreignKeys(relations, orderLine, constraints)))
+          .containsExactly("K1 ordering.fk_t_order_line");
     }
 
     @Test
@@ -297,7 +341,7 @@ class SchemaTenantConventionsTest {
               foreignKey(
                   ORDERING,
                   T_ORDER_LINE,
-                  "fk_t_order_line",
+                  FK_T_ORDER_LINE,
                   List.of(TENANT, ORDER_ID),
                   T_ORDER,
                   List.of(TENANT, ORDER_ID)));
