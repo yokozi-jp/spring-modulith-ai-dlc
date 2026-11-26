@@ -13,7 +13,7 @@ Accepted
 
 Amended by [ADR-119](ADR-119-harden-session-cookie-with-host-prefix.md)：セッションの Cookie も `__Host-` の名前にすること。方式の前提の `APP_SESSION` の記述は、この ADR の時点のものである。
 
-Amended by [ADR-134](ADR-134-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)：更新系の要求の `Origin` と `Sec-Fetch-Site` を、CSRF のトークンの前に確かめること。方式の前提の「この ADR では決めない」は、この ADR の時点のものである。
+Amended by [ADR-136](ADR-136-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)：更新系の要求の `Origin` と `Sec-Fetch-Site` を、CSRF のトークンの前に確かめること。方式の前提の「この ADR では決めない」は、この ADR の時点のものである。
 
 Proposed として起こし、[#157](https://github.com/yokozi-jp/spring-modulith-ai-dlc/pull/157) でコードと一緒にレビューし、main へ取り込むこの Pull Request で Accepted にした。
 

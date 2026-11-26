@@ -250,6 +250,13 @@ transform と filter の `error_mode` は `ignore` にする。
 - 標準出力のロググループのログストリームはタスクごとに分ける。`awslogs` ドライバーに `awslogs-stream-prefix` を設定すると、ストリーム名にタスク ID が入る。CloudWatch Logs の緊急削除はログストリームかロググループの単位になる（[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)）。
 - アプリケーションのロググループのログストリームの単位は未定である。ストリーム名は Collector が送る `x-aws-log-stream` ヘッダーで決まり、本番の上書きファイルはまだない。上書きファイルを作るときに、タスクごとの値を渡す方法を決める。
 
+## トレースの標本化
+
+本番でトレースを標本化するときは、アプリケーションの標本化率（`MANAGEMENT_TRACING_SAMPLING_PROBABILITY`）を 1.0 のままにし、Collector の tail sampling で、エラーの trace と遅い trace をすべて残す。
+アプリケーションの標本化率を下げて、エラーの trace を落とさない。
+tail sampling の processor は、本番の Collector の上書きファイルを作るときに足す。足すまでは、標本化率を 1.0 から下げない。
+理由は [ADR-134](../adr/ADR-134-read-http-requests-from-traces-and-metrics-without-access-log.md) に記録する。
+
 ## 保持とアクセス
 
 通常のアプリケーションログは本番保存先で 30 日後に自動削除する。

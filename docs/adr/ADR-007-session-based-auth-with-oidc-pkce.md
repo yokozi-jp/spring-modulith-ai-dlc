@@ -13,6 +13,7 @@ Accepted
 
 Amended by [ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)：セッションの保存先を、開発初期は Redis ではなく PostgreSQL にすること。
 Amended by [ADR-119](ADR-119-harden-session-cookie-with-host-prefix.md)：セッションの Cookie の名前を `__Host-APP_SESSION` にし、`Secure` を環境によらず付けること。
+Amended by [ADR-135](ADR-135-add-absolute-session-lifetime-and-explicit-idle-timeout.md)：セッションに無操作の期間（30 分）と作成から数える最長の期間（8 時間）を設け、セッションの Cookie に `Max-Age` を付けないこと。
 
 ## Date
 

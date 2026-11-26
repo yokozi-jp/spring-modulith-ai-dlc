@@ -1,11 +1,11 @@
 ---
 type: ADR
-title: 'ADR-134: 更新系の要求の Origin と Sec-Fetch-Site を CSRF のトークンの前に確かめる'
+title: 'ADR-136: 更新系の要求の Origin と Sec-Fetch-Site を CSRF のトークンの前に確かめる'
 description: /api/** と /logout の更新系の要求で、Origin か Sec-Fetch-Site が別のオリジンを示せば、CSRF のトークンを確かめる前に専用の type の 403 にし、403 のログに同じ type を付ける判断と、Content-Type の 415 と SameSite=Strict を取り込まない理由。
 tags: [adr, security, csrf, backend]
 ---
 
-# ADR-134: 更新系の要求の Origin と Sec-Fetch-Site を CSRF のトークンの前に確かめる
+# ADR-136: 更新系の要求の Origin と Sec-Fetch-Site を CSRF のトークンの前に確かめる
 
 ## Status
 

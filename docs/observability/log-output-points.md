@@ -1,14 +1,14 @@
 ---
 type: Convention
 title: 処理ごとに記録するログ
-description: 起動時、HTTP アクセス、一括処理で記録するログの時点と項目、フロントエンドでログを出力しない規則を定める規約。起動処理、HTTP のログ出力、大量件数を扱う処理を実装するとき、ブラウザの例外の送り方を確かめるときに読む。
+description: 起動時と一括処理で記録するログの時点と項目、フロントエンドでログを出力しない規則を定める規約。起動処理、HTTP の要求の記録の読み方、大量件数を扱う処理を実装するとき、ブラウザの例外の送り方を確かめるときに読む。
 tags: [convention, observability, logging, future-arch-guidelines]
 ---
 
 # 処理ごとに記録するログ
 
 起動時は、稼働しているビルドと起動の各段階を `INFO` で記録する。
-HTTP アクセスログは要求時と応答時に記録し、ヘルスチェックを除く。
+HTTP アクセスログは出力せず、トレースと指標で読む。
 一括処理は開始、終了、処理件数、進捗を記録し、1件ごとにはログを出さない。
 フロントエンドはブラウザの console へログを出力しない。
 
@@ -27,31 +27,12 @@ Spring Boot が出力する起動ログで足りる段階は、アプリケー�
 設定値をログへ出す場合は、allowlist で許可した値だけにする。
 秘密情報と接続文字列を出力しない。
 
-## HTTP アクセスログ
+## HTTP アクセス
 
-アクセスログは、要求の受信時と応答の送信時の両方で記録する。
-`/actuator/health` 配下へのアクセスは記録しない。
-ヘルスチェック以外は、HTTP メソッドで除外しない。
-
-要求時と応答時の両方に、次の属性を記録する。
-
-- **HTTP メソッド**：`http.request.method`
-- **route**：`http.route`
-- **URL パス**：`url.path`
-- **アプリの利用者の ID**：`user.id`（ログイン済みの場合だけ。「[テナントと利用者](conventions.md#テナントと利用者)」）
-
-応答時には、次の属性も記録する。
-
-- **HTTP status**：`http.response.status_code`
-- **処理時間**：`http.server.request.duration`（秒）
-
-時刻、レベル、trace ID、span ID はフレームワークが付けるため、アクセスログの実装で追加しない。
-`url.path` には query string と URL fragment を含めない。
-送信元 IP アドレスと User-Agent は allowlist にないため記録しない。
-記録する場合は、allowlist の変更として扱う。
-
-アクセスログを追加する変更では、これらの属性を allowlist へ加える。
-禁止する値と allowlist は[可観測性データの規約](conventions.md)に従う。
+アプリケーションは、HTTP アクセスログを出力しない。
+要求ごとの記録は受信の span で、件数と処理時間は `http.server.request.duration` の指標で読む（[メトリクス](metrics.md)）。
+認証してテナントを選んだ要求の span は `user.id` も持つ（[可観測性データの規約](conventions.md#テナントと利用者)）。
+理由は [ADR-134](../adr/ADR-134-read-http-requests-from-traces-and-metrics-without-access-log.md) に記録する。
 
 ## 一括処理
 

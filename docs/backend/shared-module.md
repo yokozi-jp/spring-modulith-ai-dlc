@@ -25,7 +25,7 @@ tags: [architecture, backend, spring-modulith, shared-module]
 - 共通カラムの `*_by` に登録するアプリの利用者を表す認証の principal（`AppUserPrincipal`）を `shared.security` に置き、このパッケージも `@NamedInterface("security")` で公開する（[ADR-096](../adr/ADR-096-require-app-user-principal-for-audit-columns.md)）。
   テナントを選ぶ前の拒否を表す `TenantNotSelectedException` もここに置き、`tenancy` が投げて `error` が専用の type の 403 にする（[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)）。
   この例外はテナントの ID も役割も持たず、ログインの状態（テナントをまだ選んでいないこと）だけを表すため、`AppUserPrincipal` と同じく認証の語彙として扱い、下の「業務の概念を置かない」の業務の概念に含めない。
-  別のオリジンからの更新の拒否を表す `CrossOriginRequestRejectedException` もここに置き、ルートパッケージの `CrossOriginRequestFilter` が `AccessDeniedHandler` へ渡して `error` が専用の type の 403 にする（[ADR-134](../adr/ADR-134-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)）。
+  別のオリジンからの更新の拒否を表す `CrossOriginRequestRejectedException` もここに置き、ルートパッケージの `CrossOriginRequestFilter` が `AccessDeniedHandler` へ渡して `error` が専用の type の 403 にする（[ADR-136](../adr/ADR-136-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)）。
   テナント、所属、役割の値と規則は `tenancy` に置く。
 - 操作しているテナントの語彙を `shared.tenancy` に置き、このパッケージも `@NamedInterface("tenancy")` で公開する（[ADR-105](../adr/ADR-105-bind-tenant-to-request-and-event-context.md)）。
   置く型は、テナントの `public_id` を包む `TenantId`、テナントを運ぶイベントの型 `TenantScoped`、呼び出しの間だけテナントを `ScopedValue` に束縛する `TenantContext` である。

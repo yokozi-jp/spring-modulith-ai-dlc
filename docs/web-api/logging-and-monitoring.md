@@ -54,7 +54,6 @@ APIの稼働は、ヘルスチェックを使った外形監視で確認する�
 
 ヘルスチェックはSpring Boot Actuatorのlivenessとreadinessのグループを使う。
 エンドポイントと公開範囲は[application.yaml](../../backend/src/main/resources/application.yaml)の`management`に従う。
-ヘルスチェックへのアクセスはアクセスログに出力しない。
 
 未認証で許可するのはlivenessとreadinessだけで、`/actuator/health`のルートはログイン済みでも拒否する。
 本番の公開originは`/actuator/**`を振り分けず、ロードバランサーは内部の経路でreadinessかlivenessを呼ぶ。

@@ -23,7 +23,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 
 /**
  * {@link CrossOriginRequestFilter} が Security filter chain の中で {@code CsrfFilter} の前に動き、拒否を専用の type
- * の Problem Details で返すことを検証する（ADR-134）。
+ * の Problem Details で返すことを検証する（ADR-136）。
  *
  * <p>どの要求を拒否し、どれを通すかは {@link CrossOriginRequestFilterTest} が確かめる。
  */

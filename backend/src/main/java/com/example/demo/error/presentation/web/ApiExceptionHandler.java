@@ -49,7 +49,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /** 409 の種類のログの属性名（version、lock、unique）。 */
   private static final String CONFLICT_KIND = "conflict.kind";
 
-  /** 403、404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-127、ADR-134）。 */
+  /** 403、404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-127、ADR-136）。 */
   private static final String PROBLEM_TYPE = "problem.type";
 
   /** Problem Details の共通フィールドを生成する。 */
@@ -265,7 +265,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         || ex instanceof ConstraintViolationException) {
       log.atWarn().addKeyValue(STATUS_CODE, status.value()).log("API validation failed");
     } else if (ex instanceof AccessDeniedException) {
-      // 403 の原因（CSRF の失敗、別のオリジンからの更新、テナントを選ぶ前など）を type で見分ける（ADR-134）。
+      // 403 の原因（CSRF の失敗、別のオリジンからの更新、テナントを選ぶ前など）を type で見分ける（ADR-136）。
       log.atInfo()
           .addKeyValue(STATUS_CODE, status.value())
           .addKeyValue(PROBLEM_TYPE, problemType(body))

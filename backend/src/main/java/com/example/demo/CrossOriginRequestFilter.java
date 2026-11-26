@@ -15,7 +15,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
-/** 別のオリジンから来た更新系の要求を、CSRF のトークンを確かめる前に拒否する（ADR-134）。 */
+/** 別のオリジンから来た更新系の要求を、CSRF のトークンを確かめる前に拒否する（ADR-136）。 */
 final class CrossOriginRequestFilter extends OncePerRequestFilter {
 
   /** CSRF のトークンを求めない method。frontend の apiFetch と同じ集合にする。 */
