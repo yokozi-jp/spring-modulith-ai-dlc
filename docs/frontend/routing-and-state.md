@@ -87,6 +87,7 @@ layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` 
 - **Loading**：routerの `defaultPendingComponent`（`components/route-pending.tsx`）が表示する。
 - **Error**：routerの `defaultErrorComponent`（`components/route-error.tsx`）が表示する。
 - **存在しないresource**：loaderで `notFound()` を投げ、routerの `defaultNotFoundComponent`（`components/route-not-found.tsx`）が表示する。
+  どのrouteにも一致しないURLは、root routeの `notFoundComponent` が同じcomponentを `<main>` で包んで表示する。アプリシェルの外に出て、`<main>` の landmark がほかにないためである。
 - **Empty**と**Content**：画面のcomponentが分ける。
 
 例外は、画面の主な内容とは別の補足の情報（別のモジュールが持つ状態など）を出す欄で、その欄の取得に失敗しても画面の残りの表示と操作を残す必要があるときだけにする。

@@ -62,6 +62,10 @@ describe("router の既定値", () => {
     renderRouter(routeTree, "/no-such-page");
 
     await expect(screen.findByRole("heading", { name: "Page not found" })).resolves.toBeTruthy();
+    // アプリシェルの外に出るので、404 が自分で main の landmark を持つ。
+    expect(screen.getByRole("main")).toContainElement(
+      screen.getByRole("heading", { name: "Page not found" }),
+    );
     expect(screen.getByRole("link", { name: "Back to home" }).getAttribute("href")).toBe("/");
   });
 

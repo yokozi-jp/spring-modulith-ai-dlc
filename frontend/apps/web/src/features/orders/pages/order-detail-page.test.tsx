@@ -84,6 +84,8 @@ describe("注文の詳細の画面", () => {
     await expect(
       screen.findByRole("heading", { name: "ページが見つかりません" }),
     ).resolves.toBeTruthy();
+    // アプリシェルの main の中に出し、main を重ねない。
+    expect(screen.getAllByRole("main")).toHaveLength(1);
   });
 
   it("下書きでなければ更新の操作を出さない", async () => {

@@ -60,7 +60,9 @@ tags: [convention, frontend, form, validation, accessibility, future-arch-guidel
 - 入力エラーを理由に送信buttonを `disabled` にしない。`disabled` のbuttonはkeyboardのfocusが届かず、押せない理由も利用者に伝わらないためである。
 - 検証ロジックはZodで実装し、`form` 要素に `noValidate` を付けてブラウザ標準の制約検証を止める。
 - inputには、入力条件に合わせて `type`（`email`、`tel`、`number`、`date` など）と、`required`、`minLength`、`maxLength`、`min`、`max`、`pattern` を付ける。
-- エラーのある入力欄には `aria-invalid="true"` を付け、`aria-errormessage` でエラー文言の要素を参照する。
+- エラーのある入力欄には `aria-invalid="true"` を付け、`aria-describedby` でエラー文言の要素を参照する。
+  `aria-errormessage` は使わない。参照先が `aria-live` も `role="alert"` も持たず、`aria-describedby` からも参照されないと、axe の `aria-valid-attr-value` が違反にする（`aria-errormessage` を読み上げない支援技術があるため）。
+  説明の文言も `aria-describedby` で参照する欄では、空白で区切って両方の id を並べる。
 
 ## エラーメッセージ
 

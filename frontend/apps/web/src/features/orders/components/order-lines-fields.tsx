@@ -26,10 +26,10 @@ const defaultProps: OrderLinesFieldsProps = {
 };
 
 function invalid(text: string | undefined, id: string) {
-  return text === undefined ? {} : { "aria-invalid": true, "aria-errormessage": id };
+  return text === undefined ? {} : { "aria-invalid": true, "aria-describedby": id };
 }
 
-/** 欄の直下の誤りの文言。aria-errormessage が id で指す。 */
+/** 欄の直下の誤りの文言。aria-describedby が id で指す。 */
 function errorText(text: string | undefined, id: string) {
   return text === undefined ? undefined : (
     <p id={id} className="text-sm text-destructive">

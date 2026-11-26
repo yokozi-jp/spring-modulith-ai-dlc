@@ -15,10 +15,12 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  /* shadcn の既定（0.556）は --muted の上で 4.34:1 なので、WCAG の 4.5:1 に届く 4.64:1 まで暗くする。 */
+  --muted-foreground: oklch(0.54 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  /* shadcn の既定（0.577）は destructive の Button の bg-destructive/10 の上で 4:1 なので、hover の /20 でも 4.5:1 に届くまで暗くする。 */
+  --destructive: oklch(0.49 0.205 27.5);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
