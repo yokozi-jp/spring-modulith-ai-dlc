@@ -78,7 +78,7 @@ Grafana では trace ID を使ってログとトレースを相互に検索す�
 Controller の中の `@PreAuthorize` が拒否したときのログは、2 つを持つ。
 
 トレースでは、`TenantSelectionFilter` が HTTP の受信の span にだけ、2 つを属性として付ける。
-`TenantSelectionFilter` の手前で拒否する CSRF の失敗の span は、ログと違い、どちらも持たない。
+`TenantSelectionFilter` の手前で拒否する CSRF の失敗と別のオリジンからの更新の拒否の span は、ログと違い、どちらも持たない。
 
 - Micrometer の Observation の高い濃度の key value にだけ入れ、低い濃度の key value に入れない（理由は ADR-110）。
 - リスナーの処理の span は Spring Modulith が作る。この span には付けない。リスナーのログには `tenant.id` が付くので、ログの trace ID からたどる。

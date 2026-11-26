@@ -125,17 +125,19 @@ Cookieはあるが`X-XSRF-TOKEN` headerと食い違う場合は、403がCookie�
 `/logout`はフォームの送信なので再送しない。
 設定は[SecurityConfig](../../backend/src/main/java/com/example/demo/SecurityConfig.java)、理由は[ADR-066](../adr/ADR-066-harden-csrf-cookie-with-host-prefix.md)にある。
 
-CSRFは、`Origin`と`Sec-Fetch-Site`の検査と、トークンの照合の2つの層で防ぐ。
-`/api/**`と`/logout`へのGET、HEAD、OPTIONS以外の要求で、次のどちらかに当てはまれば、トークンを確かめる前に`/problems/cross-origin-request-rejected`の403で返す。
+### 別のオリジンからの更新の拒否
 
-- `Origin`があり、`CorsUtils.isCorsRequest`が別のオリジンと判定する。`Origin: null`と解釈できない値も拒否する。オリジンはX-Forwarded-*を反映した公開のscheme、host、portと比べる。
+CSRFは、`Origin`と`Sec-Fetch-Site`の検査と、CSRFのトークンの照合の2つの層で防ぐ。
+`/api/**`と`/logout`へのGET、HEAD、OPTIONS以外の要求で、次のどちらかに当てはまれば、CSRFのトークンを確かめる前に`/problems/cross-origin-request-rejected`の403で返す。
+
+- `Origin`があり、`CorsUtils.isCorsRequest`が別のオリジンと判定する。
+  `Origin: null`と解釈できない値も拒否する。
+  オリジンは、X-Forwarded-*を反映した公開のscheme、host、portと比べる。
 - `Sec-Fetch-Site`があり、値が`same-origin`と`none`のどちらでもない。
 
-どちらのheaderもない要求は通し、トークンの照合に任せる。
+どちらのheaderもない要求は通し、CSRFのトークンの照合に任せる。
 SPAはこの403を再送しない。
-Viteのproxyは`changeOrigin: false`でHostを保つので、開発環境、E2E、DASTの同じオリジンの要求は通る。
-`Content-Type`の検査（415）と`SameSite=Strict`は取り込まない。
-検査は[CrossOriginRequestFilter](../../backend/src/main/java/com/example/demo/CrossOriginRequestFilter.java)、理由と取り込まない理由は[ADR-134](../adr/ADR-134-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)にある。
+検査は[CrossOriginRequestFilter](../../backend/src/main/java/com/example/demo/CrossOriginRequestFilter.java)、理由と配信の前提は[ADR-134](../adr/ADR-134-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)にある。
 
 ## システム間連携の認証
 

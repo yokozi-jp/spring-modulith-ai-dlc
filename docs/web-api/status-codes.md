@@ -27,7 +27,7 @@ tags: [convention, web-api, http, future-arch-guidelines]
 OpenAPIの`ProblemDetail.type`の`x-extensible-enum`に、今あるtypeをすべて載せる。
 CSRFトークンの検証に失敗した403は`/problems/csrf-token-invalid`にする。
 対象は`/api/**`の更新系と`/logout`で、理由は[CSRFのCookie](authentication-and-session.md#csrfのcookie)にある。
-同じ対象で、`Origin`か`Sec-Fetch-Site`が別のオリジンを示す要求をトークンの前に拒否した403は`/problems/cross-origin-request-rejected`にする（同じ節）。
+別のオリジンからの更新を拒否した403は`/problems/cross-origin-request-rejected`にする（[別のオリジンからの更新の拒否](authentication-and-session.md#別のオリジンからの更新の拒否)）。
 テナントを選ぶ前に業務のAPIを呼んだ403は`/problems/tenant-not-selected`にする（[テナントを選ぶ](authentication-and-session.md#テナントを選ぶ)）。
 権限不足の403は`about:blank`のままにする。
 入力検証エラーは`/problems/validation-error`の400で、`errors`拡張に誤りのある入力のJSON Pointerと説明を入れる。

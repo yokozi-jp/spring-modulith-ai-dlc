@@ -4,9 +4,9 @@ import java.io.Serial;
 import org.springframework.security.access.AccessDeniedException;
 
 /**
- * 別のオリジンから来た更新系の要求を、CSRF の token を確かめる前に拒否したことを表す（ADR-134）。
+ * 別のオリジンから来た更新系の要求を、CSRF のトークンを確かめる前に拒否したことを表す（ADR-134）。
  *
- * <p>{@code error} の {@code ApiExceptionHandler} が、CSRF の token の失敗と区別できる専用の type の 403 にする。
+ * <p>{@code error} の {@code ApiExceptionHandler} が、CSRF のトークンの失敗と区別できる専用の type の 403 にする。
  */
 public final class CrossOriginRequestRejectedException extends AccessDeniedException {
 
