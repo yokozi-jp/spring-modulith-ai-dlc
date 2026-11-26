@@ -87,7 +87,7 @@ MDN は Reporting API の `report-to` を推奨し、新しい方針は report-o
 - フロントエンド用の pipeline（`logs/frontend`、processor は `transform/frontend_logs`）を、バックエンド用と分ける。
   バックエンドのログ属性の allowlist はそのまま残す。
 - ブラウザの trace は送らない。faro receiver に traces の pipeline を置かず、`/collect` に span が届いても捨てる。
-  バックエンドの `traces` pipeline は加工しないまま残す。
+  バックエンドの `traces` pipeline に、この ADR では processor を足さない（送信の URL の属性は [ADR-140](ADR-140-drop-query-from-outbound-http-spans-at-source-and-collector.md) が扱う）。
 
 faroreceiver はブラウザ、ページ、セッションなどのメタデータをログの本文（logfmt）に入れるので、属性の `keep_keys` だけでは保護できない。
 そのため、フロントエンドの pipeline は検証、filter、正規化の三段で本文を処理する。

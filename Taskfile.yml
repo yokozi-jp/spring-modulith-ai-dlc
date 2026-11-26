@@ -1308,7 +1308,7 @@ tasks:
         echo "Login URL: http://localhost:18080/oauth2/authorization/web"
 
   otel-collector-check:
-    desc: Collectorの設定が許可したログの属性だけを残すことを確認
+    desc: Collectorの設定が許可したログの属性だけを残し、spanのURLからクエリを落とすことを確認
     silent: true
     cmds:
       - task: _frontend-view-allowlist-check
@@ -1414,6 +1414,34 @@ tasks:
           {{.DOCKER}} logs "$container" >&2
           exit 1
         }
+        # span の URL の属性から、クエリと fragment が落ちる。URL のパスと、ほかの属性は残る。
+        if ! curl -fsS -o /dev/null -X POST -H "Content-Type: application/json" \
+          --data-binary "@docker/otel-collector/check/fixtures/traces.json" "http://$address/v1/traces"; then
+          fail "Collector が span を受け付けませんでした。"
+        fi
+        for _ in $(seq 1 30); do
+          if grep -qF 'resourceSpans' "$out/traces.json" 2>/dev/null; then break; fi
+          sleep 1
+        done
+        if [ ! -s "$out/traces.json" ]; then fail "span が出口に届きませんでした。"; fi
+        if grep -qE 'secret-' "$out/traces.json"; then
+          fail "span の URL の属性に、クエリまたは fragment が残りました。"
+        fi
+        if ! jq -s -e '
+          [.[].resourceSpans[]?.scopeSpans[]?.spans[]?] as $spans
+          | ($spans[] | select(.name == "http post") | .attributes | map({(.key): (.value.stringValue // .value.intValue)}) | add) as $client
+          | ($spans[] | select(.name == "jooq.query") | .attributes | map({(.key): .value.stringValue}) | add) as $sql
+          | $client == {
+              "http.url": "http://payment.example.test/v1/charges",
+              "url.full": "http://payment.example.test/v1/charges",
+              "http.target": "/v1/charges",
+              "uri": "/v1/charges",
+              "http.response.status_code": "200"
+            }
+            and $sql == {"url.path": "/api/v1/orders/42"}
+        ' "$out/traces.json" >/dev/null; then
+          fail "span の URL の属性が期待値と一致しません。"
+        fi
         # faro receiver の起動は OTLP より遅れうるので、202 になるまで送る。202 の後は再送しない（出口の記録が増えるため）。
         accepted=0
         for _ in $(seq 1 30); do
@@ -1591,7 +1619,7 @@ tasks:
         if printf '%s' "$collector_logs" | grep -qF 'failed to execute statement'; then
           fail "Collector の processor で、OTTL の文の実行が失敗しました。"
         fi
-        echo "Collector OK: 許可した属性だけを残し、Faro の payload のログ、CSP の報告から URL の query と許可していない値を消しました。"
+        echo "Collector OK: 許可した属性だけを残し、Faro の payload のログ、CSP の報告、バックエンドの span から URL の query と許可していない値を消しました。"
 
   compose-reset:
     desc: 明示確認付きでComposeサービスと全データを削除

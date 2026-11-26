@@ -1,0 +1,45 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "demo-api" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "fixture" },
+          "spans": [
+            {
+              "traceId": "5b8efff798038103d269b633813fc60c",
+              "spanId": "eee19b7ec3c1b174",
+              "name": "http post",
+              "kind": 3,
+              "startTimeUnixNano": "1700000000000000000",
+              "endTimeUnixNano": "1700000000100000000",
+              "attributes": [
+                { "key": "http.url", "value": { "stringValue": "http://payment.example.test/v1/charges?api_key=secret-url-query#secret-url-fragment\nsecret-newline" } },
+                { "key": "url.full", "value": { "stringValue": "http://payment.example.test/v1/charges?api_key=secret-full-query" } },
+                { "key": "http.target", "value": { "stringValue": "/v1/charges?api_key=secret-target-query" } },
+                { "key": "uri", "value": { "stringValue": "/v1/charges?api_key=secret-uri-query" } },
+                { "key": "url.query", "value": { "stringValue": "api_key=secret-url-query-attribute" } },
+                { "key": "http.response.status_code", "value": { "intValue": "200" } }
+              ]
+            },
+            {
+              "traceId": "5b8efff798038103d269b633813fc60c",
+              "spanId": "eee19b7ec3c1b175",
+              "name": "jooq.query",
+              "kind": 1,
+              "startTimeUnixNano": "1700000000000000000",
+              "endTimeUnixNano": "1700000000100000000",
+              "attributes": [
+                { "key": "url.path", "value": { "stringValue": "/api/v1/orders/42" } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

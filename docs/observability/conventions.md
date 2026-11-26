@@ -12,7 +12,7 @@ tags: [convention, observability, opentelemetry, security]
 CSP 違反は、ブラウザ自身が Reporting API で同一オリジンの `/csp-report` から Collector へ送る。
 例外は logger へ渡して標準どおりに記録し、禁止値はアプリケーションから渡さない。
 ログの属性は Collector の allowlist で絞り、保存先で閲覧の制限と表示時のマスクを行う。
-設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)、[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)、[ADR-110](../adr/ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md) に記録している。
+設計判断は [ADR-015](../adr/ADR-015-structure-and-protect-observability-data.md)、[ADR-043](../adr/ADR-043-send-production-telemetry-to-cloudwatch-via-otel-collector.md)、[ADR-045](../adr/ADR-045-remove-aws-docs-and-production-cd-example.md)、[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)、[ADR-070](../adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)、[ADR-110](../adr/ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)、[ADR-140](../adr/ADR-140-drop-query-from-outbound-http-spans-at-source-and-collector.md) に記録している。
 
 ## 記録
 
@@ -48,6 +48,12 @@ OTLP では SDK が `exception.type`、`exception.message`、`exception.stacktra
 独自の request ID は追加しない。
 Grafana では trace ID を使ってログとトレースを相互に検索する。
 起動時やバッチの span 外で発生したログには相関情報がないため、空文字の ID を補わない。
+
+## 作らない span
+
+Spring Security の `security filterchain before` と `after` の span は作らない（`management.observations.enable` の `spring.security.filterchains: false`）。
+この span は 1 回の要求ごとに 2 本でき、時間を持たず、フィルターの数だけ event が増える。
+認可の span（`authorize request`）は残す。
 
 ## テナントと利用者
 
@@ -104,6 +110,8 @@ IdP が書く `error_description` はログへ渡さない。
 内部 ID と氏名などの表示値を同じ event へ載せない。
 MDC が付ける `user.id` と `tenant.id` はこの規則の対象外とするが、要求とリスナーの中の event に付くので、ログを書く処理は利用者とテナントの表示値（利用者の氏名、テナントの名前）を event へ載せない。
 HTTP の URL パスは span に入るため、API のパスに個人データと秘密情報を置かない。
+送信の HTTP の span の `http.url` と、`http.client.requests` の tag の `uri` からは、`QueryFreeClientRequestObservationConvention` がクエリと fragment を落とす。
+Boot の `RestClient.Builder` を通らない client の span の URL の属性は、Collector が落とす（[ADR-140](../adr/ADR-140-drop-query-from-outbound-http-spans-at-source-and-collector.md)）。
 ブラウザの例外は画面の route template を `view.name` に持つため、画面の path にも個人データと秘密情報を置かず、識別子は内部 ID にする（[フロントエンドのURL設計](../frontend/url-design.md)）。
 DTO やエンティティを logger へ渡さず、許可した値だけを個別の属性として渡す。
 
@@ -147,7 +155,8 @@ OTLP のデータはすべて Collector を通す。
 Collector の設定（`docker/otel-collector/config.yaml`）は、ローカルと本番で共有する。
 
 - **ログ**：transform processor の `keep_keys` で、許可した属性だけを残す。
-- **バックエンドのトレースとメトリクス**：加工しない。計装を追加して禁止値が入る属性が見つかった場合は、transform で消す。
+- **バックエンドのトレース**：`transform/trace_attributes` で、span の属性 `http.url`、`url.full`、`http.target`、`uri` の `?` と `#` 以降を落とし、`url.query` を消す。span の属性に allowlist はかけない。event と status の説明は加工しない。
+- **バックエンドのメトリクス**：加工しない。計装を追加して禁止値が入る属性が見つかった場合は、transform で消す。
 
 ログに属性を追加するときは、Collector の `keep_keys` とこの文書の許可する値を同じ変更で直す。
 現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code`、`conflict.kind`、`problem.type`、`error.type`、`tenant.id`、`user.id`、`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`、`event_publication.resubmitted.count`、`event_publication.over_limit.count`、`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count` だけを持つ。
@@ -227,11 +236,13 @@ JSON でない本文を送られるたびに、送り手が書いた文字を含
   `webhook_event` の受け口が、`application/reports+json` 以外の `Content-Type`（旧形式、header なし、有効な本文の `text/plain`）に 401、正しい `Content-Type` の JSON でない本文に 200（出口には残さない）、64 KiB を超える本文と空の本文に 400、GET に 405、別のパスに 404 を返すことも確かめる。
   `blockedURL` が無い報告と空の報告も流し、`csp.blocked` を残さず報告だけが残ることを確かめる。
   Collector の設定を変えたら実行する。
+  span の fixture（`traces.json`）を `traces` pipeline に流し、URL の属性からクエリと fragment が落ち、`url.query` が消え、パスとほかの属性が残ることを確かめる。
 - **`task otel-collector-check` のログの検査**：fixture を流し終えた後、Collector のログに `failed to execute statement` が 1 件もないことを確かめる。
   `error_mode: ignore` の processor で通常の経路の文が失敗すると、ここで落ちる。
   `value` が無い exception と空の exception、`blockedURL` が無い報告と空の報告は、guard の欠落を捕まえる fixture である。
 - **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることと、ログとトレースの resource が同じ `service.instance.id` を持つことを確かめる。
-  MDC の `tenant.id` と `user.id` がコンソールの JSON の入れ子の項目と LogRecord の属性に出ることと、テナントを選んだ要求の中のログと受信の span がその 2 つを持つことも確かめる（`http.server.request.duration` の tag が持たないことは[指標の名前と属性](metrics.md#検証)で確かめる）。
+  MDC の `tenant.id` と `user.id` がコンソールの JSON の入れ子の項目と LogRecord の属性に出ることと、テナントを選んだ要求の中のログと受信の span がその 2 つを持つことも確かめる。同じ要求の trace が `security filterchain` の span を持たず、認可の span を持つことも確かめる（`http.server.request.duration` の tag が持たないことは[指標の名前と属性](metrics.md#検証)で確かめる）。
+- **`ClientSpanContractTest`**：Boot の `RestClient.Builder` から作った client で、クエリ、fragment、`Authorization`、`Cookie`、request body に秘密を入れて呼び、4xx の例外を含む終えた span のどこにも秘密がないこと、`http.url` と `uri` がクエリなしで残ること、`http.client.requests` の `uri` の tag がクエリを持たないことを確かめる。`QueryFreeClientRequestObservationConvention` を外すと落ちる。
 - **`OrderConfirmedListenerTest`**：リスナーの中のログが、イベントのテナントの `tenant.id` を持ち、発行したスレッドの MDC の `user.id` を持たないことを確かめる。
 - **`TenantContextTest`**：MDC の `tenant.id` が、入れ子の束縛から戻ると外側のテナントに戻り、束縛を出ると消えることを確かめる。
 

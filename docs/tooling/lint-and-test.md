@@ -154,7 +154,7 @@ Vitestは`globals`を渡さず、Testing Libraryの自動cleanupが効かない�
 - **`task lint-docker`**：Dockerfileをhadolintで検査する。
 - **`task lint-docker-check`**：Dockerfileを`docker build --check`で検査する。
 - **`task lint-compose`**：Composeファイルの構文、参照、変数展開を検証する。
-- **`task otel-collector-check`**：許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめる。
+- **`task otel-collector-check`**：許可していない属性を含むOTLPのログをCollectorに流し、その属性が除かれ、許可した属性が残ることを確かめる。spanのURLからクエリが落ちることも確かめる。
   最初に、Collectorのroute allowlistが`routeTree.gen.ts`の`fullPaths`と一致することを確かめる。
   Faroのfixtureもフロントエンドのpipelineに流し、例外、View、LCP、INP、CLSが同じ匿名session IDを持つことを確かめる。
   許可していない属性、URL token、UUIDのsession IDが出口に残らないことも検査する。

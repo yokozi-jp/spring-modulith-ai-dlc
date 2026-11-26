@@ -16,7 +16,7 @@
 - [ADR-012: プロパティベーステストとミューテーションテストを採用する](ADR-012-adopt-property-based-and-mutation-testing.md)（Proposed, 2026-09-14）
 - [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, Amended by ADR-117, Amended by ADR-126, Amended by ADR-138, 2026-09-14）
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, Amended by ADR-132, 2026-09-14）
-- [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, Amended by ADR-110, 2026-09-15）
+- [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, Amended by ADR-110, Amended by ADR-140, 2026-09-15）
 - [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, Amended by ADR-047, 2026-09-15）
 - [ADR-017: トランクベース開発とリポジトリ保護を採用する](ADR-017-adopt-trunk-based-repository-governance.md)（Proposed, 2026-09-15）
 - [ADR-018: release-please でセマンティックリリースを自動化する](ADR-018-automate-semantic-releases.md)（Proposed, 2026-09-15）
@@ -139,4 +139,5 @@
 - [ADR-137: イベントの変更を @Nullable の component の追加だけにし、過去の版の JSON を今の型で読めることを fixture のテストで確かめる](ADR-137-guard-event-json-compatibility-with-versioned-fixtures.md)（Proposed, 2026-11-26）
 - [ADR-138: 外部の利用者が現れる前に API を /api/v1 にし、バージョンの宣言を検査する](ADR-138-introduce-api-v1-with-spring-api-versioning.md)（Proposed, 2026-11-26）
 - [ADR-139: I/F のファイル定義書を ODCS v3.2.0 の YAML で書き、リポジトリのルートの interfaces/ に置く](ADR-139-write-interface-file-definitions-in-odcs.md)（Proposed, 2026-11-26）
+- [ADR-140: 送信の HTTP の span の URL からクエリを発生源と Collector で落とす](ADR-140-drop-query-from-outbound-http-spans-at-source-and-collector.md)（Proposed, 2026-11-26）
 - [ADR-141: リスナーの同時実行数に上限を置かず、DB の接続の pool を唯一の制限にし、再投入の 1 回の件数を pool の半分以下に絞る](ADR-141-limit-listener-concurrency-by-connection-pool-only.md)（Proposed, 2026-11-26）
