@@ -17,6 +17,10 @@ mutation は生成 Hook で送り、画面遷移と通知は `mutate` の callba
 **feature の Hook** は、それらの状態と、状態を変える操作を、[feature の画面](feature-page.md)や [feature の component](feature-component.md) から分けた custom Hook である。
 Hook を作る条件、名前、置き場所の正文は [React Hooksと状態](../routing-and-state.md#react-hooksと状態)と [Hookの名前とファイル](../routing-and-state.md#hookの名前とファイル)にある。
 
+Hook は、呼び出し元が一つの画面だけでも作る。
+再利用の有無は、置き場所の判断に使わない。
+画面の mutation、form、通知の状態は `hooks/` の Hook に置き、`hooks/` の外に custom Hook を定義しない（[ADR-032](../../adr/ADR-032-organize-frontend-by-business-feature.md)）。
+
 今の feature の Hook は、次のどれかを持つ。
 
 - **操作**：生成の mutation Hook で確定、取消、役割の変更を送り、結果を通知にする（`use-order-status-actions.ts`、`use-member-actions.ts`）。
@@ -54,7 +58,7 @@ React の state を使わない処理は Hook にせず、[feature の module](f
 ## 依存してよいもの、してはいけないもの
 
 - **依存してよいもの**：`@frontend/api/endpoints/<tag>/<tag>` の生成 Hook、query options、query key、`@frontend/api/models` の型、`@frontend/api/idempotency-key` の `idempotencyKeyHeaders`、`@tanstack/react-query`（`useSuspenseQuery`、`useQueryClient`）、`@tanstack/react-router` の `useNavigate`、`react` の `useState`、`react-i18next`、`@/lib/notice`、同じ feature の module と Hook。
-- **依存してはいけないもの**：`@/routes/**` と `@/routeTree.gen`、他の feature、Base UI（`@base-ui/**`）、テスト用の部品、テレメトリの SDK、global の `fetch` と `XMLHttpRequest`、Effect（`useEffect`、`useLayoutEffect`、`useInsertionEffect`、`useEffectEvent`）。
+- **依存してはいけないもの**：`@/routes/**` と `@/routeTree.gen`、他の feature、同じ feature の画面と component、`@/components/` の共有の component、Base UI（`@base-ui/**`）、テスト用の部品、テレメトリの SDK、global の `fetch` と `XMLHttpRequest`、Effect（`useEffect`、`useLayoutEffect`、`useInsertionEffect`、`useEffectEvent`）。
 
 ## 最小の例と典型的な例
 
@@ -163,7 +167,7 @@ export function useOrderDetail(orderId: string) {
 Hook は、Hook を使う画面の component test で確かめ、Hook ごとのテストファイルを必須にしない（[観点ごとのテスト](../test-strategy.md#観点ごとのテスト)）。
 送った要求の本文と回数、通知の文言、選択肢の有無を、画面から見える形で確かめ、Hook を mock しない。
 
-次は、`useMemberActions` が 409 を自動で再送しないことを確かめる `features/tenancy/tenant-members-page.test.tsx` のテストである（抜粋）。
+次は、`useMemberActions` が 409 を自動で再送しないことを確かめる `features/tenancy/pages/tenant-members-page.test.tsx` のテストである（抜粋）。
 
 ```tsx
   it("409 は backend の title と競合の説明を出し、自動で再送しない", async () => {
@@ -197,7 +201,8 @@ Hook は、Hook を使う画面の component test で確かめ、Hook ごとの�
 
 ## 作成時のチェックリスト
 
-- [ ] `features/<feature>/hooks/` に置き、Hook を作る条件を [React Hooksと状態](../routing-and-state.md#react-hooksと状態)で確かめる。［自分で点検］
+- [ ] custom Hook の定義を `features/<feature>/hooks/` に置き、component、画面、module の中に書かない。［Oxlint で検査：react-rules/no-hook-definition］
+- [ ] Hook を作る条件を [React Hooksと状態](../routing-and-state.md#react-hooksと状態)で確かめる。［自分で点検］
 - [ ] ファイル名を Hook の名前の kebab-case にする。［Oxlint で検査：unicorn/filename-case（名前との一致は自分で点検）］
 - [ ] Hook を呼ぶ関数の名前を `use` で始める。［Oxlint で検査：react/rules-of-hooks］
 - [ ] Hook を呼ばない関数に `use` を付けない。［自分で点検］
@@ -212,6 +217,6 @@ Hook は、Hook を使う画面の component test で確かめ、Hook ごとの�
 - [ ] cache の key に生成の `get<Operation>QueryKey()` を使う。［自分で点検］
 - [ ] 戻り値を object にし、event handler に渡す関数を `handle<操作>` と名付ける。［自分で点検］
 - [ ] `useMemo` と `useCallback` を先回りして足さない。［自分で点検］
-- [ ] route、Base UI、テスト用の部品、テレメトリの SDK を import しない。［Oxlint で検査：no-restricted-imports］
+- [ ] route、同じ feature の画面と component、`@/components/`、Base UI、テスト用の部品、テレメトリの SDK を import しない。［Oxlint で検査：no-restricted-imports］
 - [ ] 他の feature を import しない。［Oxlint で検査：feature-boundaries/no-cross-feature-import］
 - [ ] Hook を使う画面のテストで、送った要求と通知を確かめる。［自分で点検］

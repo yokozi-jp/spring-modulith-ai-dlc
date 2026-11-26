@@ -53,6 +53,24 @@ const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
 };
+// module は React を使わない純粋な関数だけを置く（docs/frontend/file-roles/feature-module.md）。form.ts の @tanstack/react-form は対象外である。
+const moduleImports = {
+  group: [
+    "react",
+    "react-dom",
+    "react-i18next",
+    "@tanstack/react-query",
+    "@tanstack/react-router",
+    "@/features/*/pages/**",
+    "@/features/*/components/**",
+    "@/features/*/hooks/**",
+  ],
+  message: "A feature module must not use React or depend on pages, components or Hooks.",
+};
+const hookImports = {
+  group: ["@/features/*/pages/**", "@/features/*/components/**", "@/components/**"],
+  message: "A feature Hook must not depend on pages or components.",
+};
 const baseUiImports = {
   group: ["@base-ui/**"],
   message: "Import UI primitives from @frontend/ui (ADR-025).",
@@ -304,6 +322,47 @@ export default defineConfig({
           "no-restricted-imports": [
             "error",
             { patterns: [featureImports, baseUiImports, testOnlyImports, telemetrySdkImports] },
+          ],
+        },
+      },
+      // custom Hook は hooks/ にだけ書く。hooks/ の中は、画面と component に依存しない。
+      {
+        files: ["apps/*/src/features/**"],
+        rules: { "react-rules/no-hook-definition": "error" },
+      },
+      {
+        files: ["apps/*/src/features/*/hooks/**"],
+        rules: {
+          "react-rules/no-hook-definition": "off",
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                featureImports,
+                hookImports,
+                baseUiImports,
+                testOnlyImports,
+                telemetrySdkImports,
+              ],
+            },
+          ],
+        },
+      },
+      // feature の直下の .ts は module である。テストは、後ろのテストの override が制限を置き換える。
+      {
+        files: ["apps/*/src/features/*/*.ts"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            {
+              patterns: [
+                featureImports,
+                moduleImports,
+                baseUiImports,
+                testOnlyImports,
+                telemetrySdkImports,
+              ],
+            },
           ],
         },
       },

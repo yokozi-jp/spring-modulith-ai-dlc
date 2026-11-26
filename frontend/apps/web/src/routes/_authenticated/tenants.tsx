@@ -2,7 +2,7 @@ import { getListMembershipsSuspenseQueryOptions } from "@frontend/api/endpoints/
 import { createFileRoute } from "@tanstack/react-router";
 
 import { preloadQuery } from "@/api/preload-query";
-import { TenantsPage } from "@/features/tenancy/tenants-page";
+import { TenantsPage } from "@/features/tenancy/pages/tenants-page";
 
 export const Route = createFileRoute("/_authenticated/tenants")({
   loader: ({ context }) =>

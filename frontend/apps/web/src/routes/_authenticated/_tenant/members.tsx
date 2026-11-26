@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import { preloadQuery } from "@/api/preload-query";
 import { RouteError } from "@/components/route-error";
-import { TenantMembersPage } from "@/features/tenancy/tenant-members-page";
+import { TenantMembersPage } from "@/features/tenancy/pages/tenant-members-page";
 
 // 管理者でない利用者には backend が権限不足の 403 を返す。再試行しても同じなので、管理者だけの画面だと伝える。
 // テナントを選んでいない 403 は、RouteError がテナントを選び直す画面へ案内する。

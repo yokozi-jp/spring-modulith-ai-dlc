@@ -145,7 +145,7 @@ export const CustomerOrderCodeField = withFieldGroup({
 role と label で操作し、表示の変化、送った要求、読み上げの領域の文言を確かめる（[観点ごとのテスト](../test-strategy.md#観点ごとのテスト)）。
 coverage のファイルごとの下限は component にもかかる（[coverage](../testing.md#coverage)）。
 
-次は、field group の誤りの表示を確かめる `features/orders/order-new-page.test.tsx` のテストである（抜粋）。
+次は、field group の誤りの表示を確かめる `features/orders/pages/order-new-page.test.tsx` のテストである（抜粋）。
 
 ```tsx
   it("送信時の検証の誤りを入力欄の直下に出し、送信しない", async () => {

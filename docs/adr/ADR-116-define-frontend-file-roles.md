@@ -32,7 +32,7 @@ ADR-050 は、Java のクラス、ArchUnit、Spring Modulith を前提にして�
 `frontend/` の `src/` にあるファイルのうち、業務のコードと共有のコードを、置き場所とファイル名で決まる次の役割に分け、役割ごとに一つの文書を `docs/frontend/file-roles/` に置く。
 各文書は、backend の `class-roles/` と同じ節（定義、置き場所と命名、必須の記述、依存してよいもの、してはいけないもの、最小の例と典型的な例、対応するテスト、アンチパターン、作成時のチェックリスト）を持つ。
 
-- **粒度**：ファイルの種類を単位にする。`features/<feature>/` の直下には画面、入力の条件、form の組み立て、module が並ぶので、ディレクトリ単位にせず、ファイル名で分ける。`lib`、`components`、`i18n` のように、ディレクトリ全体が一つの役割になる場所は、ディレクトリと役割が一対一になる。
+- **粒度**：ファイルの種類を単位にする。`features/<feature>/` の直下には、入力の条件、form の組み立て、module が並ぶ。画面は `pages/`、component は `components/`、Hook は `hooks/` に置く（[ADR-032](ADR-032-organize-frontend-by-business-feature.md)）。直下のファイルはディレクトリ単位にせず、ファイル名で分ける。`lib`、`components`、`i18n` のように、ディレクトリ全体が一つの役割になる場所は、ディレクトリと役割が一対一になる。
 - **対象外**：アプリの起動と組立てのファイル（`main.tsx`、`router-defaults.ts`）、CSS（`style.css`）、生成物（`routeTree.gen.ts`、Orval の生成物）には役割の文書を置かない。起動と組立ては [フロントエンドアーキテクチャ](../frontend/architecture.md#現在の構成) が、生成物は [OrvalとAPI境界](../frontend/api-client-orval.md) が定める。
 - **対象**：実在するファイルがある役割だけに文書を置く。今の役割は、route、feature の画面、component、Hook、form の組み立て、入力 schema、module、アプリの共有 component、UI primitive、API 層、lib、国際化の resource、テストの道具、MSW の handler と fixture である。
 - **新しい役割**：その役割のファイルを最初に作る変更と同じ変更で、文書を足す。

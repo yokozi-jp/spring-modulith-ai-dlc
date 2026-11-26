@@ -17,7 +17,7 @@ tags: [runbook, frontend, feature]
 
 1. 利用者が達成する目的と業務機能名を決める。
 2. 対応するバックエンド業務モジュールがある場合は同じ業務語彙を使う。
-3. `features/<business-feature>`を作り、最初のpageまたはcomponentをkebab-caseのファイル名（`<feature>-page.tsx`）で置く。
+3. `features/<business-feature>`を作り、最初のpageを`pages/`にkebab-caseのファイル名（`<screen>-page.tsx`）で置く。
 4. URLとsearch parameterを[routeの形](routing-and-state.md#routeの形)に従って`routes`に定義し、routeからfeatureのpageを接続する。
 5. 初期描画に必要なserver stateがある場合は、TanStack Queryのquery optionsをloaderからpreloadする。
 6. OpenAPI operationへ所有featureのtagと安定した`operationId`を付ける。
@@ -25,7 +25,7 @@ tags: [runbook, frontend, feature]
 8. local UI state、server state、URL state、form stateを対応する既存機構へ割り当てる。
 9. 利用者向けの固定文言を追加または変更する場合は、[国際化](i18n.md)に従い、`src/i18n/locales/`の`ja.json`と`en.json`を同じ変更で更新する。
 10. 新しいファイルを作るときは、[ファイルの役割](file-roles/index.md)で役割を選び、その文書のチェックリストで点検する。
-11. custom Hookと共通化は、具体的な再利用または外部system同期が存在する場合だけ追加する。
+11. custom Hookは、再利用、外部system同期、または画面のmutation、form、通知の状態の分離がある場合に、`hooks/`へ追加する。共通化は、具体的な再利用が存在する場合だけ追加する。
 12. 対象コードの隣へ最小のtestを追加し、[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンド)に従って`task fe-verify`を実行する。
 
 ## APIやbackendの変更が要るときの確認

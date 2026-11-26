@@ -29,17 +29,21 @@ OrvalはOpenAPI tag単位の分割、query options、query hooks、schema、MSW 
 生成先は再生成時のclean対象になり得るため、手書きコードと同じディレクトリへ混在させるわけにはいかない。
 
 React HooksはstatefulなUI logicを関数componentから利用する標準機構である。
-しかし、custom Hookはディレクトリ分割の単位ではなく、具体的なstateful logicを再利用する単位である。
 すべての処理をHookへ変換すると、純粋関数とReactのrendering lifecycleに属する処理の区別が崩れる。
+一方、画面のmutation、form、通知の状態をcomponentへ書くと、一つのcomponentが多くを知り、多くを処理する。
+当初は「再利用する場合だけHookを作る」と定めたが、実際のHookはどれも呼び出し元が一つの画面で、画面の状態をcomponentから分けるために作られていた。
+再利用の有無は機械で判定できず、規則とコードが食い違った。
 
 AIエージェントに四つのfeatureを作らせた検証では、feature間のimportが6箇所、feature単位の循環が2組できた。
 ディレクトリ規約とレビューだけでは、最初のfeatureから境界が崩れうる。
 また、docsはcomponentのファイル名をPascalCaseと定めていたが、Oxlintの `unicorn/filename-case` は既定のkebab-caseを強制しており、docsどおりに作ると `task fe-check` が失敗した。
 routerの既定のerror表示は同梱の英語の固定文言のままであり、agentが `routeTree.gen.ts` などの生成物を手で書き換えることを止める仕組みも無かった。
 
-Decisionは次の二点を書き直した。
+Decisionは次の三点を書き直した。
 loaderで呼ぶ関数は、TanStack Queryが `ensureQueryData` を非推奨にしたため、実装に合わせて `preloadQuery` に改めた。
 jsPluginの上限は、linkとbuttonの入れ子やTailwindのclass名のような境界でない規則のjsPluginを足すにあたり、境界の規則だけを数えると明記した。
+feature内の置き場所は、Hookを再利用の有無ではなく置き場所で決め、画面を `pages/` に置くように改めた。
+配置をOxlintとテストで検査でき、featureの直下の構造が揃う。
 
 ## Decision
 
@@ -58,10 +62,10 @@ frontend/src/
 │       └── <route>/
 ├── features/
 │   └── <business-feature>/
-│       ├── <feature>-page.tsx
+│       ├── pages/             # <screen>-page.tsx とそのテスト
 │       ├── components/        # 必要になった場合だけ追加
 │       ├── hooks/             # 必要になった場合だけ追加
-│       └── *.test.tsx
+│       └── <関心>.ts          # Reactを使わない純粋な関数（module）
 ├── api/
 │   ├── generated/
 │   │   ├── endpoints/<tag>/
@@ -89,6 +93,9 @@ Oxlintの `unicorn/filename-case` の既定とshadcnの生成物がkebab-caseで
 単一endpointのquery optionsで足りる場合はOrval生成物を直接使い、複数queryの合成や業務上の既定値が必要な場合だけfeature内に手書きのquery定義を置く。
 
 feature内部にはpage、feature固有component、custom Hook、form schemaなど、実際に必要なものだけを置く。
+featureの直下には `.tsx` を置かない。画面は `pages/`、componentは `components/`、custom Hookは `hooks/` に置き、`*-page.tsx` は `pages/` にだけ置く。
+画面が一つのfeatureにも `pages/` を作る。
+Reactを使わない型、定数、純粋関数は、featureの直下の `<関心>.ts`（module）に置く。
 テストは対象ファイルの隣へ置き、種類別のトップレベル `tests` へ分離しない。
 複数のテストで使う準備のコード（MSWのserver、手書きのhandlerとfixture、共通のrender helper）は `src/testing/` に置き、最初のMSWテストを書くときに作る。
 featureに依存しないUI primitiveは `components/ui` に置き、小さな純粋関数は `lib` に置く。
@@ -126,8 +133,15 @@ hookを通らない書き換えの最終の検出は、`routeTree.gen.ts` を再
 
 React componentはfunction componentとHooksで実装する。
 local UI stateにはReactの組み込みHook、server stateにはTanStack Query、URL stateにはTanStack Router、form stateにはTanStack Formを使う。
-custom Hookは、再利用するstateful logicまたは外部systemとの同期を、具体的な用途名で表せる場合にfeature内へ置く。
-純粋な変換は通常の関数にし、生成Hookをそのまま転送するだけのwrapper Hookやトップレベル `hooks` ディレクトリは作らない。
+custom Hookは、再利用するstateful logic、外部systemとの同期、または画面のmutation、form、通知の状態の分離を、具体的な用途名で表せる場合に、featureの `hooks/` に置く。
+呼び出し元が一つの画面だけでもよい。再利用の有無は判断しない。
+custom Hookの定義（`use` で始まる関数宣言）は `hooks/` にだけ書く。
+純粋な変換は通常の関数にしてmoduleに置き、生成Hookをそのまま転送するだけのwrapper Hookやトップレベル `hooks` ディレクトリは作らない。
+
+配置は検査で守る。
+`*-page.tsx` が `pages/` の外にあること、featureの直下に `.tsx` があること、`hooks/` に `use-*.ts` 以外があることは、`frontend/lint/feature-layout.test.js` が失敗にする。
+`hooks/` の外のHookの定義は、jsPluginの `react-rules/no-hook-definition` が報告する。
+moduleからのReactのimportと、Hookから画面とcomponentへのimportは、`no-restricted-imports` のoverrideが報告する。
 
 Orvalの設定、生成Task、生成物のGit管理は[ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md)に従う。
 生成clientには `client: 'react-query'`、`httpClient: 'fetch'`、`mode: 'tags-split'` を使い、schemaもtag単位に分割する。
@@ -147,6 +161,8 @@ Orvalが所有するclient、model、mockの生成先を `api/generated` の専�
 - 画面ごとにLoadingとErrorの分岐を書かずに済み、状態表示が利用者の言語で統一される。
 - agentによる生成物の手書きをhookが止め、hookを通らない `routeTree.gen.ts` の書き換えもCIが検出する。
 - stateの種類ごとに既存ライブラリを使うため、新しいglobal state依存が要らない。
+- featureの直下の構造が、画面、component、Hook、moduleの役割ごとに揃い、配置の違反をlintとテストが報告する。
+- 「再利用があるか」の判断を置き場所の規則に置き換えたので、Hookを作るかどうかでレビューが割れない。
 
 ### Negative
 
@@ -155,6 +171,9 @@ Orvalが所有するclient、model、mockの生成先を `api/generated` の専�
 - feature境界のjsPluginはOxlintのalphaのJS plugin APIに依存し、Oxlintの更新で動作を確かめ直す必要がある。
 - jsPluginは動的な境界規則を一本だけと想定しており、アプリやパッケージに分かれたとき、または動的な規則が三本を超えたときはdependency-cruiserへ移る必要がある。
 - 他のfeatureのHookやcomponentを直接使えないため、route側の合成とslot propの受け渡しが増える。
+- 呼び出し元が一つのHookが残るため、画面の挙動を追うときにcomponentとHookを行き来する。一回の `useState` を隠すだけのHookや、生成Hookを返すだけのwrapperは、引き続きレビューで止める。
+- 画面が一つのfeatureにも `pages/` ができ、`src/features/<feature>/pages/` の分だけ階層が深くなる。
+- 同じfeatureのファイルを `pages/` から読むには、`../` を使えないため `@/features/<feature>/...` のaliasで書く。
 - 生成物のpathはhookのscriptにだけあり、Orvalの導入時に見直す必要がある。
 
 ### Neutral
@@ -182,6 +201,14 @@ Orvalが所有するclient、model、mockの生成先を `api/generated` の専�
 - **Description**：`app`、`pages`、`widgets`、`features`、`entities`、`shared` の層と公開API規約を採用する。
 - **Pros**：大規模Frontendで依存方向と再利用単位を細かく管理できる。
 - **Cons**：業務画面がない現在は分類対象より規約の方が多くなり、既存のTanStack Router構成と重複する層を先に作ることになる。
+
+### Hookを再利用がある場合だけに限る
+
+- **Description**：custom Hookを、複数の呼び出し元か外部systemとの同期がある場合だけ作る。画面の状態はcomponentに書く。
+- **Pros**：Hookの数が少なく、画面の挙動をcomponentの中で追える。
+- **Cons**：「再利用があるか」を機械で判定できず、規則とコードが食い違う。
+  mutation、form、409、通知がcomponentに戻り、一つのcomponentが長くなる。
+  Hookの置き場所ではなく有無を判断することになり、レビューごとに結論が割れる。
 
 ### Orval生成物を各featureへ配置する
 

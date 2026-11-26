@@ -1,13 +1,13 @@
 ---
 type: Convention
 title: ファイルの役割：feature の画面
-description: features/<feature>/ 直下に置く、一つの URL の画面の component（*-page.tsx）の定義、置き場所と命名、必須の記述、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。業務機能の画面を足すとき、画面の取得、見出し、Empty と Content の分け方、form の送信を書くときに読む。
+description: features/<feature>/pages/ に置く、一つの URL の画面の component（*-page.tsx）の定義、置き場所と命名、必須の記述、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。業務機能の画面を足すとき、画面の取得、見出し、Empty と Content の分け方、form の送信を書くときに読む。
 tags: [convention, frontend, file-role]
 ---
 
 # ファイルの役割：feature の画面
 
-feature の画面は、一つの URL の画面の表示と利用者の操作を持つ React component であり、`features/<feature>/<画面>-page.tsx` に置いて `<画面>Page` を export する。
+feature の画面は、一つの URL の画面の表示と利用者の操作を持つ React component であり、`features/<feature>/pages/<画面>-page.tsx` に置いて `<画面>Page` を export する。
 初期描画の data は、route の loader と同じ生成 query options を `useSuspenseQuery` で読み、Empty と Content だけを分ける。
 route の情報は `getRouteApi` で取り、route を import しない。
 
@@ -22,7 +22,9 @@ Loading、Error、存在しない resource の表示は、画面ではなく rou
 
 ## 置き場所と命名
 
-- `frontend/apps/web/src/features/<feature>/` の直下に置く。
+- `frontend/apps/web/src/features/<feature>/pages/` に置く。
+  画面が一つの feature でも `pages/` を作る。`*-page.tsx` が `pages/` の外にあると、`task fe-check` の配置の検査が失敗にする。
+- 同じ feature の component、Hook、module は、`../` を使えないため `@/features/<feature>/...` の alias で import する（`import/no-relative-parent-imports`）。
 - ファイル名は、画面を表す名詞に `-page` を付けた kebab-case にする（`orders-page.tsx`、`order-new-page.tsx`、`order-detail-page.tsx`、`tenants-page.tsx`、`tenant-members-page.tsx`）。
 - component の名前は、ファイル名を PascalCase にした名前にする（`OrdersPage`、`OrderNewPage`）。
 - テストは画面の隣に `<画面>-page.test.tsx` で置き、観点が多ければ観点の名前で分ける（`order-detail-failures.test.tsx`、`order-detail-payment.test.tsx`）。
@@ -47,7 +49,7 @@ Loading、Error、存在しない resource の表示は、画面ではなく rou
 
 ## 最小の例と典型的な例
 
-最小の例は、注文の一覧の `features/orders/orders-page.tsx` である。
+最小の例は、注文の一覧の `features/orders/pages/orders-page.tsx` である。
 loader と同じ引数で一覧を読み、件数が 0 なら Empty の文言を、それ以外は一覧の表を出す。
 
 ```tsx
@@ -57,9 +59,9 @@ import { useSuspenseQuery } from "@tanstack/react-query";
 import { getRouteApi, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
-import { OrderStatusFilter } from "./components/order-status-filter";
-import { OrdersTable } from "./components/orders-table";
-import { listOrdersParams } from "./order-status";
+import { OrderStatusFilter } from "@/features/orders/components/order-status-filter";
+import { OrdersTable } from "@/features/orders/components/orders-table";
+import { listOrdersParams } from "@/features/orders/order-status";
 
 const routeApi = getRouteApi("/_authenticated/_tenant/orders/");
 
@@ -91,7 +93,7 @@ export function OrdersPage() {
 }
 ```
 
-典型的な例は、注文の作成の `features/orders/order-new-page.tsx` の component である（抜粋）。
+典型的な例は、注文の作成の `features/orders/pages/order-new-page.tsx` の component である（抜粋）。
 form の状態と送信は `useDraftOrderForm` に、入力欄は field group の component に分けている。
 
 ```tsx
@@ -150,7 +152,7 @@ HTTP は Orval が生成した MSW handler を `server.use()` に渡して置き
 role と label で要素を見つけ、`renderRoute` が返す `user` で操作する（[フロントエンドのテストと検証](../testing.md#書き方)）。
 画面が出す状態（成功、Empty、失敗、再試行）を確かめる（[状態遷移](../testing.md#状態遷移)）。
 
-次は、`features/tenancy/tenants-page.test.tsx` の Empty の状態のテストである（抜粋）。
+次は、`features/tenancy/pages/tenants-page.test.tsx` の Empty の状態のテストである（抜粋）。
 
 ```tsx
   it("所属がないときは、所属を待っていることを伝え、テナントのボタンを出さない", async () => {
@@ -180,7 +182,7 @@ role と label で要素を見つけ、`renderRoute` が返す `user` で操作�
 
 ## 作成時のチェックリスト
 
-- [ ] `features/<feature>/` の直下に、画面を表す名詞に `-page` を付けた名前で置く。［自分で点検］
+- [ ] `features/<feature>/pages/` に、画面を表す名詞に `-page` を付けた名前で置く。［配置の検査：frontend/lint/feature-layout.test.js］
 - [ ] ファイル名を kebab-case にする。［Oxlint で検査：unicorn/filename-case］
 - [ ] component を関数宣言で書き、一つのファイルに一つだけ書く。［Oxlint で検査：func-style、react/function-component-definition、react/no-multi-comp］
 - [ ] 画面のファイルから component 以外を export しない。［Oxlint で検査：react/only-export-components］

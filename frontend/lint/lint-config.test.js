@@ -368,3 +368,27 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
     });
   });
 });
+
+describe("fixture に適用した feature の中の役割の lint 設定", () => {
+  it("hooks/ の外の custom Hook の定義を禁止する", () => {
+    expect(countIn("features/order/hook-in-component.tsx", "react-rules(no-hook-definition)")).toBe(
+      1,
+    );
+  });
+
+  it("hooks/ の中の custom Hook の定義を許可する", () => {
+    expect(codesIn("features/order/hooks/use-order-draft.ts")).toStrictEqual([]);
+  });
+
+  it("hooks/ から画面、component、共有の component の import を禁止する", () => {
+    expect(countIn("features/order/hooks/page-import.ts", "eslint(no-restricted-imports)")).toBe(3);
+  });
+
+  it("module から React、react-i18next、TanStack の react-query と react-router、feature の Hook の import を禁止する", () => {
+    expect(countIn("features/order/module-react.ts", "eslint(no-restricted-imports)")).toBe(4);
+  });
+
+  it("module から @tanstack/react-form の import を許可する", () => {
+    expect(codesIn("features/order/form.ts")).toStrictEqual([]);
+  });
+});

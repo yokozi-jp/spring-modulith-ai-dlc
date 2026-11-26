@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: フロントエンドのルーティングと状態管理
-description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、mutation の後の cache の無効化、状態の置き場所、custom Hook を作る条件と名前、Effect の禁止と代わりの書き方を定める。route、loader、mutation、state、Hook、Effect を追加または変更するときに読む。
+description: TanStack Router の route file の責務と形、認証が要る画面の layout、loader による server state の preload、状態表示の分担、mutation の後の cache の無効化、状態の置き場所、custom Hook を作る条件と置き場所と名前、Effect の禁止と代わりの書き方を定める。route、loader、mutation、state、Hook、Effect を追加または変更するときに読む。
 tags: [convention, frontend, routing, state, react]
 ---
 
@@ -10,7 +10,7 @@ tags: [convention, frontend, routing, state, react]
 route file は URL と画面の接続だけを担当し、画面の実装は `features` に置く。
 初期描画に必要な server state は loader から TanStack Query へ preload する。
 状態は意味に対応する既存機構（React Hooks、TanStack Query、TanStack Router、TanStack Form）へ置き、global store を先に追加しない。
-custom Hook は具体的な用途名で表せる再利用または外部 system との同期がある場合だけ作り、Effect は使わない（ADR-088）。
+custom Hook は具体的な用途名で表せる再利用、外部 system との同期、または画面の mutation、form、通知の状態の分離がある場合だけ作り、`features/<feature>/hooks/` にだけ書く。Effect は使わない（ADR-088）。
 
 ## ルーティング
 
@@ -150,7 +150,11 @@ HooksはReactのstate、context、effectなどをfunction componentから使う�
 
 これらで扱えない共有stateが実在するまでは、ReduxやZustandなどのglobal storeを追加しない。
 
-custom Hookは、再利用するstateful logicまたは外部systemとの同期を、`useMediaQuery` や `usePublicationFilters` のような具体的な用途名で表せる場合に作る。
+custom Hookは、次のどれかを `useMediaQuery` や `useOrderStatusActions` のような具体的な用途名で表せる場合に作る。
+
+- 再利用するstateful logic。
+- 外部systemとの同期。
+- 画面のmutation、form、通知の状態を、componentから分けるもの。呼び出し元が一つの画面だけでもよい。再利用の有無は判断しない。
 
 一回の `useState` を隠すだけのHook、生成Hookをそのまま返すだけのwrapper Hook、`useMount` のようにReact lifecycleを言い換えるHookは作らない。
 
@@ -198,6 +202,12 @@ Hookを呼ばない関数に `use` を付ける形はOxlintが検出しないた
 Hookのファイル名は `use-media-query.ts` のようにHook名をkebab-caseにし、Oxlintの `unicorn/filename-case` が検査する。
 
 置き場所は[目標のディレクトリ構成](architecture.md#目標のディレクトリ構成)のとおり、custom Hookがあるfeatureの `hooks/` とする。
+
+custom Hookの定義（`use` で始まる関数宣言）は、featureの `hooks/` にだけ書く。
+component、画面、moduleの中に書くと、Oxlintの `react-rules/no-hook-definition` が移し先とともに報告する。
+
+Reactのstateを使わない処理は、Hookにせずfeatureのmoduleの関数にする。
+moduleがReactをimportすると、`no-restricted-imports` のoverrideが報告する（[feature の module](file-roles/feature-module.md)）。
 
 custom Hookのテストは[テスト観点の割り当て](test-strategy.md#観点ごとのテスト)に従う。
 

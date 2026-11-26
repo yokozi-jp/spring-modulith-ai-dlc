@@ -4,7 +4,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { preloadQuery } from "@/api/preload-query";
 import { isOrderStatus, listOrdersParams } from "@/features/orders/order-status";
-import { OrdersPage } from "@/features/orders/orders-page";
+import { OrdersPage } from "@/features/orders/pages/orders-page";
 
 export const Route = createFileRoute("/_authenticated/_tenant/orders/")({
   // 不正な status は捨てて全件を表示する（エラー画面にしない）。

@@ -169,7 +169,7 @@ jsdom の component test で、role と label から要素を探し、利用者�
   not found の見出しとリンク、loader の失敗で詳細を出さないことと再試行、読み込み中の `status` を見る。
 - アプリシェルは、`frontend/apps/web/src/components/app-shell.test.tsx` が `renderRoute("/")` で描画し、ログアウトの form の送信を確かめる。
 - `StatusScreen` は自身のテストファイルを持たず、使う route のテスト（`routes/-logged-out.test.tsx`、`routes/-login-failed.test.tsx`）が見出し、リンクの `href`、`<title>` を確かめる。
-- `ProblemNotice` は自身のテストファイルを持たず、使う画面のテスト（`features/orders/order-new-page.test.tsx` など）が `getByRole("status")` で通知を読む。
+- `ProblemNotice` は自身のテストファイルを持たず、使う画面のテスト（`features/orders/pages/order-new-page.test.tsx` など）が `getByRole("status")` で通知を読む。
 
 次は `frontend/apps/web/src/router-defaults.test.tsx` の not found のテストである。
 
