@@ -36,6 +36,11 @@ final class ClassRoleFixtureRows {
                 VIOLATING),
             "ordering.infrastructure.persistence.ExpiredOrderSweeper"),
         row(
+            "databaseTechnologyApisAreOnlyUsedByPersistenceAdapters",
+            PackageByFeatureOnionArchitectureTest
+                .databaseTechnologyApisAreOnlyUsedByPersistenceAdaptersRule(VIOLATING),
+            "ordering.application.JooqOrderCounter"),
+        row(
             "sharedModuleIsUsedOnlyByPersistenceAdapters",
             PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
                 VIOLATING),
@@ -185,6 +190,10 @@ final class ClassRoleFixtureRows {
             "controllersResideInPresentationWeb",
             PackageByFeatureOnionArchitectureTest.controllersResideInPresentationWeb,
             "ordering.presentation.OrderResource"),
+        row(
+            "repositoriesResideInPersistenceAdapters",
+            PackageByFeatureOnionArchitectureTest.repositoriesResideInPersistenceAdapters,
+            "ordering.application.OrderArchiveStore"),
         row(
             "presentationDoesNotDependOnDomain",
             PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain,

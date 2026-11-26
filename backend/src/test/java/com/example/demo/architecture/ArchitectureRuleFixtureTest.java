@@ -3,6 +3,13 @@ package com.example.demo.architecture;
 import static com.example.demo.architecture.ViolatingFixtures.VIOLATING;
 import static com.example.demo.architecture.ViolatingFixtures.VIOLATING_CLASSES;
 import static com.example.demo.architecture.ViolatingFixtures.row;
+import static java.util.Map.entry;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -13,9 +20,12 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import errorfixture.presentation.web.ErrorFixtureFailure;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
@@ -258,9 +268,89 @@ class ArchitectureRuleFixtureTest {
   void conformingFixtureSatisfiesEveryRule() {
     final JavaClasses conforming = new ClassFileImporter().importPackages(CONFORMING);
 
-    for (final ArchRule rule : rulesFor(CONFORMING)) {
-      assertThatCode(() -> rule.check(conforming)).doesNotThrowAnyException();
+    final Map<String, ArchRule> rules = rulesFor(CONFORMING);
+
+    for (final String name : rules.keySet()) {
+      assertThatCode(() -> rules.get(name).check(conforming)).as(name).doesNotThrowAnyException();
     }
+  }
+
+  @Test
+  @DisplayName("@ArchTest の規則は、違反の行と rulesFor() の両方に載るか、理由を付けて除外する")
+  void everyRuleIsRegisteredOrExempted() {
+    final Map<String, List<String>> owners =
+        ArchTestFields.ruleFields().stream()
+            .collect(
+                groupingBy(
+                    ArchTestFields.RuleField::name,
+                    TreeMap::new,
+                    mapping(ArchTestFields.RuleField::owner, toList())));
+    final Set<String> violating =
+        eachRuleDetectsItsViolatingFixture()
+            .map(row -> ((String) row.get()[0]).split(":", 2)[0])
+            .collect(toSet());
+    final Map<String, Set<String>> registrations =
+        Map.of(
+            "eachRuleDetectsItsViolatingFixture の行",
+            violating,
+            "rulesFor()",
+            rulesFor(CONFORMING).keySet());
+    final Map<String, String> exemptions = FixtureExemptions.REASONS;
+    final List<String> problems = new ArrayList<>();
+
+    owners.entrySet().stream()
+        .filter(owner -> owner.getValue().size() > 1)
+        .forEach(owner ->
+            problems.add(
+                owner.getKey()
+                    + "："
+                    + owner.getValue()
+                    + " に同じ名前の @ArchTest がある。登録を規則の名前で照らすため。直し方：どちらかの名前を変える"));
+    for (final String name : owners.keySet()) {
+      final String missing =
+          registrations.entrySet().stream()
+              .filter(registration -> !registration.getValue().contains(name))
+              .map(Map.Entry::getKey)
+              .sorted()
+              .collect(joining("と "));
+      if (exemptions.containsKey(name) && missing.isEmpty()) {
+        problems.add(
+            name
+                + "：両方に載るのに FixtureExemptions にある。除外が後の登録の漏れを隠さないようにするため。"
+                + "直し方：FixtureExemptions から消す");
+      } else if (!exemptions.containsKey(name) && !missing.isEmpty()) {
+        problems.add(
+            name
+                + "："
+                + missing
+                + " にない。規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめるため。"
+                + "直し方：ないほうに足す（違反の行には違反フィクスチャのクラスも足す）。"
+                + "フィクスチャで確かめないときは、FixtureExemptions に理由を付けて足す");
+      }
+    }
+    Stream.concat(
+            registrations.entrySet().stream(),
+            Stream.of(entry("FixtureExemptions", exemptions.keySet())))
+        .forEach(registration ->
+            registration.getValue().stream()
+                .filter(name -> !owners.containsKey(name))
+                .forEach(name ->
+                    problems.add(
+                        name
+                            + "："
+                            + registration.getKey()
+                            + " にあるが、この名前の @ArchTest の規則がない。誤った名前や消した規則の登録を残さないため。"
+                            + "直し方：@ArchTest のフィールドの名前に直すか、登録を消す")));
+    exemptions.forEach((name, reason) -> {
+      if (reason.isBlank()) {
+        problems.add(
+            name + "：FixtureExemptions の理由が空。除外した理由を後から確かめられるようにするため。直し方：フィクスチャで確かめない理由を書く");
+      }
+    });
+
+    assertThat(problems)
+        .as("@ArchTest の規則の登録に誤りがある（docs/backend/architecture-tests.md の「規則を確かめるフィクスチャ」）")
+        .isEmpty();
   }
 
   @ParameterizedTest(name = "{0}")
@@ -568,86 +658,218 @@ class ArchitectureRuleFixtureTest {
   /** フィクスチャが列を変換する先の値オブジェクト。 */
   private record OrderNumber(String value) {}
 
-  /** 検査クラスの全規則を、指定した基底パッケージで組み立てて返す。 */
-  private static List<ArchRule> rulesFor(final String basePackage) {
-    return List.of(
-        PackageByFeatureOnionArchitectureTest.dependenciesPointInwardRule(basePackage),
-        PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModelRule(
-            basePackage),
-        PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
-            basePackage),
-        PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(basePackage),
-        PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWebRule(
-            basePackage),
-        PackageByFeatureOnionArchitectureTest.failureReasonsAreModuleEnumsRule(basePackage),
-        PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(basePackage),
-        PackageByFeatureOnionArchitectureTest
-            .databaseTechnologyApisAreOnlyUsedByPersistenceAdapters,
-        GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
-        PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(basePackage),
-        PackageByFeatureOnionArchitectureTest.applicationDependsOnlyOnAllowedTypesRule(basePackage),
-        PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation,
-        PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
-            basePackage),
-        PackageByFeatureOnionArchitectureTest.domainServicesAreAnnotatedWithService,
-        PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService,
-        PackageByFeatureOnionArchitectureTest.controllersResideInPresentationWeb,
-        PackageByFeatureOnionArchitectureTest.repositoriesResideInPersistenceAdapters,
-        PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain,
-        PackageByFeatureOnionArchitectureTest.domainInterfacesAreImplementedInInfrastructureRule(
-            basePackage),
-        PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories,
-        PackageByFeatureOnionArchitectureTest.externalSystemImplementationsAreClients,
-        PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel,
-        PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods,
-        ClassRoleArchTest.moduleRootTypesAreRecordsEnumsOrQueriesRule(basePackage),
-        ClassRoleArchTest.applicationServicesHaveRoleNames,
-        ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle,
-        ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(basePackage),
-        ClassRoleArchTest.resultComponentsAreNotNullableRule(basePackage),
-        ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers,
-        ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance,
-        ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners,
-        ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients,
-        ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers,
-        ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces,
-        ClassRoleArchTest.listenersAreNotCalled,
-        ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
-        ProxyRulesArchTest.aspectsDeclareOrder,
-        ProxyRulesArchTest.transactionManagementIsNotRedeclared,
-        ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass,
-        ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic,
-        ProxyRulesArchTest.publicBeanMethodsAreNotFinal,
-        ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture,
-        ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal,
-        ClassRoleArchTest.moduleListenersAreApplicationListeners,
-        ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage),
-        ClassRoleArchTest.tenantIsBoundOnlyByAllowedCallersRule(basePackage),
-        ClassRoleArchTest.unboundTenantIsReadOnlyByTransactionManagerRule(basePackage),
-        ClassRoleArchTest.roleAndTenantAreSetOnlyByTransactionManagerRule(basePackage),
-        ClassRoleArchTest.eventListenersAreApplicationModuleListeners,
-        ClassRoleArchTest.applicationListenerIsNotImplemented,
-        ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler,
-        ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage),
-        ClassRoleArchTest.queryServicesImplementModuleQueries,
-        ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(basePackage),
-        ClassRoleArchTest.mappingLibrariesAreNotUsed,
-        ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
-        TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage),
-        TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(basePackage),
-        TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule(),
-        TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(basePackage),
-        TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage),
-        TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule(),
-        TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
-        IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(basePackage),
-        IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotencyRule(basePackage),
-        ApiVersionArchTest.apiControllersDeclareVersionRule(basePackage),
-        PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage),
-        DatabaseConventionsArchTest.ownGeneratedSchemaRule(
-            basePackage, JOOQ_PACKAGE, FIXTURE_MODULES),
-        DatabaseConventionsArchTest.moduleCodeDoesNotUseJdbcRule(basePackage, FIXTURE_MODULES),
-        DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
-            basePackage, FIXTURE_MODULES));
+  /** 検査クラスの全規則を、指定した基底パッケージで組み立て、{@code @ArchTest} のフィールドの名前をキーにして返す。 */
+  private static Map<String, ArchRule> rulesFor(final String basePackage) {
+    return Map.ofEntries(
+        entry(
+            "dependenciesPointInward",
+            PackageByFeatureOnionArchitectureTest.dependenciesPointInwardRule(basePackage)),
+        entry(
+            "infrastructureDependsOnlyOnDomainModel",
+            PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModelRule(
+                basePackage)),
+        entry(
+            "sharedModuleIsUsedOnlyByPersistenceAdapters",
+            PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
+                basePackage)),
+        entry(
+            "httpTypesAreNotUsedByInnerLayers",
+            PackageByFeatureOnionArchitectureTest.httpTypesAreNotUsedByInnerLayersRule(
+                basePackage)),
+        entry(
+            "httpErrorsAreMappedOnlyInErrorPresentationWeb",
+            PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWebRule(
+                basePackage)),
+        entry(
+            "failureReasonsAreModuleEnums",
+            PackageByFeatureOnionArchitectureTest.failureReasonsAreModuleEnumsRule(basePackage)),
+        entry(
+            "moduleApiDoesNotExposeInternalTypes",
+            PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
+                basePackage)),
+        entry(
+            "databaseTechnologyApisAreOnlyUsedByPersistenceAdapters",
+            PackageByFeatureOnionArchitectureTest
+                .databaseTechnologyApisAreOnlyUsedByPersistenceAdaptersRule(basePackage)),
+        entry(
+            "noSuchElementExceptionIsNotThrown",
+            GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown),
+        entry(
+            "domainModelDependsOnlyOnAllowedTypes",
+            PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
+                basePackage)),
+        entry(
+            "applicationDependsOnlyOnAllowedTypes",
+            PackageByFeatureOnionArchitectureTest.applicationDependsOnlyOnAllowedTypesRule(
+                basePackage)),
+        entry(
+            "valueObjectsDoNotThrowBusinessRuleViolation",
+            PackageByFeatureOnionArchitectureTest.valueObjectsDoNotThrowBusinessRuleViolation),
+        entry(
+            "domainServicesDependOnlyOnDomainAndJava",
+            PackageByFeatureOnionArchitectureTest.domainServicesDependOnlyOnDomainAndJavaRule(
+                basePackage)),
+        entry(
+            "domainServicesAreAnnotatedWithService",
+            PackageByFeatureOnionArchitectureTest.domainServicesAreAnnotatedWithService),
+        entry(
+            "servicesResideInApplicationOrDomainService",
+            PackageByFeatureOnionArchitectureTest.servicesResideInApplicationOrDomainService),
+        entry(
+            "controllersResideInPresentationWeb",
+            PackageByFeatureOnionArchitectureTest.controllersResideInPresentationWeb),
+        entry(
+            "repositoriesResideInPersistenceAdapters",
+            PackageByFeatureOnionArchitectureTest.repositoriesResideInPersistenceAdapters),
+        entry(
+            "presentationDoesNotDependOnDomain",
+            PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain),
+        entry(
+            "domainInterfacesAreImplementedInInfrastructure",
+            PackageByFeatureOnionArchitectureTest
+                .domainInterfacesAreImplementedInInfrastructureRule(basePackage)),
+        entry(
+            "repositoryImplementationsAreJooqRepositories",
+            PackageByFeatureOnionArchitectureTest.repositoryImplementationsAreJooqRepositories),
+        entry(
+            "externalSystemImplementationsAreClients",
+            PackageByFeatureOnionArchitectureTest.externalSystemImplementationsAreClients),
+        entry(
+            "transactionalIsNotDeclaredAtClassLevel",
+            PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel),
+        entry(
+            "transactionalMethodsArePublicApplicationMethods",
+            PackageByFeatureOnionArchitectureTest.transactionalMethodsArePublicApplicationMethods),
+        entry(
+            "moduleRootTypesAreRecordsEnumsOrQueries",
+            ClassRoleArchTest.moduleRootTypesAreRecordsEnumsOrQueriesRule(basePackage)),
+        entry(
+            "applicationServicesHaveRoleNames", ClassRoleArchTest.applicationServicesHaveRoleNames),
+        entry(
+            "commandHandlersExposeOnlyTransactionalHandle",
+            ClassRoleArchTest.commandHandlersExposeOnlyTransactionalHandle),
+        entry(
+            "commandsAndResultsAreApplicationRecords",
+            ClassRoleArchTest.commandsAndResultsAreApplicationRecordsRule(basePackage)),
+        entry(
+            "resultComponentsAreNotNullable",
+            ClassRoleArchTest.resultComponentsAreNotNullableRule(basePackage)),
+        entry(
+            "commandHandlersDoNotDependOnOtherCommandHandlers",
+            ClassRoleArchTest.commandHandlersDoNotDependOnOtherCommandHandlers),
+        entry(
+            "commandHandlersAndListenersDoNotUseInheritance",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotUseInheritance),
+        entry(
+            "externalSystemCommandHandlersAreDependedOnlyByListeners",
+            ClassRoleArchTest.externalSystemCommandHandlersAreDependedOnlyByListeners),
+        entry(
+            "externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients",
+            ClassRoleArchTest.externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients),
+        entry(
+            "eventPublisherIsUsedOnlyByCommandHandlers",
+            ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers),
+        entry(
+            "commandHandlersAndListenersDoNotImplementInterfaces",
+            ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces),
+        entry("listenersAreNotCalled", ClassRoleArchTest.listenersAreNotCalled),
+        entry(
+            "pointcutsNarrowTargetsWithWithin",
+            ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin),
+        entry("aspectsDeclareOrder", ProxyRulesArchTest.aspectsDeclareOrder),
+        entry(
+            "transactionManagementIsNotRedeclared",
+            ProxyRulesArchTest.transactionManagementIsNotRedeclared),
+        entry(
+            "proxiedMethodsAreNotCalledFromSameClass",
+            ProxyRulesArchTest.proxiedMethodsAreNotCalledFromSameClass),
+        entry(
+            "proxiedMethodsAreNotPrivateFinalOrStatic",
+            ProxyRulesArchTest.proxiedMethodsAreNotPrivateFinalOrStatic),
+        entry("publicBeanMethodsAreNotFinal", ProxyRulesArchTest.publicBeanMethodsAreNotFinal),
+        entry("asyncMethodsReturnVoidOrFuture", ProxyRulesArchTest.asyncMethodsReturnVoidOrFuture),
+        entry(
+            "scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal",
+            ProxyRulesArchTest.scheduledMethodsAreNoArgVoidAndNotPrivateOrFinal),
+        entry(
+            "moduleListenersAreApplicationListeners",
+            ClassRoleArchTest.moduleListenersAreApplicationListeners),
+        entry(
+            "moduleListenerEventsAreTenantScoped",
+            ClassRoleArchTest.moduleListenerEventsAreTenantScopedRule(basePackage)),
+        entry(
+            "tenantIsBoundOnlyByAllowedCallers",
+            ClassRoleArchTest.tenantIsBoundOnlyByAllowedCallersRule(basePackage)),
+        entry(
+            "unboundTenantIsReadOnlyByTransactionManager",
+            ClassRoleArchTest.unboundTenantIsReadOnlyByTransactionManagerRule(basePackage)),
+        entry(
+            "roleAndTenantAreSetOnlyByTransactionManager",
+            ClassRoleArchTest.roleAndTenantAreSetOnlyByTransactionManagerRule(basePackage)),
+        entry(
+            "eventListenersAreApplicationModuleListeners",
+            ClassRoleArchTest.eventListenersAreApplicationModuleListeners),
+        entry(
+            "applicationListenerIsNotImplemented",
+            ClassRoleArchTest.applicationListenerIsNotImplemented),
+        entry(
+            "listenersExposeOnlyOnAndCallOneCommandHandler",
+            ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler),
+        entry(
+            "requestsAndResponsesArePresentationWebRecords",
+            ClassRoleArchTest.requestsAndResponsesArePresentationWebRecordsRule(basePackage)),
+        entry(
+            "queryServicesImplementModuleQueries",
+            ClassRoleArchTest.queryServicesImplementModuleQueries),
+        entry(
+            "queryResultStatusIsNotReadByOtherModules",
+            ClassRoleArchTest.queryResultStatusIsNotReadByOtherModulesRule(basePackage)),
+        entry("mappingLibrariesAreNotUsed", ClassRoleArchTest.mappingLibrariesAreNotUsed),
+        entry("jooqReflectionMappingIsNotUsed", ClassRoleArchTest.jooqReflectionMappingIsNotUsed),
+        entry(
+            "tableWritesGoThroughTableWriter",
+            TableWriterArchTest.tableWritesGoThroughTableWriterRule(basePackage)),
+        entry(
+            "repositoryUpdateCallsVersionedEntryPoint",
+            TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(basePackage)),
+        entry(
+            "repositoryWritesTakeVersionedAggregates",
+            TableWriterArchTest.repositoryWritesTakeVersionedAggregatesRule()),
+        entry(
+            "commandHandlersEnsureScreenLockNo",
+            TableWriterArchTest.commandHandlersEnsureScreenLockNoRule(basePackage)),
+        entry(
+            "commandsBuiltByPresentationForWritesAreVersioned",
+            TableWriterArchTest.commandsBuiltByPresentationForWritesAreVersionedRule(basePackage)),
+        entry(
+            "onlyCommandHandlersUpdateOrDeleteAggregates",
+            TableWriterArchTest.onlyCommandHandlersUpdateOrDeleteAggregatesRule()),
+        entry(
+            "expectedLockNoIsCreatedOnlyByRequests",
+            TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage)),
+        entry(
+            "unsafeHandlersTakeIdempotencyKey",
+            IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(basePackage)),
+        entry(
+            "idempotentCommandHandlersExecuteThroughIdempotency",
+            IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotencyRule(
+                basePackage)),
+        entry(
+            "apiControllersDeclareVersion",
+            ApiVersionArchTest.apiControllersDeclareVersionRule(basePackage)),
+        entry(
+            "numericIdsDoNotLeaveModules",
+            PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage)),
+        entry(
+            "persistenceAdaptersUseOnlyOwnGeneratedSchema",
+            DatabaseConventionsArchTest.ownGeneratedSchemaRule(
+                basePackage, JOOQ_PACKAGE, FIXTURE_MODULES)),
+        entry(
+            "moduleCodeDoesNotUseJdbc",
+            DatabaseConventionsArchTest.moduleCodeDoesNotUseJdbcRule(basePackage, FIXTURE_MODULES)),
+        entry(
+            "moduleCodeDoesNotChangeConnectionSettings",
+            DatabaseConventionsArchTest.moduleCodeDoesNotChangeConnectionSettingsRule(
+                basePackage, FIXTURE_MODULES)));
   }
 }
