@@ -19,12 +19,16 @@ public final class CapturedLogRecords implements LogRecordProcessor {
     records.add(logRecord.toLogRecordData());
   }
 
+  /** 共有コンテキストの全テストで発生した LogRecord を返す。 */
+  public List<LogRecordData> all() {
+    return List.copyOf(records);
+  }
+
   /** 指定した本文を持つ LogRecord を返す。 */
   public List<LogRecordData> withBody(final String body) {
     return records.stream()
-        .filter(
-            record ->
-                record.getBodyValue() != null && body.equals(record.getBodyValue().asString()))
+        .filter(record ->
+            record.getBodyValue() != null && body.equals(record.getBodyValue().asString()))
         .toList();
   }
 

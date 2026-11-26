@@ -29,7 +29,8 @@ export function isTenantNotSelected(error: unknown): error is ApiProblemError {
   );
 }
 
-const loginPath = "/oauth2/authorization/web";
+/** バックエンドの OAuth2 のログインの入口。 */
+export const loginPath = "/oauth2/authorization/web";
 const redirectGuardMs = 30_000;
 const redirectedAtKey = "api.loginRedirectedAt";
 

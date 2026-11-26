@@ -43,6 +43,26 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 - `AppUserPrincipal`でない`OidcUser`を保存していた版から上げるとき。消さないと、そのセッションが切れるまで書き込みが失敗する。
 - `SignInOidcUserService`が返す`OidcUser`のクラスか、選んだテナントの権限のクラス（`TenantMembershipAuthority`）を持たない版へ切り戻すとき、またはそれらのクラスを移動、改名するとき。消さないと、セッションを読めずにリクエストが500になる。
 
+## ログインの失敗
+
+ログインのコールバックが失敗すると、バックエンドはSPAの`/login-failed`へ移す。
+状態は302で、要求が`X-Forwarded-*`を持つときは、`ForwardedHeaderFilter`が相対の`Location`のまま303にする。
+IdPがエラーを返したとき、認可リクエストを持つセッションがないとき、`SignInOidcUserService`がIDトークンの`iss`と`sub`を拒否したときが当たる。
+`/login-failed`は`_authenticated`の外の画面でAPIを呼ばないので、401からログインへ移る流れは、ログインが失敗し続けてもこの画面で止まる。
+この画面は戻り先を消さないので、もう一度ログインに成功すると、ログインの前に開いていた画面へ戻る。
+
+`LoginFailureHandler`は、失敗ごとに`OAuth2 login failed`をINFOで1件残し、OAuth2のerror codeを`error.type`に入れる。
+残すのは`LoginFailureHandler`が持つ既知のerror codeの閉じた集合の値だけで、それ以外は`_OTHER`にする。
+集合は、Spring Securityの`OAuth2ErrorCodes`の定数（RFC 6749の4.1.2.1と5.2のcodeを含む）、OpenID Connect Core 1.0の3.1.2.6が定めるcode、Spring Securityとこのアプリがログインの処理で投げるcodeである。
+error codeはコールバックのquery stringから来て、認可リクエストを持つセッションさえあれば誰でも任意の値を送れるが、ログに届くのは集合の値だけになる。
+このため、IdPが標準の外のcodeを返したときは、そのcodeは`_OTHER`としてしか残らない。
+IdPが書く`error_description`と例外のmessageは、ログ、URL、セッションのどれにも置かない。
+失敗の種類もURLに載せないので、履歴とRefererに残らない。
+
+Spring Securityの`SimpleUrlAuthenticationFailureHandler`は使わない。
+このhandlerはセッションがあれば例外をセッションへ保存する。
+コールバックの時点では認可リクエストを保存したセッションが必ずあるので、`error_description`を含む例外がDBのセッションに残るためである。
+
 ## テナントを選ぶ
 
 ログインした利用者は、所属するテナントを1つ選んでから業務のAPIを使う。

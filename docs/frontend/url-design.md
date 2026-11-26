@@ -34,7 +34,8 @@ TanStack Routerのfile-based routingでは、path parameterを `$orderId` のよ
 画面のpathにはこれらを使わない。
 ログインはSPAのrouteではなく、バックエンドの認証開始URLから始める。
 ログアウト後の画面は、ログインを要求しない `/logged-out` とする。
-このpathはリソースではなく状態を表す画面であり、リソースを中心にpathを構成する規則の例外とする。
+ログインに失敗した後の画面は、ログインを要求しない `/login-failed` とする（[APIの認証、セッション、権限](../web-api/authentication-and-session.md#ログインの失敗)）。
+これらのpathはリソースではなく状態を表す画面であり、リソースを中心にpathを構成する規則の例外とする。
 
 ## 命名
 

@@ -96,8 +96,10 @@ Controller の中の `@PreAuthorize` が拒否したときのログは、2 つ�
 
 利用者とテナントを指す ID は、アプリが採番した `user.id`（利用者の ID）と `tenant.id`（テナントの `public_id`）だけを渡す（「[テナントと利用者](#テナントと利用者)」）。
 
-ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、403、404、409、422 の problem type（`problem.type`）、テナントと利用者の ID（`tenant.id`、`user.id`）、trace と span の相関情報、業務上必要な内部 ID である。
+ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、403、404、409、422 の problem type（`problem.type`）、OIDC のログインの失敗の error code（`error.type`）、テナントと利用者の ID（`tenant.id`、`user.id`）、trace と span の相関情報、業務上必要な内部 ID である。
 イベント出版の定期の再投入と手での 1 回の再投入は、業務上必要な内部 ID として出版の ID、イベントの型とリスナーの完全修飾名、試行の回数（`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`）と、1 回の実行の件数と、回数の上限を超えて `FAILED` に残った出版の件数（`event_publication.resubmitted.count`、`event_publication.over_limit.count`）と、手での 1 回の再投入の結果の件数（`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`）を出す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+ログインの失敗の `error.type` に入る値は「[ログインの失敗](../web-api/authentication-and-session.md#ログインの失敗)」に書く。
+IdP が書く `error_description` はログへ渡さない。
 イベントの本文（`serialized_event`）は読まず、ログへ渡さない。
 内部 ID と氏名などの表示値を同じ event へ載せない。
 MDC が付ける `user.id` と `tenant.id` はこの規則の対象外とするが、要求とリスナーの中の event に付くので、ログを書く処理は利用者とテナントの表示値（利用者の氏名、テナントの名前）を event へ載せない。
@@ -148,7 +150,7 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - **バックエンドのトレースとメトリクス**：加工しない。計装を追加して禁止値が入る属性が見つかった場合は、transform で消す。
 
 ログに属性を追加するときは、Collector の `keep_keys` とこの文書の許可する値を同じ変更で直す。
-現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code`、`conflict.kind`、`problem.type`、`tenant.id`、`user.id`、`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`、`event_publication.resubmitted.count`、`event_publication.over_limit.count`、`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count` だけを持つ。
+現在の `keep_keys` は、使っている `exception.type`、`exception.message`、`exception.stacktrace`、`http.response.status_code`、`conflict.kind`、`problem.type`、`error.type`、`tenant.id`、`user.id`、`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`、`event_publication.resubmitted.count`、`event_publication.over_limit.count`、`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count` だけを持つ。
 
 フロントエンドのログは、バックエンドと別の pipeline（`logs/frontend`）で絞る。
 検証、filter、正規化の三段で faro receiver の logfmt 本文を処理し、検証済みの record だけを保存先へ送る。
@@ -159,7 +161,7 @@ Collector の設定（`docker/otel-collector/config.yaml`）は、ローカル�
 - 画面遷移は本文を `Browser view` に固定し、`telemetry.signal`、`view.name`、`session.id` だけを残す。
 - Web Vitals は本文を `Browser web vital` に固定し、`telemetry.signal`、`measurement.type`、`measurement.name`、`measurement.value`、`view.name`、`session.id` だけを残す。
 
-route template の allowlist は `/`、`/logged-out`、`/orders/`、`/orders/$orderId/`、`/orders/new` で、`transform/frontend_validate` の 1 か所だけに書く。
+route template の allowlist は `/`、`/logged-out`、`/login-failed`、`/members`、`/orders/`、`/orders/$orderId/`、`/orders/new`、`/tenants` で、`transform/frontend_validate` の 1 か所だけに書く。
 route params の `$` は、Collector の環境変数の展開と正規表現の終端を避けるため、allowlist に `[$$]` と書く。
 `task fe-route-tree-check` と `task otel-collector-check` は、この allowlist が `routeTree.gen.ts` の `fullPaths` と一致しなければ失敗する。
 route を追加するときは、Collector の allowlist とこの文書を同じ変更で更新する。

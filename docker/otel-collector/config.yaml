@@ -41,7 +41,7 @@ processors:
     error_mode: ignore
     log_statements:
       # ログ属性の allowlist。属性を足すときは docs/observability/conventions.md と同じ変更で直す。
-      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code", "conflict.kind", "problem.type", "tenant.id", "user.id", "event_publication.id", "event_publication.event_type", "event_publication.listener_id", "event_publication.completion_attempts", "event_publication.resubmitted.count", "event_publication.over_limit.count", "event_publication.completed.count", "event_publication.incomplete.count", "event_publication.remaining.count"])
+      - keep_keys(log.attributes, ["exception.type", "exception.message", "exception.stacktrace", "http.response.status_code", "conflict.kind", "problem.type", "error.type", "tenant.id", "user.id", "event_publication.id", "event_publication.event_type", "event_publication.listener_id", "event_publication.completion_attempts", "event_publication.resubmitted.count", "event_publication.over_limit.count", "event_publication.completed.count", "event_publication.incomplete.count", "event_publication.remaining.count"])
   # faro receiver の logfmt 本文を解析し、型と値を検証した record だけへ Collector 内部の印を付ける。
   transform/frontend_validate:
     # 型が違う record では Len が nil に対して失敗するのが通常の経路で、record ごとに warn が出る。
@@ -62,7 +62,7 @@ processors:
       - set(log.cache["route"], log.cache["view_name"]) where log.attributes["kind"] != "event"
       - set(log.cache["route"], log.cache["event_data_toView"]) where log.attributes["kind"] == "event"
       # route の allowlist はこの 1 行だけに書く。task fe-route-tree-check と task otel-collector-check が routeTree.gen.ts と照合する。
-      - set(log.attributes["frontend.view"], log.cache["route"]) where IsMatch(log.cache["route"], "^(?:/|/logged-out|/members|/orders/|/orders/[$$]orderId/|/orders/new|/tenants)$$")
+      - set(log.attributes["frontend.view"], log.cache["route"]) where IsMatch(log.cache["route"], "^(?:/|/logged-out|/login-failed|/members|/orders/|/orders/[$$]orderId/|/orders/new|/tenants)$$")
       - set(log.attributes["frontend.lcp"], Double(log.cache["value_lcp"])) where Len(log.cache["value_lcp"]) >= 1 and Len(log.cache["value_lcp"]) <= 32 and IsMatch(log.cache["value_lcp"], "^[0-9]+(?:\\.[0-9]+)?$$")
       - set(log.attributes["frontend.inp"], Double(log.cache["value_inp"])) where Len(log.cache["value_inp"]) >= 1 and Len(log.cache["value_inp"]) <= 32 and IsMatch(log.cache["value_inp"], "^[0-9]+(?:\\.[0-9]+)?$$")
       - set(log.attributes["frontend.cls"], Double(log.cache["value_cls"])) where Len(log.cache["value_cls"]) >= 1 and Len(log.cache["value_cls"]) <= 32 and IsMatch(log.cache["value_cls"], "^[0-9]+(?:\\.[0-9]+)?$$")

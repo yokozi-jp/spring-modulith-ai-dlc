@@ -162,9 +162,12 @@ public class SecurityConfig {
         // 別のオリジンから来た更新系の要求は、CSRF のトークンを確かめる前に専用の type の 403 にする（ADR-136）。
         .addFilterBefore(
             new CrossOriginRequestFilter(apiRequests, apiAccessDenied), CsrfFilter.class)
+        // 成功の handler は tenancy の TenantSecurityCustomizer が足す。
         .oauth2Login(oauth2 ->
-            oauth2.authorizationEndpoint(authorization ->
-                authorization.authorizationRequestResolver(authorizationRequestResolver)))
+            oauth2
+                .authorizationEndpoint(authorization ->
+                    authorization.authorizationRequestResolver(authorizationRequestResolver))
+                .failureHandler(new LoginFailureHandler()))
         // アプリケーションセッションを破棄した後、IdP が対応していれば SSO セッションも終了する。
         // Spring Security の既定どおり POST /logout と CSRF トークンを要求する。
         .logout(logout ->
