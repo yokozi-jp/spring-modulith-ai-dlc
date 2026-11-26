@@ -427,7 +427,7 @@ DELETE FROM modulith.event_publication
 その出版は `failed{state=retrying}` に残り、`failed.oldest.age{state=retrying}` が伸び続ける。
 
 `EventContractTest` は、fixture の名前の型を読み込めないと失敗するため、型の名前やパッケージを変える変更をマージの前に止める（[クラスの役割：イベント](../backend/class-roles/event.md)の「対応するテスト」）。
-テストを通さずにデプロイしたときや、型と一緒に過去の fixture の名前を変えるか消したときは、この状態が起きうる。
+テストを通さずにデプロイしたときや、型と一緒に過去の fixture の名前を変えるか消したとき（pre-push の [`task test-weakening`](../tooling/lint-and-test.md) が警告する）は、この状態が起きうる。
 
 `failed.oldest.age{state=retrying}` の警報の閾値は、出版が上限に達して `ABANDONED` になり、`retrying` から外れるまでの最長の時間より長くする。
 上限（`abandon-after-attempts`）を N、`wait-age` を W、倍率を m、待ち時間の上限を M、間隔を I とすると、その時間は次のとおりである（リスナーの処理時間は省く）。

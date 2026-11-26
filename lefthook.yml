@@ -319,7 +319,7 @@ pre-push:
     - name: adr-check
       run: task adr-check
 
-    # push 前に、テストファイルの削除とテストケースの減少を警告（ナッジ）。止めず、TESTS_ACK=1 で抑制。
+    # push 前に、テストファイルの削除、テストケースの減少、過去のイベントの fixture の変更と削除を警告（ナッジ）。止めず、TESTS_ACK=1 で抑制。
     - name: test-weakening
       run: task test-weakening
 

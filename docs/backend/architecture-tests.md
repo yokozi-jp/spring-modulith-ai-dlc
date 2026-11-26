@@ -172,6 +172,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
   `ordering`の`JooqOrderRepository`が`shared.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
 - `backend/src/test/java/archfixture/violating/`：規則ごとに違反するクラスを置く。各クラスのJavadocに違反する規則名を書く。パラメータ化テストが、規則ごとに対応する違反クラスの完全修飾名を含む失敗を確かめる。
+- `backend/src/test/java/archfixture/eventcontract/`と`backend/src/test/resources/archfixture-events/`：イベントの互換の規則にわざと違反する型と、シナリオごとのfixtureを置く。`EventContractViolationTest`が、各規則が違反を見つけることを確かめる。全件の`EventContractTest`の対象には載せない（[クラスの役割：イベント](class-roles/event.md)の「対応するテスト」）。
 
 フィクスチャは`com.example.demo`の外に置く。
 そのため、Springのコンポーネントスキャン、Spring Modulithの`ApplicationModules`、プロダクション向けの`@AnalyzeClasses(packagesOf = DemoApplication.class)`は、フィクスチャを読まない。
