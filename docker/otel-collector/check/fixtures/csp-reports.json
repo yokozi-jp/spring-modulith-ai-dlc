@@ -95,13 +95,19 @@
   },
   {
     "age": 1,
-    "body": { "id": "secret-intervention", "message": "secret-intervention" },
+    "body": {
+      "id": "secret-intervention",
+      "message": "secret-intervention"
+    },
     "type": "intervention",
     "url": "https://localhost:5173/?secret-int=1"
   },
   {
     "age": 1,
-    "body": { "reason": "oom", "stack": "secret-crash" },
+    "body": {
+      "reason": "oom",
+      "stack": "secret-crash"
+    },
     "type": "crash",
     "url": "https://localhost:5173/?secret-crash=1"
   },
@@ -167,6 +173,27 @@
       "blockedURL": "https://secret-nodisposition.example/x",
       "documentURL": "https://localhost:5173/",
       "effectiveDirective": "img-src"
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src"
+    },
+    "type": "csp-violation",
+    "url": "https://localhost:5173/"
+  },
+  {
+    "age": 1,
+    "body": {
+      "disposition": "enforce",
+      "documentURL": "https://localhost:5173/",
+      "effectiveDirective": "img-src",
+      "blockedURL": ""
     },
     "type": "csp-violation",
     "url": "https://localhost:5173/"
