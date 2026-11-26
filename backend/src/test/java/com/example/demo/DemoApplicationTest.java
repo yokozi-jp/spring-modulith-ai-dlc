@@ -101,6 +101,9 @@ class DemoApplicationTest {
   /** resilience4j の注釈が掛かることを検証する決済代行の Client。 */
   @Autowired private PaymentGateway paymentGateway;
 
+  /** application.yaml から読んだセッションの期間。 */
+  @Autowired private SecurityConfig.SessionLifetimeProperties sessionLifetime;
+
   /** 起動確認の対象となる {@code ApplicationContext}。 */
   @Autowired private ApplicationContext applicationContext;
 
@@ -323,6 +326,13 @@ class DemoApplicationTest {
                 + " ms が DB_IDLE_IN_TRANSACTION_TIMEOUT_MS "
                 + idleTimeoutMillis
                 + " ms より短いこと");
+  }
+
+  @Test
+  @DisplayName("セッションの最長の期間は 8 時間である")
+  void sessionMaxLifetimeIsEightHours() {
+    assertEquals(
+        Duration.ofHours(8), sessionLifetime.maxLifetime(), "app.session.max-lifetime が 8 時間であること");
   }
 
   @Test
