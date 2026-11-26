@@ -18,7 +18,7 @@ tags: [convention, integration, async, spring-modulith, future-arch-guidelines]
 - **プロデューサー**：メッセージを発行する側。
 - **コンシューマー**：メッセージを受け取って処理する側。現在は `@ApplicationModuleListener` を付けた非同期のイベントリスナーが該当する。
 - **キュー**：メッセージを保持してコンシューマーへ渡す仕組み。現在は Spring Modulith のイベント出版レジストリがこの役割を担い、外部ブローカーを導入した後はブローカーのキューとトピックを指す。
-- **DLQ**：処理できなかったメッセージを退避する場所。扱いは[非同期処理の失敗時の再試行と回復](async-failure-recovery.md)に従う。
+- **DLQ**：処理できなかったメッセージを退避する場所。現在は Spring Modulith の `ABANDONED` のイベント出版が当たる。扱いは[非同期処理の失敗時の再試行と回復](async-failure-recovery.md)に従う。
 
 ## 実行基盤
 

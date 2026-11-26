@@ -108,7 +108,7 @@ rollback させたい失敗は、例外にする。
 409 の type は、`Kind.VERSION` が `/problems/version-conflict`、`Kind.LOCK` が `/problems/lock-timeout`、`Kind.UNIQUE` が `/problems/unique-violation`、`Kind.IDEMPOTENCY_IN_PROGRESS` が `Retry-After` 付きの `/problems/idempotency-key-in-progress` である。
 Listener の扱いは[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の「Spring Modulith のイベントの失敗」に合わせる。
 業務上の失敗の三つの型は、自動で再試行しない。
-ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を `FAILED` で残す（レジストリが DLQ を兼ねる）。
+ステータス管理テーブル（[非同期処理のステータス管理](../../integration/async-job-status.md)）を持つ処理は FAILED と失敗の内容を記録して正常終了し、持たない処理は `on` から送出してイベント出版を `FAILED` で残し、上限まで再投入しても失敗した出版は `ABANDONED`（DLQ）になる。
 ステータス管理テーブルを持たない処理では、`ConflictException` で `FAILED` のまま残ったイベント出版を運用者が `FailedEventPublications` で再投入すると、読み直して成功する見込みがある。
 
 `23505` と `55P03` の Spring の例外のメッセージには SQL が入り、`23505` では重複したキーの値も入る。
