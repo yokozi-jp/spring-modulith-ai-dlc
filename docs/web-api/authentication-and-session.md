@@ -19,6 +19,7 @@ tags: [convention, web-api, security, auth, future-arch-guidelines]
 
 未認証のAPIリクエストには、401のProblem Detailsに`WWW-Authenticate: Session realm="demo"`を付けて返す。
 SPAは401を受けると、いまの画面のpath、query、hashを戻り先としてsessionStorageに保存してからログインへ遷移する。
+ただし、同じ文書でAPIが1回でも成功した後の401では、SPAはログインの前に`/session-expired`の画面を出す（[状態表示の分担](../frontend/routing-and-state.md#状態表示の分担)）。
 バックエンドは、ログインの後は常に`/`へ戻す。SPAが`/`で保存した戻り先を読み、同一オリジンのpathのときだけその画面へ移す。
 画面のURLを知るのはSPAだけなので、バックエンドは、401にした要求をログインの後の戻り先として保存しない（`NullRequestCache`）。
 Spring Securityの既定の保存は、`Accept`のないAPIのGETを保存し、ログインの後にそのJSONへ戻すためである。

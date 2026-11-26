@@ -113,6 +113,7 @@ barrelの`index.ts`は作らず、次の入口を個別に公開する。
 | `@frontend/api/zod/<tag>/<tag>.zod`   | `src/generated/zod/<tag>/<tag>.zod.ts`   |
 | `@frontend/api/api-fetch`             | `src/api-fetch.ts`                       |
 | `@frontend/api/api-error`             | `src/api-error.ts`                       |
+| `@frontend/api/unauthorized-redirect` | `src/unauthorized-redirect.ts`           |
 | `@frontend/api/csrf`                  | `src/csrf.ts`                            |
 | `@frontend/api/idempotency-key`       | `src/idempotency-key.ts`                 |
 
@@ -172,8 +173,7 @@ Problem Detailsの本文はZodで検証しない。
 同一オリジンのバックエンドが契約テストで形を保証しており、schemaの手書きはこの規約が禁じているためである。
 Problem Detailsの検証が必要になったら、`readProblem`の型の断定を、生成したZod schemaに置き換える。
 
-401は、mutatorではなく`QueryCache`と`MutationCache`の`onError`（`redirectToLoginOnUnauthorized`）でログインへ遷移させる。
-遷移の前に、戻り先として画面のURLを保存する（[状態表示の分担](routing-and-state.md#状態表示の分担)）。
+401は、mutatorではなく`QueryCache`と`MutationCache`の`onError`（`@frontend/api/unauthorized-redirect`の`createUnauthorizedRedirect()`）で遷移させる。
 遷移はerrorへの反応であり、loaderとcomponentの401を1か所で扱えるためである。
 扱いの詳細は[状態表示の分担](routing-and-state.md#状態表示の分担)にある。
 

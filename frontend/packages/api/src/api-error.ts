@@ -1,5 +1,4 @@
 import type { ProblemDetail } from "./generated/models";
-import { saveReturnTo } from "./login-return-to";
 
 /** API が 2xx 以外を返したことを表す。problem は application/problem+json の本文。 */
 export class ApiProblemError extends Error {
@@ -27,48 +26,6 @@ export function isTenantNotSelected(error: unknown): error is ApiProblemError {
     error.status === 403 &&
     error.problem?.type === tenantNotSelectedType
   );
-}
-
-/** バックエンドの OAuth2 のログインの入口。 */
-export const loginPath = "/oauth2/authorization/web";
-const redirectGuardMs = 30_000;
-const redirectedAtKey = "api.loginRedirectedAt";
-
-// ponytail: memory の値は再読み込みで消える。storage が使えない browser で遷移を繰り返すようになったら、URL の query で回数を渡す。
-let redirectedAtFallback = Number.NaN;
-
-function readRedirectedAt(): number {
-  try {
-    const stored = globalThis.sessionStorage.getItem(redirectedAtKey);
-    // setItem だけが失敗した場合に備え、storage に値がなければ memory を見る。
-    return stored === null ? redirectedAtFallback : Number(stored);
-  } catch {
-    return redirectedAtFallback;
-  }
-}
-
-function writeRedirectedAt(redirectedAt: number): void {
-  try {
-    globalThis.sessionStorage.setItem(redirectedAtKey, String(redirectedAt));
-  } catch {
-    redirectedAtFallback = redirectedAt;
-  }
-}
-
-/** query と mutation の失敗が 401 なら、直前に遷移していなければログインへ遷移する。 */
-export function redirectToLoginOnUnauthorized(error: unknown): void {
-  if (!(error instanceof ApiProblemError) || error.status !== 401) {
-    return;
-  }
-  const now = Date.now();
-  const redirectedAt = readRedirectedAt();
-  // 数値でない保存値（NaN や Infinity）は遷移していないとして扱う。
-  if (Number.isFinite(redirectedAt) && now - redirectedAt < redirectGuardMs) {
-    return;
-  }
-  writeRedirectedAt(now);
-  saveReturnTo();
-  globalThis.location.assign(loginPath);
 }
 
 /** 同じ Idempotency-Key の要求をサーバーが処理している 409 の problem type（ADR-126）。 */

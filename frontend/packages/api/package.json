@@ -9,6 +9,7 @@
     "./csrf": "./src/csrf.ts",
     "./idempotency-key": "./src/idempotency-key.ts",
     "./login-return-to": "./src/login-return-to.ts",
+    "./unauthorized-redirect": "./src/unauthorized-redirect.ts",
     "./endpoints/*": "./src/generated/endpoints/*.ts",
     "./mocks/*": "./src/generated/mocks/*.ts",
     "./models": "./src/generated/models/index.ts",

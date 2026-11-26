@@ -24,6 +24,8 @@
   "loginAgain": "Log in again",
   "loginFailedHeading": "Login failed",
   "loginFailedDescription": "Please try again.",
+  "sessionExpiredHeading": "Your login has expired",
+  "sessionExpiredDescription": "Please log in again. Your last action may not have completed.",
   "notice": {
     "generalTitle": "The operation could not be completed",
     "generalFailure": "Try again later.",

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as LoggedOutRouteImport } from './routes/logged-out'
 import { Route as LoginFailedRouteImport } from './routes/login-failed'
+import { Route as SessionExpiredRouteImport } from './routes/session-expired'
 import { Route as AuthenticatedTenantRouteRouteImport } from './routes/_authenticated/_tenant/route'
 import { Route as AuthenticatedTenantsRouteImport } from './routes/_authenticated/tenants'
 import { Route as AuthenticatedTenantIndexRouteImport } from './routes/_authenticated/_tenant/index'
@@ -32,6 +33,11 @@ const LoggedOutRoute = LoggedOutRouteImport.update({
 const LoginFailedRoute = LoginFailedRouteImport.update({
   id: '/login-failed',
   path: '/login-failed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SessionExpiredRoute = SessionExpiredRouteImport.update({
+  id: '/session-expired',
+  path: '/session-expired',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedTenantRouteRoute =
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedTenantIndexRoute
   '/logged-out': typeof LoggedOutRoute
   '/login-failed': typeof LoginFailedRoute
+  '/session-expired': typeof SessionExpiredRoute
   '/tenants': typeof AuthenticatedTenantsRoute
   '/members': typeof AuthenticatedTenantMembersRoute
   '/orders/new': typeof AuthenticatedTenantOrdersNewRoute
@@ -89,6 +96,7 @@ export interface FileRoutesByTo {
   '/': typeof AuthenticatedTenantIndexRoute
   '/logged-out': typeof LoggedOutRoute
   '/login-failed': typeof LoginFailedRoute
+  '/session-expired': typeof SessionExpiredRoute
   '/tenants': typeof AuthenticatedTenantsRoute
   '/members': typeof AuthenticatedTenantMembersRoute
   '/orders/new': typeof AuthenticatedTenantOrdersNewRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/logged-out': typeof LoggedOutRoute
   '/login-failed': typeof LoginFailedRoute
+  '/session-expired': typeof SessionExpiredRoute
   '/_authenticated/_tenant': typeof AuthenticatedTenantRouteRouteWithChildren
   '/_authenticated/tenants': typeof AuthenticatedTenantsRoute
   '/_authenticated/_tenant/members': typeof AuthenticatedTenantMembersRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/logged-out'
     | '/login-failed'
+    | '/session-expired'
     | '/tenants'
     | '/members'
     | '/orders/new'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/'
     | '/logged-out'
     | '/login-failed'
+    | '/session-expired'
     | '/tenants'
     | '/members'
     | '/orders/new'
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/logged-out'
     | '/login-failed'
+    | '/session-expired'
     | '/_authenticated/_tenant'
     | '/_authenticated/tenants'
     | '/_authenticated/_tenant/members'
@@ -147,6 +159,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoggedOutRoute: typeof LoggedOutRoute
   LoginFailedRoute: typeof LoginFailedRoute
+  SessionExpiredRoute: typeof SessionExpiredRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -170,6 +183,13 @@ declare module '@tanstack/react-router' {
       path: '/login-failed'
       fullPath: '/login-failed'
       preLoaderRoute: typeof LoginFailedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/session-expired': {
+      id: '/session-expired'
+      path: '/session-expired'
+      fullPath: '/session-expired'
+      preLoaderRoute: typeof SessionExpiredRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/_tenant': {
@@ -264,6 +284,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoggedOutRoute: LoggedOutRoute,
   LoginFailedRoute: LoginFailedRoute,
+  SessionExpiredRoute: SessionExpiredRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
