@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as LoggedOutRouteImport } from './routes/logged-out'
+import { Route as LoginFailedRouteImport } from './routes/login-failed'
 import { Route as AuthenticatedTenantRouteRouteImport } from './routes/_authenticated/_tenant/route'
 import { Route as AuthenticatedTenantsRouteImport } from './routes/_authenticated/tenants'
 import { Route as AuthenticatedTenantIndexRouteImport } from './routes/_authenticated/_tenant/index'
@@ -26,6 +27,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const LoggedOutRoute = LoggedOutRouteImport.update({
   id: '/logged-out',
   path: '/logged-out',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginFailedRoute = LoginFailedRouteImport.update({
+  id: '/login-failed',
+  path: '/login-failed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedTenantRouteRoute =
@@ -72,6 +78,7 @@ const AuthenticatedTenantOrdersOrderIdIndexRoute =
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedTenantIndexRoute
   '/logged-out': typeof LoggedOutRoute
+  '/login-failed': typeof LoginFailedRoute
   '/tenants': typeof AuthenticatedTenantsRoute
   '/members': typeof AuthenticatedTenantMembersRoute
   '/orders/new': typeof AuthenticatedTenantOrdersNewRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof AuthenticatedTenantIndexRoute
   '/logged-out': typeof LoggedOutRoute
+  '/login-failed': typeof LoginFailedRoute
   '/tenants': typeof AuthenticatedTenantsRoute
   '/members': typeof AuthenticatedTenantMembersRoute
   '/orders/new': typeof AuthenticatedTenantOrdersNewRoute
@@ -91,6 +99,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/logged-out': typeof LoggedOutRoute
+  '/login-failed': typeof LoginFailedRoute
   '/_authenticated/_tenant': typeof AuthenticatedTenantRouteRouteWithChildren
   '/_authenticated/tenants': typeof AuthenticatedTenantsRoute
   '/_authenticated/_tenant/members': typeof AuthenticatedTenantMembersRoute
@@ -104,6 +113,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/logged-out'
+    | '/login-failed'
     | '/tenants'
     | '/members'
     | '/orders/new'
@@ -113,6 +123,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/logged-out'
+    | '/login-failed'
     | '/tenants'
     | '/members'
     | '/orders/new'
@@ -122,6 +133,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_authenticated'
     | '/logged-out'
+    | '/login-failed'
     | '/_authenticated/_tenant'
     | '/_authenticated/tenants'
     | '/_authenticated/_tenant/members'
@@ -134,6 +146,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   LoggedOutRoute: typeof LoggedOutRoute
+  LoginFailedRoute: typeof LoginFailedRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -150,6 +163,13 @@ declare module '@tanstack/react-router' {
       path: '/logged-out'
       fullPath: '/logged-out'
       preLoaderRoute: typeof LoggedOutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login-failed': {
+      id: '/login-failed'
+      path: '/login-failed'
+      fullPath: '/login-failed'
+      preLoaderRoute: typeof LoginFailedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/_tenant': {
@@ -243,6 +263,7 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   LoggedOutRoute: LoggedOutRoute,
+  LoginFailedRoute: LoginFailedRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
