@@ -2,49 +2,57 @@ package com.example.demo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withUnauthorizedRequest;
 
 import com.example.demo.testkit.CapturedSpans;
 import com.example.demo.testkit.SharedTestConfiguration;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.sdk.trace.data.EventData;
+import io.opentelemetry.api.trace.StatusCode;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import java.util.List;
 import java.util.UUID;
-import java.util.stream.Stream;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.SpringBootTest.WebEnvironment;
-import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 /**
- * 送信の HTTP の span に、クエリ、ヘッダー、body の秘密が入らないことを、実際のポートへの呼び出しで検証する。
+ * Boot の {@link RestClient.Builder} から作った client の送信の span と tag に、クエリと fragment、ヘッダー、body
+ * の秘密が入らないことを検証する（ADR-140）。
  *
- * <p>Boot の {@link RestClient.Builder} から作った client が自分の API を呼ぶ。送信の span の属性は、Spring が既定で {@code
- * http.url} と {@code uri} にクエリを入れるので、{@link ClientObservationConfig} が落とすことを確かめる。
+ * <p>Spring の既定は {@code http.url} と {@code uri} にクエリを入れるので、{@link
+ * QueryFreeClientRequestObservationConvention} が落とすことを確かめる。 応答は 401 にして、例外を記録する span の event と
+ * status の説明も調べる。
  */
-@SpringBootTest(
-    webEnvironment = WebEnvironment.RANDOM_PORT,
-    properties = {
-      // テストの既定は tracing の export を無効にする。
-      "spring.test.tracing.export=true",
-      "management.tracing.export.otlp.enabled=false"
-    })
+@SuppressWarnings("PMD.TooManyStaticImports")
+@SpringBootTest
+@AutoConfigureMockMvc
 @Import(SharedTestConfiguration.class)
 class ClientSpanContractTest {
+
+  /** 送信先の URL からクエリを除いたもの。 */
+  private static final String URL = "http://payment.example.test/v1/charges";
 
   /** 送信の span の、URL の属性（Spring の既定の名前）。 */
   private static final AttributeKey<String> HTTP_URL = AttributeKey.stringKey("http.url");
 
-  /** 認証が要るので 401 になる API。応答の status は問わない。 */
-  private static final String PATH = "/api/v1/orders";
+  /** 送信の span の、URI テンプレートの属性。 */
+  private static final AttributeKey<String> URI = AttributeKey.stringKey("uri");
 
   /** 終えた span。 */
   @Autowired private CapturedSpans capturedSpans;
@@ -52,46 +60,85 @@ class ClientSpanContractTest {
   /** Boot が observation を入れる client の builder。 */
   @Autowired private RestClient.Builder restClientBuilder;
 
-  /** 起動したサーバーのポート。 */
-  @LocalServerPort private int port;
+  /** 指標。 */
+  @Autowired private MeterRegistry meterRegistry;
 
-  @Test
-  @DisplayName("送信の span は、クエリ、ヘッダー、body の秘密を属性、event、status に持たない")
-  void clientSpanCarriesNoSecret() {
-    final String secret = "S3CRET" + UUID.randomUUID();
-    final String url = "http://localhost:" + port + PATH;
-
-    restClientBuilder
-        .build()
-        .post()
-        .uri(url + "?api_key=" + secret + "#" + secret)
-        .header(HttpHeaders.AUTHORIZATION, "Bearer " + secret)
-        .header(HttpHeaders.COOKIE, "SESSION=" + secret)
-        .contentType(MediaType.APPLICATION_JSON)
-        .body("{\"password\":\"" + secret + "\"}")
-        .exchange((request, response) -> response.getStatusCode());
-
-    final List<SpanData> clientSpans =
-        capturedSpans.all().stream().filter(span -> span.getKind() == SpanKind.CLIENT).toList();
-    assertTrue(
-        clientSpans.stream().anyMatch(span -> url.equals(span.getAttributes().get(HTTP_URL))),
-        () -> "クエリを落とした http.url を持つ送信の span がない: " + clientSpans);
-    final List<SpanData> leaking =
-        capturedSpans.all().stream().filter(span -> renderedText(span).contains(secret)).toList();
-    assertEquals(List.of(), leaking, "秘密を持つ span");
-    assertFalse(
-        capturedSpans.all().stream()
-            .anyMatch(span -> span.getName().startsWith("security filterchain")),
-        "security filterchain の span がある");
+  /** 秘密をクエリ、fragment、ヘッダー、body に入れて、401 を返す送信先を呼ぶ。 */
+  private void callWithSecret(final String secret) {
+    final MockRestServiceServer server = MockRestServiceServer.bindTo(restClientBuilder).build();
+    server
+        .expect(requestTo(Matchers.startsWith(URL)))
+        .andExpect(method(HttpMethod.POST))
+        .andRespond(withUnauthorizedRequest());
+    try {
+      restClientBuilder
+          .build()
+          .post()
+          .uri(URL + "?api_key=" + secret + "#" + secret)
+          .header(HttpHeaders.AUTHORIZATION, "Bearer " + secret)
+          .header(HttpHeaders.COOKIE, "SESSION=" + secret)
+          .contentType(MediaType.APPLICATION_JSON)
+          .body("{\"password\":\"" + secret + "\"}")
+          .retrieve()
+          .toBodilessEntity();
+    } catch (RestClientResponseException expected) {
+      assertEquals(401, expected.getStatusCode().value(), "応答の status");
+    }
+    server.verify();
   }
 
-  /** span の名前、属性、event、status の説明を、1 つの文字列にする。 */
-  private static String renderedText(final SpanData span) {
-    return Stream.of(
-            Stream.of(
-                span.getName(), span.getStatus().getDescription(), span.getAttributes().toString()),
-            span.getEvents().stream().map(EventData::getAttributes).map(Object::toString))
-        .flatMap(stream -> stream)
-        .reduce("", String::concat);
+  private List<SpanData> clientSpans() {
+    return capturedSpans.all().stream()
+        .filter(span -> span.getKind() == SpanKind.CLIENT)
+        .filter(span -> URL.equals(span.getAttributes().get(HTTP_URL)))
+        .toList();
+  }
+
+  @Test
+  @DisplayName("送信の span の http.url と uri は、クエリと fragment を持たない")
+  void clientSpanUrlHasNoQueryOrFragment() {
+    final String secret = "S3CRET" + UUID.randomUUID();
+    final int before = clientSpans().size();
+
+    callWithSecret(secret);
+
+    final List<SpanData> spans = clientSpans();
+    assertEquals(before + 1, spans.size(), () -> "クエリなしの http.url を持つ送信の span: " + spans);
+    assertEquals("/v1/charges", spans.getLast().getAttributes().get(URI), "uri の属性");
+  }
+
+  @Test
+  @DisplayName("どの span も、名前、属性、event、status の説明に秘密を持たない")
+  void noSpanCarriesSecret() {
+    final String secret = "S3CRET" + UUID.randomUUID();
+
+    callWithSecret(secret);
+
+    final List<SpanData> failed =
+        capturedSpans.all().stream()
+            .filter(span -> span.getStatus().getStatusCode() == StatusCode.ERROR)
+            .filter(span -> span.getKind() == SpanKind.CLIENT)
+            .toList();
+    assertFalse(failed.isEmpty(), "401 の例外を記録した送信の span がない");
+    assertEquals(
+        List.of(),
+        capturedSpans.all().stream().filter(span -> span.toString().contains(secret)).toList(),
+        "秘密を持つ span");
+  }
+
+  @Test
+  @DisplayName("http.client.requests の uri の tag は、クエリを持たない")
+  void clientMetricUriTagHasNoQuery() {
+    final String secret = "S3CRET" + UUID.randomUUID();
+
+    callWithSecret(secret);
+
+    assertNotNull(
+        meterRegistry.find("http.client.requests").tag("uri", "/v1/charges").timer(),
+        "クエリなしの uri の tag を持つ timer がない");
+    assertTrue(
+        meterRegistry.find("http.client.requests").timers().stream()
+            .noneMatch(timer -> timer.getId().getTag("uri").contains("?")),
+        "クエリを持つ uri の tag がある");
   }
 }

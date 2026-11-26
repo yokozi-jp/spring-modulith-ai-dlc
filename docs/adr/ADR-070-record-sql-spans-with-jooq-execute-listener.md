@@ -27,7 +27,7 @@ SQL の span には次の制約がある。
 
 - SQL は発生源で渡さない値である（[可観測性データの規約](../observability/conventions.md) の「発生源で渡さない値」）。
   バインドの値は利用者の入力を含みうる。
-- バックエンドの traces は Collector で加工しない（[ADR-015](ADR-015-structure-and-protect-observability-data.md)）。
+- バックエンドの traces の Collector の transform は、送信の URL の属性だけを扱う（[ADR-140](ADR-140-drop-query-from-outbound-http-spans-at-source-and-collector.md)）。SQL の属性のために足さない。
   そのため、span に入れた値は保存先までそのまま届く。
 - 業務の DB アクセスは jOOQ で行い（[ADR-003](ADR-003-adopt-jooq-for-data-access.md)）、jOOQ の技術的な共通処理は `shared` に置く（[ADR-048](ADR-048-add-shared-module-for-jooq-common-code.md)）。
 - PostgreSQL のエラーのメッセージは、制約違反の行の値を含みうる。
@@ -87,7 +87,7 @@ jOOQ の `ExecuteListener` で、jOOQ が発行する SQL ごとに Micrometer �
 
 - **Description**：JDBC の計装を入れ、バックエンドの traces の pipeline の transform で SQL の文の属性を消す。
 - **Pros**：計装の選択肢が広がる。
-- **Cons**：SQL は発生源で渡さない値であり、発生源で入れない計装を選べる。バックエンドの traces を加工しない方針（ADR-015）も変える必要がある。
+- **Cons**：SQL は発生源で渡さない値であり、発生源で入れない計装を選べる。SQL の属性のために、バックエンドの traces の transform を足すことにもなる。
 
 ## References
 

@@ -1428,17 +1428,17 @@ tasks:
           fail "span の URL の属性に、クエリまたは fragment が残りました。"
         fi
         if ! jq -s -e '
-          def string_attr($key): first(.attributes[]? | select(.key == $key) | .value.stringValue);
           [.[].resourceSpans[]?.scopeSpans[]?.spans[]?] as $spans
-          | ($spans | map(select(.name == "http post"))[0]) as $client
-          | ($spans | map(select(.name == "jooq.query"))[0]) as $sql
-          | ($client | string_attr("http.url")) == "http://payment.example.test/v1/charges"
-            and ($client | string_attr("url.full")) == "http://payment.example.test/v1/charges"
-            and ($client | string_attr("http.target")) == "/v1/charges"
-            and ($client | string_attr("uri")) == "/v1/charges"
-            and ($client | [.attributes[]?.key] | index("url.query")) == null
-            and (first($client.attributes[]? | select(.key == "http.response.status_code") | .value.intValue) == "200")
-            and ($sql | string_attr("url.path")) == "/api/v1/orders/42"
+          | ($spans[] | select(.name == "http post") | .attributes | map({(.key): (.value.stringValue // .value.intValue)}) | add) as $client
+          | ($spans[] | select(.name == "jooq.query") | .attributes | map({(.key): .value.stringValue}) | add) as $sql
+          | $client == {
+              "http.url": "http://payment.example.test/v1/charges",
+              "url.full": "http://payment.example.test/v1/charges",
+              "http.target": "/v1/charges",
+              "uri": "/v1/charges",
+              "http.response.status_code": "200"
+            }
+            and $sql == {"url.path": "/api/v1/orders/42"}
         ' "$out/traces.json" >/dev/null; then
           fail "span の URL の属性が期待値と一致しません。"
         fi

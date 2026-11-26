@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-140: 送信の HTTP の span の URL からクエリを発生源と Collector で落とす'
-description: Spring Boot の RestClient が span と指標の tag に入れる URL のクエリを ClientRequestObservationConvention の Bean で落とし、Bean を通らない client の分を Collector の transform で落とす。計装は Spring Boot の starter と Micrometer の Observation で入れ、security filterchain の span を切る判断。
+description: Spring Boot の RestClient が span と指標の tag に入れる URL のクエリを ClientRequestObservationConvention の Bean で落とし、Bean を通らない client の分を Collector の transform で落とす。計装は Spring Boot の starter と Micrometer の Observation で入れる判断。
 tags: [adr, observability, tracing, security, backend]
 ---
 
@@ -32,9 +32,8 @@ Spring Framework 7.1.0 の `DefaultClientRequestObservationConvention.requestUri
 
 Boot の `RestClient.Builder` を通らない client（`RestClient.create()`、`WebClient`、JDK の `HttpClient`）は、convention の Bean を通らない。
 前例として、Spring Security の既定は `RestClient.builder()` で作るため、Boot の設定が入らなかった（`OidcTokenClientConfig`）。
-
-Spring Security は、1 回の要求ごとに `security filterchain before` と `after` の span を 2 本作り、それぞれがフィルターの数の event を持つ。
-どちらも時間を持たず、数だけ増える。
+バックエンドの規約は `RestClient.builder()` と `RestClient.create()` を禁じている（[外部システムの Client](../backend/class-roles/external-client.md)）。
+Collector の保険は、この規約をすり抜けた client と、`RestClient` を使わず自前の計装を持つライブラリ（例：[ADR-125](ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md) の `SesV2Client`）の受け皿である。
 
 ## Decision
 
@@ -44,13 +43,11 @@ OpenTelemetry の Java agent と `opentelemetry-spring-boot-starter` は使わ�
 
 送信の span の URL からクエリと fragment を、2 か所で落とす。
 
-1. **発生源。** `ClientObservationConfig` が `DefaultClientRequestObservationConvention` を継ぐ Bean を置き、`http.url` と `uri` の値から `?` と `#` 以降を落とす。Boot の `RestClient.Builder` から作る client が使う。
-2. **Collector。** `traces` pipeline に `transform/trace_attributes` を置き、`http.url`、`url.full`、`http.target`、`uri` の `?` と `#` 以降を落とし、`url.query` を消す。Bean を通らない client と、将来の計装が付ける属性の受け皿である。
+1. **発生源。** `QueryFreeClientRequestObservationConvention` が `DefaultClientRequestObservationConvention` を継いで Bean になり、`http.url` と `uri` の値から `?` と `#` 以降を落とす。Boot の `RestClient.Builder` から作る client が使う。
+2. **Collector。** `traces` pipeline に `transform/trace_attributes` を置き、span の属性 `http.url`、`url.full`、`http.target`、`uri` の `?` と `#` 以降を落とし、`url.query` を消す。span の event と status の説明は加工しない。
 
 発生源が主で、Collector は保険である。
 span の属性に allowlist をかけない判断（ADR-015）は変えない。
-
-`management.observations.enable.spring.security.filterchains: false` で、`security filterchain` の span を切る。認可の span（`authorize request`）は残す。
 
 span の例外の詳細は、ADR-015 の例外の扱い（発生源で禁じず、保存先の保護と表示時のマスクで扱う）を当てる。
 Micrometer Tracing の OpenTelemetry bridge は、observation の error で `recordException` を呼び、status の説明に例外のメッセージを入れる。
@@ -62,15 +59,15 @@ Micrometer Tracing の OpenTelemetry bridge は、observation の error で `rec
 ### Positive
 
 - Boot の `RestClient.Builder` から作る client では、クエリが span にも指標の tag にも入らない。
-- Bean を通らない client の URL も、保存先に着く前に Collector で落ちる。
-- 数だけ増える span がなくなり、1 回の要求の span 数と event 数が減る。
+- Bean を通らない client の span の URL の属性も、保存先に着く前に Collector で落ちる。
 - 発生源で消す判断が ADR-070 と同じになる。
 
 ### Negative
 
-- バックエンドの `traces` pipeline を Collector で加工するようになる。ADR-015 の「traces は加工しない」を前提にした ADR-070 の記述は、この ADR で改まる。
-- Collector は属性の名前に依存する。Spring が属性の名前を変えると、気づかず素通りする。`task otel-collector-check` は、この ADR が挙げた 5 つの名前だけを確かめる。
-- `security filterchain` の span がなくなり、フィルターごとの経過は Tempo で見えなくなる。
+- バックエンドの `traces` pipeline を Collector で加工するようになる。「traces は加工しない」を前提にした ADR-070 と ADR-068 の記述は、この ADR に合わせて直した。
+- Collector が落とすのは span の属性の 4 つの名前だけである。Spring が属性の名前を変えると、気づかず素通りする。`task otel-collector-check` は、この ADR が挙げた名前だけを確かめ、実際に出る名前は確かめない。
+- Collector は span の event の `exception.message` と status の説明を加工しない。Bean を通らない client の例外のメッセージに URL が入れば、そのまま保存先へ届く。
+- Bean があると、`management.observations.http.client.requests.name` は効かない。
 
 ### Neutral
 
@@ -106,6 +103,7 @@ Micrometer Tracing の OpenTelemetry bridge は、observation の error で `rec
 ## References
 
 - Issue #579、#320、#321、#563
+- [外部システムの Client](../backend/class-roles/external-client.md)
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)
 - [ADR-070: SQL の span を jOOQ の ExecuteListener で作り、SQL の文と値を入れない](ADR-070-record-sql-spans-with-jooq-execute-listener.md)
 - [ADR-133: OpenTelemetry の semantic conventions に指標の名前と属性を揃える](ADR-133-align-metrics-with-opentelemetry-semantic-conventions.md)

@@ -18,7 +18,7 @@
               "startTimeUnixNano": "1700000000000000000",
               "endTimeUnixNano": "1700000000100000000",
               "attributes": [
-                { "key": "http.url", "value": { "stringValue": "http://payment.example.test/v1/charges?api_key=secret-url-query#secret-url-fragment" } },
+                { "key": "http.url", "value": { "stringValue": "http://payment.example.test/v1/charges?api_key=secret-url-query#secret-url-fragment\nsecret-newline" } },
                 { "key": "url.full", "value": { "stringValue": "http://payment.example.test/v1/charges?api_key=secret-full-query" } },
                 { "key": "http.target", "value": { "stringValue": "/v1/charges?api_key=secret-target-query" } },
                 { "key": "uri", "value": { "stringValue": "/v1/charges?api_key=secret-uri-query" } },

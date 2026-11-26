@@ -220,6 +220,34 @@ class ObservabilityContractTest {
   }
 
   @Test
+  @DisplayName("要求の trace は security filterchain の span を持たず、認可の span を持つ")
+  void requestTraceHasNoFilterChainSpans() throws Exception {
+    final String orderId = UUID.randomUUID().toString();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.get("/api/v1/orders/{orderId}", orderId)
+                .with(AppUsers.oidcLogin()))
+        .andExpect(MockMvcResultMatchers.status().isNotFound());
+
+    final String traceId =
+        capturedSpans.withAttribute(URL_PATH, ORDERS_PATH + orderId).stream()
+            .filter(span -> span.getKind() == SpanKind.SERVER)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("orderId=" + orderId + " の受信の span がない"))
+            .getTraceId();
+    final List<String> names =
+        capturedSpans.all().stream()
+            .filter(span -> traceId.equals(span.getTraceId()))
+            .map(SpanData::getName)
+            .toList();
+    assertTrue(names.contains("authorize request"), () -> "認可の span がない: " + names);
+    assertTrue(
+        names.stream().noneMatch(name -> name.startsWith("security filterchain")),
+        () -> "security filterchain の span がある: " + names);
+  }
+
+  @Test
   @DisplayName("ログとトレースの resource は、同じ service.instance.id を持つ")
   void logsAndTracesShareServiceInstanceId() {
     final String event = "observability instance contract";
