@@ -13,7 +13,7 @@
   代表データを読む補助は `scripts/seeded.mjs` にある。
   E2E は代表データを使わない（`docs/e2e/testing-strategy.md` の「テストデータ」）。
 - journey は代表データを変更しない。
-  journey が作る注文の客先注文番号は `orders.uniqueCode("VERIFY")` で作る。
+  journey が作る注文の客先注文番号は `helpers.uniqueCode("VERIFY")` で作る。
 
 ## 操作の決まり
 

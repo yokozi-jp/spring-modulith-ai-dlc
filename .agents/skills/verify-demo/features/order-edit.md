@@ -22,7 +22,7 @@
 Preconditions:
 
 - `stack.sh doctor` がすべて OK である。
-- journey が `orders.createOrder` で下書きを作る。
+- journey が `screensOf(page).create.create` で下書きを作る。
   代表の下書きの注文（`SEED-C01`、`SEED-C02`）を変更しない。
 
 `node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journeys/order-edit.mjs` が、次のすべてを順に実行する。

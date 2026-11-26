@@ -25,7 +25,24 @@ const e2e = (file) => import(pathToFileURL(join(web, "e2e", file)).href);
 // 資格情報と決済代行の URL は .env.test から e2e/environment.ts が読み、なければ止まる。
 const { chooseSeededTenant, idpOrigin, signInOnKeycloak, webOrigin } = await e2e("environment.ts");
 const { chargeRequestCount, failChargesFor } = await e2e("payment-gateway.ts");
-const orders = { ...(await e2e("orders.ts")), ...(await import("./seeded.mjs")) };
+const { listPayments, readJson } = await e2e("api.ts");
+const { uniqueCode } = await e2e("fixtures.ts");
+const { OrderCreatePage } = await e2e("order-create-page.ts");
+const { OrderListPage } = await e2e("order-list-page.ts");
+const { OrderDetailPage } = await e2e("order-detail-page.ts");
+const helpers = { listPayments, readJson, uniqueCode, ...(await import("./seeded.mjs")) };
+/**
+ * 画面ごとのページオブジェクト（e2e/order-*-page.ts）。page ごとに作る。
+ * @param {import("@playwright/test").Page} target
+ * @returns {{ create: import("../../../../frontend/apps/web/e2e/order-create-page.ts").OrderCreatePage,
+ *   list: import("../../../../frontend/apps/web/e2e/order-list-page.ts").OrderListPage,
+ *   detail: import("../../../../frontend/apps/web/e2e/order-detail-page.ts").OrderDetailPage }}
+ */
+const screensOf = (target) => ({
+  create: new OrderCreatePage(target),
+  list: new OrderListPage(target),
+  detail: new OrderDetailPage(target),
+});
 
 const [journeyArg, ...rest] = process.argv.slice(2);
 if (journeyArg === undefined) {
@@ -96,6 +113,12 @@ async function step(label, target = page) {
   log("steps.log", `${prefix} ${target.url()}`);
 }
 
+// 決済の欄が自分で読み直して文言を変えるのを、画面を読み直さずに待つ。
+function expectPaymentText(target, text) {
+  const detail = screensOf(target).detail;
+  return expect(detail.paymentStatus).toHaveText(text, { timeout: detail.paymentTextTimeoutMs });
+}
+
 const gateway = {
   chargeCount: (orderId) => chargeRequestCount(context.request, orderId),
   failChargesFor: (orderId, failure) => failChargesFor(context.request, orderId, failure),
@@ -115,7 +138,7 @@ try {
   // ログインそのものを確かめる journey は export const login = false で自分でログインする。
   if (journey.login !== false) await login();
   await journey.default({
-    page, context, expect, step, gateway, sql, login, orders, params, webOrigin, idpOrigin,
+    page, context, expect, step, gateway, sql, login, helpers, screensOf, expectPaymentText, params, webOrigin, idpOrigin,
     request,
     record: (key, value) => (result.records[key] = value),
   });

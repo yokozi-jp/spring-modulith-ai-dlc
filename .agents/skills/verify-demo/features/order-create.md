@@ -43,7 +43,7 @@ Preconditions:
   作成の失敗の文言が見える。
   `sql("select count(*) from ordering.t_order where customer_order_code = 'SEED-C01'")` が `1` のままである。
 - **販売中の商品だけ（`create-on-sale-only`）。**
-  `orders.listProducts(page.request)` で `salesStatus` が `DISCONTINUED` の商品を 1 つ選ぶ。
+  `helpers.listProducts(page.request)` で `salesStatus` が `DISCONTINUED` の商品を 1 つ選ぶ。
   `/orders/new` の `getByLabel("商品")` に、その商品名の `option` が 0 件で、販売中の商品名の `option` が 1 件ある。
 - **CSRF（`create-csrf`）。**
   画面の作成の `network.log` に `POST /api/orders 201` がある。
@@ -56,7 +56,7 @@ Preconditions:
 - 「`<商品名>`（販売終了）」のラベルは、販売終了の商品を既に持つ行を明細の変更のフォームで開いたときだけ出る。
   作成の画面には出ないので、作成の画面から販売終了の商品の 422 には届かない。
 - 客先注文番号は 30 文字以下である。
-  `orders.uniqueCode` は接頭辞に 19 文字を足すので、接頭辞を 11 文字以下にする。
+  `helpers.uniqueCode` は接頭辞に 19 文字を足すので、接頭辞を 11 文字以下にする。
 - 誤りを出したフォームで別の欄を誤りにして「作成する」を押しても、新しい誤りは出ない。
   空の客先注文番号のまま数量を `0` にして押したとき、数量の誤りは出なかった。
   欄ごとの誤りは、開き直した画面で 1 つずつ確かめる。
