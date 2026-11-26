@@ -1,8 +1,8 @@
 // 下書きの明細の保存、2 つのタブの競合と 2 つの回復、取り消しと取り消した後の画面を確かめる。
 // features/order-edit.md の `edit-save`、`edit-conflict-discard`、`edit-conflict-reapply`、`edit-cancel`、`edit-locked`。
-async function draft({ page, orders, screensOf }) {
-  const product = await orders.onSaleProduct(page.request);
-  return screensOf(page).create.create({ code: orders.uniqueCode("VERIFY"), productName: product.productName, quantity: 1 });
+async function draft({ page, helpers, screensOf }) {
+  const product = await helpers.onSaleProduct(page.request);
+  return screensOf(page).create.create({ code: helpers.uniqueCode("VERIFY"), productName: product.productName, quantity: 1 });
 }
 
 async function openConflict(tools) {
@@ -68,7 +68,7 @@ export default async function (tools) {
   const cancelled = await draft(tools);
   await detail.cancelButton.click();
   await expect(detail.cancelledNotice).toBeVisible();
-  await expect(page.getByText("取消済み", { exact: true })).toBeVisible();
+  await expect(detail.statusBadge("取消済み")).toBeVisible();
   await expect(detail.linesEditor).toHaveCount(0);
   await expect(detail.confirmButton).toHaveCount(0);
   await expect(detail.cancelButton).toHaveCount(0);

@@ -76,7 +76,8 @@ journey は ESM の 1 ファイルで、既定の export の関数が次を受�
 - **`request`**：`@playwright/test` の `request`（`request.newContext({ baseURL })` で Cookie を共有しない要求を作る）
 - **`step(label, page?)`**：その時点の screenshot と ARIA snapshot を `NN-<label>.png`、`NN-<label>.aria.yml` に残す
 - **`screensOf(page)`**：その page の画面のクラス `{ create, list, detail }`（`e2e/order-create-page.ts`、`order-list-page.ts`、`order-detail-page.ts`）。別のタブには、そのタブの page を渡して作る
-- **`orders`**：`e2e/api.ts` の `listPayments`、`readJson`、`e2e/fixtures.ts` の `uniqueCode`と、`scripts/seeded.mjs` の export すべて（代表の注文の表、`listProducts`、`onSaleProduct`）
+- **`helpers`**：`e2e/api.ts` の `listPayments`、`readJson`、`e2e/fixtures.ts` の `uniqueCode` と、`scripts/seeded.mjs` の export すべて（代表の注文の表、`listProducts`、`onSaleProduct`）
+- **`expectPaymentText(page, text)`**：決済の欄の文言が `text` になるのを、画面を読み直さず `OrderDetailPage.paymentTextTimeoutMs` まで待つ
 - **`gateway.chargeCount`**：決済代行の WireMock が、注文 ID を冪等性キーにした請求を受けた回数（`e2e/payment-gateway.ts`）
 - **`gateway.failChargesFor`**：注文 ID の請求だけを `{ kind: "status" | "delay" | "declined" }` で失敗させ、取り除く関数を返す
 - **`sql(query, options?)`**：モジュールのロールで SQL を実行し、結果の文字列を返す（`sql.log` にも残す）

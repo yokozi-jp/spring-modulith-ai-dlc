@@ -39,13 +39,13 @@ Preconditions:
   下書きを作った後に `/orders?status=DRAFT` の「`<客先注文番号>` の詳細」を押し、開いた詳細の画面で「確定する」を押す。
 - **拒否（`pay-declined`）。**
   作成の後、確定の前に `const restore = await gateway.failChargesFor(orderId, { kind: "declined" })` を足し、確定する。
-  `detail.paymentStatus` が `detail.paymentTextTimeoutMs` までに「決済代行が決済を拒否しました。」になる（`detail` は `screensOf(page).detail`）。
+  `expectPaymentText(page, "決済代行が決済を拒否しました。")` が通る。
   最後に `restore()` を呼ぶ。
 - **一時障害（`pay-transient`）。**
   確定の前に `gateway.failChargesFor(orderId, { kind: "status", status: 503 })` を足す。
   タイムアウトは `{ kind: "delay", milliseconds: 3000 }` で作る。
-  `expect.poll(() => gateway.chargeCount(orderId)).toBeGreaterThanOrEqual(1)` の後、`detail.paymentStatus` で再投入待ちの文言（「決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。」）を待つ。
-  `orders.listPayments(page.request, orderId)` が空で、`sql("select count(*) from payment.t_payment where order_public_id = :'orderId'", { orderId })` が `0` である。
+  `expect.poll(() => gateway.chargeCount(orderId)).toBeGreaterThanOrEqual(1)` の後、`expectPaymentText` で再投入待ちの文言（「決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。」）を待つ。
+  `helpers.listPayments(page.request, orderId)` が空で、`sql("select count(*) from payment.t_payment where order_public_id = :'orderId'", { orderId })` が `0` である。
   スタブを取り除いてから「決済の状態を読み直す」を押すと、欄は 15 秒ほど「決済の結果を確かめています。」に戻り、ボタンが消える。
   その後に再投入待ちの文言に戻り、請求は 1 回のままである。
 - **代表の注文（`pay-seeded`）。**
@@ -55,7 +55,7 @@ Preconditions:
 ## Gotchas
 
 - 決済の結果は非同期で入る。
-  確定の直後に欄を読まず、`detail.paymentStatus` が変わるのを `detail.paymentTextTimeoutMs`（30 秒）まで待つ。
+  確定の直後に欄を読まず、`expectPaymentText` で最大 30 秒待つ。
   画面を読み直すか「決済の状態を読み直す」を押すと、15 秒の読み直しの期間が最初からになる。
 - 一時障害の後に成功へ戻しても決済済みにならないのが、検証スタックでの正しい結果である。
   理由と、再投入の後の決済記録を確かめる場所は `docs/e2e/testing-strategy.md` の「E2E で確かめない範囲」にある。

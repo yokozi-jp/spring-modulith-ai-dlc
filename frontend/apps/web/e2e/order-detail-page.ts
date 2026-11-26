@@ -1,16 +1,23 @@
 import type { Locator, Page } from "@playwright/test";
 
+import type { OrderStatusLabel } from "./order-status";
+
 // 注文の詳細の画面（/orders/<注文 ID>）。画面の操作と要素を持ち、何を確かめるかは spec が持つ。
 export class OrderDetailPage {
+  // spec が期待値として直接使う文言。要素を探すための文言は、Locator の中に置く。
   public readonly paymentNotYetText =
     "決済をまだ受け付けていません。処理中か、失敗して再投入を待っています。";
-  // 決済の欄は確定から 15 秒まで自分で読み直す。その期間と Listener の処理の時間より長くする。
+  // 決済の欄が自分で読み直して文言を変えるまでの上限。確定から 15 秒の読み直しと Listener の処理の時間より長くする。
   public readonly paymentTextTimeoutMs = 30_000;
 
   private readonly page: Page;
 
   public constructor(page: Page) {
     this.page = page;
+  }
+
+  public get listLink(): Locator {
+    return this.page.getByRole("link", { name: "注文の一覧へ戻る" });
   }
 
   public get confirmButton(): Locator {
@@ -43,7 +50,12 @@ export class OrderDetailPage {
 
   // 明細の表の、1 行目の数量。
   public get firstLineQuantity(): Locator {
-    return this.page.getByRole("table").getByRole("row").nth(1).getByRole("cell").nth(2);
+    return this.lineRows.nth(1).getByRole("cell").nth(2);
+  }
+
+  // 明細の表の行。見出しの行を含む。
+  public get lineRows(): Locator {
+    return this.page.getByRole("table").getByRole("row");
   }
 
   public get paymentRegion(): Locator {
@@ -79,6 +91,14 @@ export class OrderDetailPage {
 
   public get linesEditor(): Locator {
     return this.page.getByRole("form", { name: "明細の変更" });
+  }
+
+  public heading(code: string): Locator {
+    return this.page.getByRole("heading", { level: 1, name: `注文 ${code}` });
+  }
+
+  public statusBadge(label: OrderStatusLabel): Locator {
+    return this.page.getByText(label, { exact: true });
   }
 
   public async goto(orderId: string): Promise<void> {

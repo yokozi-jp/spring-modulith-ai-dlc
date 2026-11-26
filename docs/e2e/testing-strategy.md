@@ -133,9 +133,12 @@ setup project は、`storageState` を持たない browser context で `/oauth2/
 画面の操作と要素の探し方は、画面ごとのクラス（ページオブジェクト）に置く。
 spec は `new` せず、`fixtures.ts` の `test.extend` が注入する fixture（`orderCreatePage`、`orderListPage`、`orderDetailPage`）で受け取る。
 
-- クラスは、画面の操作のメソッドと、要素の Locator と、画面の文言を持つ。
-  文言は、その画面のクラスの中に置く。
-  Locator は、上の「書き方」のとおり role と accessible name で探す。
+- クラスは、画面の操作のメソッドと、要素の Locator と、画面の定数を持つ。
+  固定の Locator は getter、引数を取る Locator は引数付きのメソッドにする。
+  要素を探すための文言は Locator の中に置く。
+  spec が期待値として直接使う文言（`paymentNotYetText`）と、画面が自分で状態を変えるのを待つ上限（`paymentTextTimeoutMs`）は、定数としてクラスに置く。
+  1 つの spec だけが使う期待値の文言は、その spec に置いてよい。
+  Locator は、CSS や test id を使わず、利用者から見える名前（role と accessible name、label、画面の文言）で探す。
 - アサーションは spec に置く。
   クラスは「何を操作するか」を持ち、「何を確かめるか」は持たない。
   `expect` を呼ばないので、クラスは `fixtures.ts` を import しない。
@@ -145,9 +148,11 @@ spec は `new` せず、`fixtures.ts` の `test.extend` が注入する fixture�
   `page.request` や screenshot が要る spec は、`page` fixture を別に受け取る。
 - 複数の画面が使う部品（明細の表、決済の欄など）は、画面のクラスが共有するなら別のクラス（Component Object）に分ける。
   今は、同じ部品を使う画面が 1 つなので分けていない。
+- 状態の名前（`OrderStatus`、`OrderStatusLabel`）は、どの画面のクラスにも属さないので `order-status.ts` に置く。
 - 注文の画面以外の spec（ログイン、ログアウト、トップページ）は、`pages.ts` の関数のままである。
-  その spec を変更するときに、画面のクラスへ移す。
-- Screenplay は導入しない。spec は 7 本で、画面のクラスで足りる。
+  画面のクラスを足す spec は `<画面>-page.ts` に置き、`pages.ts` には足さない。
+  `pages.ts` の関数は、その spec を変更するときに画面のクラスへ移す。
+- Screenplay は導入しない。画面のクラスで足りる規模である。
 
 ## 不安定なテスト
 

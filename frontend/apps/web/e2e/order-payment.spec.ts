@@ -5,7 +5,8 @@ import type { Product } from "./fixtures";
 import { expect, test, uniqueCode } from "./fixtures";
 import type { OrderCreatePage } from "./order-create-page";
 import type { OrderDetailPage } from "./order-detail-page";
-import type { OrderListPage, OrderStatusLabel } from "./order-list-page";
+import type { OrderListPage } from "./order-list-page";
+import type { OrderStatusLabel } from "./order-status";
 import { chargeRequestCount, failChargesFor } from "./payment-gateway";
 import type { ChargeFailure } from "./payment-gateway";
 

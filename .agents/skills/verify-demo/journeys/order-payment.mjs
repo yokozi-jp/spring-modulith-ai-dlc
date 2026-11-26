@@ -1,24 +1,24 @@
 // 注文を画面で作成して確定し、Listener の請求と決済の表示、決済記録の行、決済代行への請求の回数を確かめる。
 // features/order-payment.md の `pay-confirm` と `pay-success`。params: quantity=<1 以上>（既定 2）
-export default async function ({ page, expect, step, gateway, sql, orders, screensOf, params, record }) {
-  const { create, detail } = screensOf(page);
+export default async function ({ page, expect, step, gateway, sql, helpers, screensOf, expectPaymentText, params, record }) {
+  const { create, detail, list } = screensOf(page);
   const quantity = Number(params.quantity ?? 2);
-  const product = await orders.onSaleProduct(page.request);
-  const code = orders.uniqueCode("VERIFY");
+  const product = await helpers.onSaleProduct(page.request);
+  const code = helpers.uniqueCode("VERIFY");
 
-  await page.goto("/orders");
-  await expect(page.getByRole("heading", { level: 1, name: "注文" })).toBeVisible();
-  await page.getByRole("link", { name: "注文を作成する" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "注文の作成" })).toBeVisible();
+  await list.goto();
+  await expect(list.heading).toBeVisible();
+  await list.createLink.click();
+  await expect(create.heading).toBeVisible();
   const orderId = await create.create({ code, productName: product.productName, quantity }, () => step("filled"));
-  await expect(page.getByRole("heading", { level: 1, name: `注文 ${code}` })).toBeVisible();
+  await expect(detail.heading(code)).toBeVisible();
   await step("draft");
 
   await detail.confirmButton.click();
   await expect(detail.confirmedNotice).toBeVisible();
   await step("confirmed");
 
-  await expect(detail.paymentStatus).toHaveText("決済済み", { timeout: detail.paymentTextTimeoutMs });
+  await expectPaymentText(page, "決済済み");
   const total = product.unitPrice * quantity;
   const yen = new Intl.NumberFormat("ja-JP", { style: "currency", currency: "JPY" }).format(total);
   await expect(detail.paymentRegion).toContainText(yen);

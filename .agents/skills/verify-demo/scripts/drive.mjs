@@ -30,8 +30,14 @@ const { uniqueCode } = await e2e("fixtures.ts");
 const { OrderCreatePage } = await e2e("order-create-page.ts");
 const { OrderListPage } = await e2e("order-list-page.ts");
 const { OrderDetailPage } = await e2e("order-detail-page.ts");
-const orders = { listPayments, readJson, uniqueCode, ...(await import("./seeded.mjs")) };
-// 画面ごとのページオブジェクト（e2e/order-*-page.ts）。page ごとに作る。
+const helpers = { listPayments, readJson, uniqueCode, ...(await import("./seeded.mjs")) };
+/**
+ * 画面ごとのページオブジェクト（e2e/order-*-page.ts）。page ごとに作る。
+ * @param {import("@playwright/test").Page} target
+ * @returns {{ create: import("../../../../frontend/apps/web/e2e/order-create-page.ts").OrderCreatePage,
+ *   list: import("../../../../frontend/apps/web/e2e/order-list-page.ts").OrderListPage,
+ *   detail: import("../../../../frontend/apps/web/e2e/order-detail-page.ts").OrderDetailPage }}
+ */
 const screensOf = (target) => ({
   create: new OrderCreatePage(target),
   list: new OrderListPage(target),
@@ -107,6 +113,12 @@ async function step(label, target = page) {
   log("steps.log", `${prefix} ${target.url()}`);
 }
 
+// 決済の欄が自分で読み直して文言を変えるのを、画面を読み直さずに待つ。
+function expectPaymentText(target, text) {
+  const detail = screensOf(target).detail;
+  return expect(detail.paymentStatus).toHaveText(text, { timeout: detail.paymentTextTimeoutMs });
+}
+
 const gateway = {
   chargeCount: (orderId) => chargeRequestCount(context.request, orderId),
   failChargesFor: (orderId, failure) => failChargesFor(context.request, orderId, failure),
@@ -126,7 +138,7 @@ try {
   // ログインそのものを確かめる journey は export const login = false で自分でログインする。
   if (journey.login !== false) await login();
   await journey.default({
-    page, context, expect, step, gateway, sql, login, orders, screensOf, params, webOrigin, idpOrigin,
+    page, context, expect, step, gateway, sql, login, helpers, screensOf, expectPaymentText, params, webOrigin, idpOrigin,
     request,
     record: (key, value) => (result.records[key] = value),
   });
