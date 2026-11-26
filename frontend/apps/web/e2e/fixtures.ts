@@ -78,7 +78,7 @@ export const test = base.extend<{
   orderListPage: OrderListPage;
   orderDetailPage: OrderDetailPage;
   // 注文を画面で作り、詳細の画面を開いたままにする（ADR-130）。商品を渡さなければ新しく作る。
-  createOrder: (options?: OrderOptions) => Promise<CreatedOrder>;
+  createOrder: App["createOrder"];
   app: App;
   makeAxeBuilder: () => AxeBuilder;
   // 今の画面の screenshot と、axe の結果の全体（incomplete を含む）を report に添付し、違反があれば失敗する。
