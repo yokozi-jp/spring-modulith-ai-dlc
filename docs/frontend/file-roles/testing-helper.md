@@ -8,7 +8,8 @@ tags: [convention, frontend, file-role]
 # ファイルの役割：テストの道具
 
 テストの道具は、複数のテストが同じ準備を同じ形で使うための関数と Vitest の setupFiles であり、`src/testing/` に置く。
-道具は、本番の関数を呼び、テストに要る差分だけを変える。画面を操作して要素を取る道具は、本番の関数を呼ばずに、描画された画面だけを使う。
+道具は、本番の関数を呼び、テストに要る差分だけを変える。
+画面を操作して要素を取る道具は、本番の関数を呼ばずに、描画された画面だけを使う。
 テストの書き方の正文は[フロントエンドのテストと検証](../testing.md)にあり、テスト基盤の判断理由は [ADR-027](../../adr/ADR-027-adopt-frontend-testing-stack.md) に示す。
 
 ## 定義
@@ -24,7 +25,7 @@ tags: [convention, frontend, file-role]
 - **setupFiles**（`setup.ts`）：全テストに要る準備と後片付け。package ごとに一つ置き、`vite.config.ts` の `test.setupFiles` から指す
 - **本番の設定でテストの対象を組み立てる道具**（`render-route.tsx`、`query-client.ts`）：本番の関数を呼び、テストに要る差分だけを変える
 - **処理の流れを操る道具**（`gate.ts`、`idempotency-keys.ts`、`csrf-cookie.ts`）：promise を止める、要求の header を記録する、`document.cookie` を差し替える
-- **画面の操作と要素の取得**（`order-detail-screen.ts`）：描画された画面だけを使い、本番の関数を呼ばない
+- **画面の操作と要素の取得**（`order-detail-screen.ts`）：描画された画面を操作し、要素を取る
 - **Node のテストの翻訳**（`catalog-i18n.ts`）：`ja.json` だけを読んだ instance から `t` を取る
 
 MSW の server（`src/testing/msw.ts`）と、業務機能ごとの fixture と handler（`src/testing/<feature>.ts`）は [MSW の handler と fixture](msw-handler.md) が扱う。
