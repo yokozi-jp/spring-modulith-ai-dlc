@@ -36,7 +36,7 @@ Issue #570 の作業で、v3.2.0 の JSON Schema と文書を読み、上の属�
 - 連携：`servers[]`（`type: s3`、`location`、`format`、`encoding`）、`slaProperties`（`frequency`、`timeOfAvailability`、`retention`）、`support`、`customProperties`。
 
 区分値は、v3.2.0 で足された `enum` で書ける。
-`quality` の `invalidValues` の `validValues` でも書けるが、`enum` は値ごとに名称（`label`）を持てる。
+`quality` の `invalidValues` か `validValues` でも書けるが、`enum` は値ごとに名称（`label`）を持てる。
 
 Data Contract CLI の v1.2.11 は、ODCS の `lint`、`test`、`breaking`、`changelog`、`export` を持つ。
 `interface-documentation.md` の例を写したファイルは `datacontract lint` を通り、`logicalType` を `varchar` にすると失敗した。
