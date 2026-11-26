@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.16.0...v0.17.0) (2026-11-26)
+
+
+### Features
+
+* **backend:** セッションの最長の期間を足し、無操作の期間を明示する ([#774](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/774)) ([283deee](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/283deee0e1438c3039c1ae8e1781f43d235e0a56)), closes [#681](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/681)
+* **backend:** 更新系の要求の origin と sec-fetch-site を csrf のトークンの前に確かめる ([#771](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/771)) ([0a16bed](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/0a16bede6577b79e9374f7f15fe2de45302f553b)), closes [#682](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/682)
+
 ## [0.16.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.15.0...v0.16.0) (2026-11-26)
 
 
