@@ -138,3 +138,4 @@
 - [ADR-136: 更新系の要求の Origin と Sec-Fetch-Site を CSRF のトークンの前に確かめる](ADR-136-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)（Proposed, 2026-11-26）
 - [ADR-137: イベントの変更を @Nullable の component の追加だけにし、過去の版の JSON を今の型で読めることを fixture のテストで確かめる](ADR-137-guard-event-json-compatibility-with-versioned-fixtures.md)（Proposed, 2026-11-26）
 - [ADR-138: 外部の利用者が現れる前に API を /api/v1 にし、バージョンの宣言を検査する](ADR-138-introduce-api-v1-with-spring-api-versioning.md)（Proposed, 2026-11-26）
+- [ADR-139: I/F のファイル定義書を ODCS v3.2.0 の YAML で書き、リポジトリのルートの interfaces/ に置く](ADR-139-write-interface-file-definitions-in-odcs.md)（Proposed, 2026-11-26）

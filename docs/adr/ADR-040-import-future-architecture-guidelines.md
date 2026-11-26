@@ -100,3 +100,4 @@ ADR が Proposed の間は Decision を直接直す（[ADR の規約](convention
 - [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.ja)
 - [ADR-038: steering をナビゲーションに限定し、規約の正文を docs/ に置く](ADR-038-route-steering-to-docs-knowledge.md)
 - [docs 文書の作成と変更](../knowledge/documentation-authoring.md)
+- [ADR-139: I/F のファイル定義書を ODCS v3.2.0 の YAML で書き、リポジトリのルートの interfaces/ に置く](ADR-139-write-interface-file-definitions-in-odcs.md)
