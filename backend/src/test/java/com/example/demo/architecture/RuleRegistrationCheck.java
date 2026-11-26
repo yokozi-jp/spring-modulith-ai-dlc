@@ -18,7 +18,7 @@ import java.util.stream.Stream;
  * {@code @ArchTest} の規則が、違反の行と {@link ConformingRules} の両方に同じ規則で載るか、{@link FixtureExemptions}
  * に理由を付けて除外されていることを確かめる。
  *
- * <p>名前の後ろの規則は、最後の because で照らす。ファクトリに別の基底パッケージを渡した規則は、説明がパッケージを含むため、 インスタンスでも説明の全体でも
+ * <p>名前に対応づけた規則は、最後の because で照らす。ファクトリに別の基底パッケージを渡した規則は、説明がパッケージを含むため、インスタンスでも説明の全体でも
  * {@code @ArchTest} のフィールドと比べられない。
  *
  * @param fields {@code @ArchTest} を付けた規則のフィールド
@@ -26,7 +26,7 @@ import java.util.stream.Stream;
  * @param conformingRules 規約どおりのフィクスチャで確かめる規則。キーは規則の名前
  * @param exemptions 除外する規則の名前と、除外する理由
  */
-/* package */ record RuleRegistrationCheck(
+record RuleRegistrationCheck(
     List<RuleField> fields,
     List<FixtureRow> rows,
     Map<String, ArchRule> conformingRules,
