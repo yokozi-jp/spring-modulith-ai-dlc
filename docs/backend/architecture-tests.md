@@ -408,9 +408,9 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
 
 `ApiVersionArchTest`は、`/api/`のControllerがAPIのバージョンを宣言することを検査する（[ADR-138](../adr/ADR-138-introduce-api-v1-with-spring-api-versioning.md)）。
 
-- `apiControllersDeclareVersion`：`presentation.web`の`@RestController`のうち、クラスの`@RequestMapping`のパスが`/api/`で始まるものは、パスを`/api/v{version}/`で始め、`version`を宣言する。
+- `apiControllersDeclareVersion`：`@Controller`（`@RestController`を含む）のうち、クラスかメソッドのmappingのパスが`/api/`で始まるものは、クラスのパスを`/api/v{version}/`で始め、正の整数のメジャーバージョンの`version`を宣言する。
   `version`を書かないmappingはどのバージョンにも一致し、パスに`v{version}`がないとバージョンを読む区間がずれる。
-  メソッドの`@RequestMapping`に書いた`/api/`のパスは検出しない。
+  メソッドのmappingに`/api/`の絶対のパスを書くと、クラスの`version`を迂回するので違反にする。
 
 ## DB
 

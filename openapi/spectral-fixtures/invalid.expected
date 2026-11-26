@@ -21,6 +21,7 @@ openapi-version-3-1|openapi
 operation-description|paths./api/v1/sample-orders.post
 operation-id-naming|paths./api/v1/sampleTags.get.operationId
 operation-operationId|paths./api/v1/sample-labels.get
+operation-security|paths./api/sample-unversioned.get
 operation-security|paths./api/v1/orders.get
 operation-security|paths./api/v1/sample-labels.get
 operation-security|paths./api/v1/sample-memos.get
@@ -35,6 +36,7 @@ operation-singular-tag|paths./api/v1/sample-orders.get.tags
 operation-success-response|paths./api/v1/sample-memos.get.responses
 operation-tag-defined|paths./api/v1/sample-payments.get.tags[0]
 operation-tags|paths./api/v1/sample-labels.get
+path-api-version|paths./api/sample-unversioned
 path-kebab-case-resource|paths./api/v1/sampleTags
 path-kebab-case|paths./api/v1/sample_items
 path-params|paths./api/v1/sample-orders/{code}
@@ -56,5 +58,3 @@ schema-property-example|components.schemas.SampleOrderRequest.properties.quantit
 tag-description|tags[3]
 tag-name-format|paths./api/v1/orders.get.tags[0]
 tag-name-format|paths./api/v1/sample-orders.get.tags[1]
-path-api-version|paths./api/sample-unversioned
-operation-security|paths./api/sample-unversioned.get

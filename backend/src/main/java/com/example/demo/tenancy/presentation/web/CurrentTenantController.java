@@ -28,7 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "tenancy", description = "テナントと所属の API")
 class CurrentTenantController {
 
-  /** 選んだテナントのパス。PUT だけは、テナントを選ぶ前にも呼べる。 */
+  /**
+   * 選んだテナントのパス。PUT だけは、テナントを選ぶ前にも呼べる。
+   *
+   * <p>mapping と {@code requestMatchers} に渡すパスのテンプレートで、URL ではない。
+   */
   /* package */ static final String PATH = "/api/v{version}/current-tenant";
 
   /** 利用者の所属の参照。 */

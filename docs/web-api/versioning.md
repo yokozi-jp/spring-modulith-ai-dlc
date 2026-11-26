@@ -21,10 +21,12 @@ APIのバージョンはメジャーバージョンの粒度で管理し、リ�
 業務のAPIはすべて`/api/v1/...`で公開する。
 `WebApiVersionConfig`が、`/api/`で始まるパスの次の区間をバージョンとして読む。
 
-- Controllerは`@RequestMapping(path = "/api/v{version}/<リソース>", version = "1")`と書く。
-  パスの`v`は文字として書く。パスを`{version}`だけにすると、`/api/x1/...`もv1になる。
+- Controllerは、クラスに`@RequestMapping(path = "/api/v{version}/<リソース>", version = "1")`と書く。
+  メソッドのmappingには`/api/`の絶対のパスを書かない。クラスの`version`を迂回する。
+  パスの`v`は文字として書き、`version`は正の整数のメジャーバージョンにする（`1.1`や`1+`は書かない）。
 - `version`を書かないmappingはどのバージョンにも一致するので、必ず書く。`ApiVersionArchTest`が検査する。
-- 契約のパスは`/api/v<メジャー番号>/`で始める。springdocが`{version}`を`version`の値で置き換える。Spectralの`path-api-version`が検査する。
+- リクエストのバージョンは`v`と正の整数だけを受ける。`WebApiVersionConfig`の厳格なparserが、`vX1`、`v01`、`v1.0`、`v0`を400にする。Springの既定のparserはこれらをv1として読む。
+- 契約のパスは`/api/v<メジャー番号>/`で始める。springdocが`{version}`を`version`の値で置き換える。Spectralの`path-api-version`が、`^/api/v[1-9][0-9]*/`で検査する。
 - セキュリティの`requestMatchers`が使うパスは、`/api/v{version}/...`の形にして、どのバージョンにも同じ認可を掛ける。
 - 対応するバージョンの一覧は、Controllerに書いた`version`から決まる。対応しないバージョン（`/api/v2/...`など）は400になる。
 - バージョンのない`/api/...`は、どのmappingにも一致せず404になる。
@@ -62,7 +64,6 @@ OpenAPIの`info.version`は、パスのバージョンとは別の、契約の�
 - 値は`OpenApiConfig.CONTRACT_VERSION`で手で管理し、初期値を`0.1.0`にする。
 - 後方互換な追加ではMINORを上げ、後方互換を壊す変更ではMAJORを上げる。
 - `/api/v1`の導入で`1.0.0`にした。
-- `1.0.0`にするまでは、後方互換を壊す変更でもMINORを上げる。
 - APIのバージョンと同じく、リリース版の番号と連動させない。
 
 版の上げ忘れは機械で検出できないため、Pull Requestのチェックリストで確かめる。

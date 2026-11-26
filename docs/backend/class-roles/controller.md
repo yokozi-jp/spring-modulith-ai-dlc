@@ -29,7 +29,8 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 
 - `com.example.demo.<feature>.presentation.web` に置く。
 - 名前は集約の名前に `Controller` を付ける（`OrderController`）。
-- `@RequestMapping` のパスは `/api/v{version}/` に集約の複数形を付け（`/api/v{version}/orders`）、`version` に API のバージョンを書く（`version = "1"`）。`ApiVersionArchTest` が検査する（[APIの互換性と廃止](../../web-api/versioning.md)）。
+- `@RequestMapping` のパスは `/api/v{version}/` に集約の複数形を付け（`/api/v{version}/orders`）、`version` に API のバージョンを書く（`version = "1"`）。
+  `ApiVersionArchTest` が検査する（[APIの互換性と廃止](../../web-api/versioning.md)）。
   URL の形は[Web APIの方式とURLの設計](../../web-api/api-style.md)に従う。
 - ハンドラメソッドの名前は操作の動詞にする（`place`、`confirm`、`cancel`、`details`、`search`）。
 - ハンドラメソッドには `@Operation(operationId = "...")` で operationId を明示する（`placeOrder`、`confirmOrder`、`cancelOrder`、`findOrderById`、`listOrders`）。

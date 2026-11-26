@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.testkit.SharedTestConfiguration;
+import java.net.URI;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -40,14 +41,34 @@ class ApiVersionContractTest {
   }
 
   @ParameterizedTest(name = "{0}")
-  @ValueSource(strings = {"/api/v2/memberships", "/api/v0/memberships", "/api/v1.1/memberships"})
-  @DisplayName("対応しないバージョンは 400 の Problem Details になる")
+  @ValueSource(
+      strings = {
+        "/api/v2/memberships",
+        "/api/v0/memberships",
+        "/api/v1.1/memberships",
+        "/api/v1.0/memberships",
+        "/api/v01/memberships",
+        "/api/vX1/memberships",
+        "/api/vv1/memberships",
+        "/api/v/memberships"
+      })
+  @DisplayName("v1 でも対応するバージョンでもない区間は、v1 として読まれず 400 の Problem Details になる")
   void unsupportedVersionIsRejected(final String path) throws Exception {
     mockMvc
         .perform(get(path).with(oidcLogin()))
         .andExpect(status().isBadRequest())
         .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
         .andExpect(jsonPath("$.type").value("about:blank"))
+        .andExpect(jsonPath("$.detail").doesNotExist())
+        .andExpect(jsonPath("$.status").value(400));
+  }
+
+  @Test
+  @DisplayName("先頭の区間をパーセントエンコードしても、バージョンの検査を逃れない")
+  void percentEncodedApiSegmentIsStillValidated() throws Exception {
+    mockMvc
+        .perform(get(URI.create("/%61pi/v2/memberships")).with(oidcLogin()))
+        .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.status").value(400));
   }
 

@@ -20,7 +20,7 @@ function createdOrderId(location: string | null): string | undefined {
   if (url === null || url.origin !== globalThis.location.origin) {
     return undefined;
   }
-  return /^\/api\/v1\/orders\/(?<orderId>[^/]+)$/u.exec(url.pathname)?.groups?.orderId;
+  return /^\/api\/v[1-9][0-9]*\/orders\/(?<orderId>[^/]+)$/u.exec(url.pathname)?.groups?.orderId;
 }
 
 // module の読み込みで 1 回だけ作り、描画のたびに明細の rowKey を作り直さない。

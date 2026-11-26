@@ -238,13 +238,13 @@ rules:
 
   # ponytail: 先頭の区間だけを見る。v2 を足すときは、同じ契約に /api/v1/ と /api/v2/ を並べてよいので、この規則を変えない。
   path-api-version:
-    description: パスを /api/v<メジャー番号>/ で始める（docs/web-api/versioning.md）。
+    description: パスを /api/v<1 以上のメジャー番号>/ で始める（docs/web-api/versioning.md）。
     severity: error
     given: "$.paths[*]~"
     then:
       function: pattern
       functionOptions:
-        match: '^/api/v[0-9]+/'
+        match: '^/api/v[1-9][0-9]*/'
 
   # ponytail: 区間は kebab-case かパスパラメータ。パスパラメータの名前は英字で始まる英数字に限る（camelCase を許す）。
   path-kebab-case:

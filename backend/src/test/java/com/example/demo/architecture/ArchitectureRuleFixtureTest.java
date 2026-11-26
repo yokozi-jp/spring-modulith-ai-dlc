@@ -332,9 +332,17 @@ class ArchitectureRuleFixtureTest {
             IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(VIOLATING),
             "ordering.presentation.web.OrderKeyController.ship("),
         row(
-            "apiControllersDeclareVersion",
+            "apiControllersDeclareVersion: no version",
             ApiVersionArchTest.apiControllersDeclareVersionRule(VIOLATING),
             "ordering.presentation.web.OrderVersionController"),
+        row(
+            "apiControllersDeclareVersion: absolute path on a method",
+            ApiVersionArchTest.apiControllersDeclareVersionRule(VIOLATING),
+            "ordering.presentation.web.OrderMethodPathController"),
+        row(
+            "apiControllersDeclareVersion: minor version",
+            ApiVersionArchTest.apiControllersDeclareVersionRule(VIOLATING),
+            "ordering.presentation.web.OrderMinorVersionController"),
         row(
             "idempotentCommandHandlersExecuteThroughIdempotency",
             IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotencyRule(VIOLATING),
