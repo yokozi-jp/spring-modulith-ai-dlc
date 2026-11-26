@@ -1,5 +1,6 @@
 /* @vitest-environment jsdom */
 
+import { ApiProblemError } from "@frontend/api/api-error";
 import { QueryClient } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -85,6 +86,46 @@ describe("router の既定値", () => {
 
     await expect(screen.findByText("loaded")).resolves.toBeTruthy();
     expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    ["about:blank の problem", { status: 403, title: "Forbidden", type: "about:blank" }],
+    [
+      "別のオリジンの更新の拒否",
+      { status: 403, title: "Forbidden", type: "/problems/cross-origin-request-rejected" },
+    ],
+    ["problem のない応答", undefined],
+  ])(
+    "loader がテナントを選ぶ前でない 403 を返したら、%s でも再試行ではなくホームへのリンクを出す",
+    async (_label, problem) => {
+      vi.spyOn(console, "warn").mockReturnValue();
+      vi.spyOn(console, "error").mockReturnValue();
+      renderRouter(
+        treeWithLoader(() => Promise.reject(new ApiProblemError(403, problem))),
+        "/",
+      );
+
+      await expect(screen.findByRole("heading", { name: "Access denied" })).resolves.toBeTruthy();
+      expect(screen.getByText("You do not have permission to view this page.")).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Back to home" }).getAttribute("href")).toBe("/");
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+    },
+  );
+
+  it("loader が 5xx を返したら、再試行を出す", async () => {
+    vi.spyOn(console, "warn").mockReturnValue();
+    vi.spyOn(console, "error").mockReturnValue();
+    renderRouter(
+      treeWithLoader(() =>
+        Promise.reject(
+          new ApiProblemError(500, { status: 500, title: "Error", type: "about:blank" }),
+        ),
+      ),
+      "/",
+    );
+
+    await expect(screen.findByRole("button", { name: "Try again" })).resolves.toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Access denied" })).toBeNull();
   });
 
   it("loader が投げたエラーをテレメトリへ送る", async () => {

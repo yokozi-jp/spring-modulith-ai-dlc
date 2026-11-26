@@ -157,7 +157,7 @@ describe("所属の管理の画面の失敗", () => {
     expect(screen.getByText("時間をおいてもう一度お試しください。")).toBeTruthy();
   });
 
-  it("管理者でない利用者の 403 は、管理者だけの画面だと伝え、再試行を出さない", async () => {
+  it("管理者でない利用者の 403 は、権限がない画面を出す", async () => {
     server.use(
       http.get("*/api/v1/current-tenant/members", () =>
         problemResponse(403, "アクセス権限がありません"),
@@ -165,8 +165,9 @@ describe("所属の管理の画面の失敗", () => {
     );
     await renderRoute("/members");
 
-    const alert = await screen.findByRole("alert");
-    expect(alert.textContent).toContain("管理者だけが使える画面です");
+    await expect(
+      screen.findByRole("heading", { level: 1, name: "権限がありません" }),
+    ).resolves.toBeTruthy();
     expect(screen.queryByRole("button", { name: "再試行" })).toBeNull();
   });
 
@@ -177,18 +178,18 @@ describe("所属の管理の画面の失敗", () => {
     await renderRoute("/members");
 
     await expect(screen.findByRole("button", { name: "再試行" })).resolves.toBeTruthy();
-    expect(screen.queryByText("管理者だけが使える画面です")).toBeNull();
+    expect(screen.queryByText("権限がありません")).toBeNull();
   });
 
-  it("テナントを選んでいない 403 は、管理者だけの画面ではなく、テナントを選び直す画面へ案内する", async () => {
+  it("テナントを選んでいない 403 は、テナントを選び直す画面へ案内する", async () => {
     server.use(http.get("*/api/v1/current-tenant/members", () => tenantNotSelected()));
     await renderRoute("/members");
 
     await expect(screen.findByRole("link", { name: "テナントを選ぶ" })).resolves.toBeTruthy();
-    expect(screen.queryByText("管理者だけが使える画面です")).toBeNull();
+    expect(screen.queryByText("権限がありません")).toBeNull();
   });
 
-  it("自分の役割を下げて、その後の一覧の再取得が 403 になったら、操作を残さず管理者だけの画面を出す", async () => {
+  it("自分の役割を下げた後の一覧の再取得が 403 になったら、操作を残さず権限がない画面を出す", async () => {
     let reads = 0;
     server.use(
       http.get("*/api/v1/current-tenant/members", () => {
@@ -209,7 +210,10 @@ describe("所属の管理の画面の失敗", () => {
       "MEMBER",
     );
 
-    await expect(screen.findByText("管理者だけが使える画面です")).resolves.toBeTruthy();
+    await expect(
+      screen.findByRole("heading", { level: 1, name: "権限がありません" }),
+    ).resolves.toBeTruthy();
+    expect(screen.queryByRole("button", { name: "再試行" })).toBeNull();
     expect(screen.queryByRole("combobox")).toBeNull();
   });
 });

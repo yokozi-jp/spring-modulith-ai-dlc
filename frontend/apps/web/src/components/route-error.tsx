@@ -1,4 +1,4 @@
-import { isTenantNotSelected } from "@frontend/api/api-error";
+import { ApiProblemError, isTenantNotSelected } from "@frontend/api/api-error";
 import { Button, buttonVariants } from "@frontend/ui/button";
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -19,6 +19,20 @@ export function RouteError({ error }: ErrorComponentProps) {
         <p className="text-muted-foreground">{t("tenancy.notSelectedDescription")}</p>
         <Link to="/tenants" className={buttonVariants()}>
           {t("tenancy.chooseTenant")}
+        </Link>
+      </section>
+    );
+  }
+
+  // テナントを選ぶ前の 403 は上の分岐で扱うので、ここに残る 403 は再試行しても変わらない。
+  // 役割の構成が変わりうるため、必要な役割は書かない。
+  if (error instanceof ApiProblemError && error.status === 403) {
+    return (
+      <section className="flex flex-col items-start gap-4 px-6 py-16 sm:px-10" role="alert">
+        <h1 className="text-2xl font-semibold">{t("forbiddenHeading")}</h1>
+        <p className="text-muted-foreground">{t("forbiddenDescription")}</p>
+        <Link to="/" className={buttonVariants({ variant: "outline" })}>
+          {t("backToHome")}
         </Link>
       </section>
     );
