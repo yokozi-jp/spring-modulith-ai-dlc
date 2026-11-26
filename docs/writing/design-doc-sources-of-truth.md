@@ -30,7 +30,7 @@ API の契約は OpenAPI、テーブル定義（表と列の論理名を含む�
 - **API が返す文言と問題種別**：バックエンドの `MessageSource` と Problem Details の `type`（[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)、[ADR-016](../adr/ADR-016-localize-api-and-spa-messages.md)）。メッセージ定義表を設計書に作らない。
 - **ログの event 名と属性**：ソースコード（[ログメッセージと属性の書き方](../observability/log-messages.md)）。
 - **画面遷移、レイアウト、表示項目の見た目**：デザインツールのファイル。設計書にはファイルへのリンクだけを書く。
-- **連携ファイルの仕様**：I/F のファイル定義書（[連携の一覧と定義書](../integration/interface-documentation.md)）。
+- **連携ファイルの仕様**：ODCS の YAML で書く I/F のファイル定義書（[連携の一覧と定義書](../integration/interface-documentation.md)、[ADR-139](../adr/ADR-139-write-interface-file-definitions-in-odcs.md)）。項目定義を設計書に書き写さない。
 
 ## 正本にない情報
 
