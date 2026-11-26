@@ -95,7 +95,6 @@ function unauthorized() {
   );
 }
 
-/** okUrl は成功を返し、itemsUrl は 401 を返す。 */
 function serveUnauthorizedItems() {
   server.use(
     http.get(okUrl, () => HttpResponse.json({ ok: true })),

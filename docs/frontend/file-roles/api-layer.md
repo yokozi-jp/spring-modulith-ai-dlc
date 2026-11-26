@@ -19,7 +19,8 @@ API 層は、画面とバックエンドの HTTP API のあいだに置くファ
 
 - **`packages/api/src/generated/**`**：`openapi/openapi.yaml` から Orval が生成した endpoint、query options、Hook、型、Zod の schema、MSW の handler（[生成API境界](../api-client-orval.md#生成api境界)）。
 - **`packages/api/src/api-fetch.ts`**：生成した関数が呼ぶ custom mutator の `apiFetch`。
-- **`packages/api/src/api-error.ts`**：非 2xx を表す `ApiProblemError`、エラーの判定、401 の遷移、再試行の判定。
+- **`packages/api/src/api-error.ts`**：非 2xx を表す `ApiProblemError`、エラーの判定、再試行の判定。
+- **`packages/api/src/unauthorized-redirect.ts`**：401 の遷移を決める `createUnauthorizedRedirect` と、ログインの入口の `loginPath`（[状態表示の分担](../routing-and-state.md#状態表示の分担)）。
 - **`packages/api/src/csrf.ts`**：CSRF の Cookie の値を読む `csrfToken` と、form に入れる値を作る `maskedCsrfToken`。
 - **`packages/api/src/idempotency-key.ts`**：利用者の操作ごとに新しい `Idempotency-Key` のヘッダーを作る `idempotencyKeyHeaders`。
 - **`packages/api/src/testing/`**：この package のテストが共有する MSW の server と setup。
@@ -53,7 +54,7 @@ API 層は業務の処理を持たない。
 アプリの `src/api/` は次を守る。
 
 - `main.tsx` は `createQueryClient()` で `QueryClient` を作り、テストの `createTestQueryClient()`（`src/testing/query-client.ts`）も同じ関数から作る。
-- `createQueryClient()` は、`createUnauthorizedRedirect()` を1回呼び、`QueryCache` と `MutationCache` の `onSuccess` に `recordSuccess` を、`onError` に `redirectToLoginOnUnauthorized` を、`defaultOptions.queries.retry` に `retryUnlessClientError` を、`defaultOptions.mutations.retry` に `retryIdempotentMutation` を渡し、`MutationCache` の `onSettled` で全 query を無効化する（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
+- `createQueryClient()` は、`createUnauthorizedRedirect()` が返す `onSuccess` と `onError` を `QueryCache` と `MutationCache` に、`defaultOptions.queries.retry` に `retryUnlessClientError` を、`defaultOptions.mutations.retry` に `retryIdempotentMutation` を渡し、`MutationCache` の `onSettled` で全 query を無効化する（[mutationの後のcache](../routing-and-state.md#mutationの後のcache)）。
 - `preloadQuery` は `queryClient.query()` を呼び、無効化された query だけを取得し直す（[状態表示の分担](../routing-and-state.md#状態表示の分担)）。
 
 ## 生成物の扱い
@@ -68,7 +69,7 @@ API 層は業務の処理を持たない。
 
 - **`@frontend/api` が依存してよいもの**：同じ package のファイル、`packages/api/package.json` に書いた依存。
 - **`@frontend/api` が依存してはいけないもの**：`@frontend/ui`、アプリのコード、`@base-ui/**`、`@grafana/*`、手書きの production source からのテスト用部品（`msw` を含む）。
-- **アプリの `src/api/` が依存してよいもの**：`@frontend/api/api-error`、`@tanstack/react-query`。
+- **アプリの `src/api/` が依存してよいもの**：`@frontend/api/api-error`、`@frontend/api/unauthorized-redirect`、`@tanstack/react-query`。
 - **アプリの `src/api/` が依存してはいけないもの**：`@/features/**`、`@/routes/**`、`@/routeTree.gen`、`@base-ui/**`、テスト用部品、`@grafana/*`、global の `fetch` と `XMLHttpRequest`。
 
 `fetch` と `XMLHttpRequest` は `packages/api/**` の外で使えない（[ファイルの範囲ごとの制限](../lint-config.md#ファイルの範囲ごとの制限)）。
@@ -100,21 +101,17 @@ component は同じ生成 query options を `useSuspenseQuery` で読む（`fron
 典型的な例は `createQueryClient` である（`frontend/apps/web/src/api/query-client.ts`）。
 
 ```ts
-import {
-  createUnauthorizedRedirect,
-  retryIdempotentMutation,
-  retryUnlessClientError,
-} from "@frontend/api/api-error";
+import { retryIdempotentMutation, retryUnlessClientError } from "@frontend/api/api-error";
+import { createUnauthorizedRedirect } from "@frontend/api/unauthorized-redirect";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 /** 本番とテストが同じ設定で使う QueryClient を作る。 */
 export function createQueryClient(): QueryClient {
-  const { recordSuccess, redirectToLoginOnUnauthorized } = createUnauthorizedRedirect();
+  const redirect = createUnauthorizedRedirect();
   const queryClient: QueryClient = new QueryClient({
-    queryCache: new QueryCache({ onSuccess: recordSuccess, onError: redirectToLoginOnUnauthorized }),
+    queryCache: new QueryCache(redirect),
     mutationCache: new MutationCache({
-      onSuccess: recordSuccess,
-      onError: redirectToLoginOnUnauthorized,
+      ...redirect,
       // ponytail: 成功でも失敗（409 を含む）でも、描画中の関係のない query まで全部取り直す。
       // 再取得が性能の問題になったら、mutationKey か meta で絞るか、Orval の mutationInvalidates へ移る（docs/frontend/routing-and-state.md）。
       // Promise を返すので、mutation は再取得が終わるまで pending のままになり、関係のない query が 5xx を返すと再試行と backoff（最大 3 回）の分だけ遅れる。

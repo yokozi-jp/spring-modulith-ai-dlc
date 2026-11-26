@@ -1,21 +1,14 @@
-import {
-  createUnauthorizedRedirect,
-  retryIdempotentMutation,
-  retryUnlessClientError,
-} from "@frontend/api/api-error";
+import { retryIdempotentMutation, retryUnlessClientError } from "@frontend/api/api-error";
+import { createUnauthorizedRedirect } from "@frontend/api/unauthorized-redirect";
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
 
 /** 本番とテストが同じ設定で使う QueryClient を作る。 */
 export function createQueryClient(): QueryClient {
-  const { recordSuccess, redirectToLoginOnUnauthorized } = createUnauthorizedRedirect();
+  const redirect = createUnauthorizedRedirect();
   const queryClient: QueryClient = new QueryClient({
-    queryCache: new QueryCache({
-      onSuccess: recordSuccess,
-      onError: redirectToLoginOnUnauthorized,
-    }),
+    queryCache: new QueryCache(redirect),
     mutationCache: new MutationCache({
-      onSuccess: recordSuccess,
-      onError: redirectToLoginOnUnauthorized,
+      ...redirect,
       // ponytail: 成功でも失敗（409 を含む）でも、描画中の関係のない query まで全部取り直す。
       // 再取得が性能の問題になったら、mutationKey か meta で絞るか、Orval の mutationInvalidates へ移る（docs/frontend/routing-and-state.md）。
       // Promise を返すので、mutation は再取得が終わるまで pending のままになり、関係のない query が 5xx を返すと再試行と backoff（最大 3 回）の分だけ遅れる。

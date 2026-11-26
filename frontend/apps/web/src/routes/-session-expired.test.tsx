@@ -1,7 +1,7 @@
 /* @vitest-environment jsdom */
 
 import { screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vite-plus/test";
+import { describe, expect, it, onTestFinished } from "vite-plus/test";
 
 import { renderRoute } from "@/testing/render-route";
 
@@ -40,6 +40,9 @@ describe("ログインの有効期限切れの画面", () => {
 
   it("ほかの画面へ移らず、もう一度ログインした後に戻る先を残す", async () => {
     globalThis.sessionStorage.setItem("auth.returnTo", "/orders/new");
+    onTestFinished(() => {
+      globalThis.sessionStorage.removeItem("auth.returnTo");
+    });
 
     const { router } = await renderRoute("/session-expired", { locale: "en" });
 

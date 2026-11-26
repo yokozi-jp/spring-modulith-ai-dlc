@@ -1,36 +1,9 @@
-// oxlint-disable max-lines -- 401 の遷移と再試行の判定を、api-error の 1 つの module の test に集めるため、行数で分割しない。
 // oxlint-disable-next-line import/no-nodejs-modules -- 判定に使う type を、コミット済みの OpenAPI 契約と突き合わせる。
 import { readFileSync } from "node:fs";
 
-import { beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { describe, expect, it } from "vite-plus/test";
 
-const loginPath = "/oauth2/authorization/web";
-const assign = vi.fn<(url: string) => void>();
-// fallback の memory の値はモジュールの変数なので、テストごとに読み直す（beforeEach）。
-let api = await import("./api-error");
-let redirect = api.createUnauthorizedRedirect();
-
-function stubSessionStorage() {
-  const items = new Map<string, string>();
-  vi.stubGlobal("sessionStorage", {
-    // oxlint-disable-next-line unicorn/no-null -- Storage.getItem の仕様どおり、値がなければ null を返す。
-    getItem: (key: string) => items.get(key) ?? null,
-    setItem: (key: string, value: string) => items.set(key, value),
-    removeItem: (key: string) => items.delete(key),
-  });
-}
-
-function failStorage(): never {
-  throw new Error("storage is disabled");
-}
-
-function stubThrowingSessionStorage() {
-  vi.stubGlobal("sessionStorage", {
-    getItem: failStorage,
-    setItem: failStorage,
-    removeItem: failStorage,
-  });
-}
+const api = await import("./api-error");
 
 const csrfTokenInvalidType = "/problems/csrf-token-invalid";
 const tenantNotSelectedType = "/problems/tenant-not-selected";
@@ -46,14 +19,6 @@ const versionConflictProblem = {
 };
 
 describe("api-error", () => {
-  beforeEach(async () => {
-    vi.resetModules();
-    api = await import("./api-error");
-    redirect = api.createUnauthorizedRedirect();
-    assign.mockReset();
-    vi.stubGlobal("location", { assign, href: "http://localhost/", origin: "http://localhost" });
-  });
-
   describe("isTenantNotSelected", () => {
     it("テナントを選ぶ前の type の 403 を、テナントを選ぶ前の拒否とみなす", () => {
       expect(api.isTenantNotSelected(new api.ApiProblemError(403, tenantProblem))).toBe(true);
@@ -94,148 +59,6 @@ describe("api-error", () => {
       );
 
       expect(exempt).toStrictEqual(["selectTenant"]);
-    });
-  });
-
-  describe("createUnauthorizedRedirect", () => {
-    it("401 でログインへ 1 回だけ遷移する", () => {
-      stubSessionStorage();
-      const error = new api.ApiProblemError(401, undefined);
-
-      redirect.redirectToLoginOnUnauthorized(error);
-      redirect.redirectToLoginOnUnauthorized(error);
-
-      expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
-    });
-
-    it("遷移の前に、いまの path、query、hash を戻り先として保存する", async () => {
-      stubSessionStorage();
-      vi.stubGlobal("location", {
-        assign,
-        href: "http://localhost/orders/new?a=1#x",
-        origin: "http://localhost",
-        pathname: "/orders/new",
-        search: "?a=1",
-        hash: "#x",
-      });
-
-      redirect.redirectToLoginOnUnauthorized(new api.ApiProblemError(401, undefined));
-
-      const { takeReturnTo } = await import("./login-return-to");
-      expect(takeReturnTo()).toBe("/orders/new?a=1#x");
-    });
-
-    it("30 秒以内の 2 回目の 401 は、保存した戻り先を書き換えない", async () => {
-      stubSessionStorage();
-      const error = new api.ApiProblemError(401, undefined);
-      vi.stubGlobal("location", {
-        assign,
-        origin: "http://localhost",
-        pathname: "/orders/1",
-        search: "",
-        hash: "",
-      });
-      redirect.redirectToLoginOnUnauthorized(error);
-      vi.stubGlobal("location", {
-        assign,
-        origin: "http://localhost",
-        pathname: "/orders/2",
-        search: "",
-        hash: "",
-      });
-
-      redirect.redirectToLoginOnUnauthorized(error);
-
-      const { takeReturnTo } = await import("./login-return-to");
-      expect(takeReturnTo()).toBe("/orders/1");
-    });
-
-    it("30 秒を過ぎた 401 では再び遷移する", () => {
-      stubSessionStorage();
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2025-01-01T00:00:00Z"));
-      const error = new api.ApiProblemError(401, undefined);
-
-      redirect.redirectToLoginOnUnauthorized(error);
-      vi.setSystemTime(new Date("2025-01-01T00:00:29.999Z"));
-      redirect.redirectToLoginOnUnauthorized(error);
-      vi.setSystemTime(new Date("2025-01-01T00:00:30Z"));
-      redirect.redirectToLoginOnUnauthorized(error);
-
-      expect(assign).toHaveBeenCalledTimes(2);
-    });
-
-    it("401 以外と ApiProblemError 以外では遷移しない", () => {
-      stubSessionStorage();
-
-      redirect.redirectToLoginOnUnauthorized(new api.ApiProblemError(403, undefined));
-      redirect.redirectToLoginOnUnauthorized(new TypeError("Failed to fetch"));
-      redirect.redirectToLoginOnUnauthorized(Object.assign(new Error("x"), { status: 401 }));
-
-      expect(assign).not.toHaveBeenCalled();
-    });
-
-    it("sessionStorage が例外を投げても遷移を 1 回に抑える", () => {
-      stubThrowingSessionStorage();
-      const error = new api.ApiProblemError(401, undefined);
-
-      redirect.redirectToLoginOnUnauthorized(error);
-      redirect.redirectToLoginOnUnauthorized(error);
-
-      expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
-    });
-
-    it("数値でない保存値は遷移していないとして扱う", () => {
-      stubSessionStorage();
-      globalThis.sessionStorage.setItem("api.loginRedirectedAt", "not-a-number");
-
-      redirect.redirectToLoginOnUnauthorized(new api.ApiProblemError(401, undefined));
-
-      expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
-    });
-
-    describe("同じ文書で API が成功した後", () => {
-      it("API の成功の後の 401 は、ログインではなく有効期限切れの画面へ移り、戻り先を保存する", async () => {
-        stubSessionStorage();
-        vi.stubGlobal("location", {
-          assign,
-          origin: "http://localhost",
-          pathname: "/orders/new",
-          search: "?a=1",
-          hash: "",
-        });
-        redirect.recordSuccess();
-
-        redirect.redirectToLoginOnUnauthorized(new api.ApiProblemError(401, undefined));
-
-        expect(assign).toHaveBeenCalledExactlyOnceWith("/session-expired");
-        const { takeReturnTo } = await import("./login-return-to");
-        expect(takeReturnTo()).toBe("/orders/new?a=1");
-      });
-
-      it("API の成功の後の 401 は、30 秒以内にログインへ遷移していても有効期限切れの画面へ移る", () => {
-        stubSessionStorage();
-        const error = new api.ApiProblemError(401, undefined);
-        redirect.redirectToLoginOnUnauthorized(error);
-        redirect.recordSuccess();
-
-        redirect.redirectToLoginOnUnauthorized(error);
-
-        expect(assign.mock.calls).toStrictEqual([[loginPath], ["/session-expired"]]);
-      });
-
-      it("有効期限切れの画面への遷移は、ログインへの遷移の 30 秒の抑止を始めない", () => {
-        stubSessionStorage();
-        const error = new api.ApiProblemError(401, undefined);
-        redirect.recordSuccess();
-        redirect.redirectToLoginOnUnauthorized(error);
-        assign.mockReset();
-
-        // 成功を記録していない別の値（別の QueryClient）は、最初の 401 としてログインへ移る。
-        api.createUnauthorizedRedirect().redirectToLoginOnUnauthorized(error);
-
-        expect(assign).toHaveBeenCalledExactlyOnceWith(loginPath);
-      });
     });
   });
 
