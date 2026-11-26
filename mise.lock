@@ -23,13 +23,13 @@ checksum = "sha256:b1f2abe0b3cccb462cf64fb4a5587c7d09df60cf8be7748b152cbd89d018b
 url = "https://download.eclipse.org/jdtls/milestones/1.63.0/jdt-language-server-1.63.0-202610191322.tar.gz"
 
 [[tools."http:kiro-cli"]]
-version = "3.5.0"
+version = "3.6.2"
 backend = "http:kiro-cli"
-specifiers = ["3.5.0"]
+specifiers = ["3.6.2"]
 
 [tools."http:kiro-cli"."platforms.linux-x64"]
-checksum = "sha256:7f9bb76921f477125629619450d5942e160942aba9dd8cdc4a66f7678a20c56d"
-url = "https://prod.download.cli.kiro.dev/stable/3.5.0/kirocli-x86_64-linux.zip"
+checksum = "sha256:ebb9f6ccd6ad9524171cbbd6ba1554c862e82511f2249038efb93c188b93e507"
+url = "https://prod.download.cli.kiro.dev/stable/3.6.2/kirocli-x86_64-linux.zip"
 
 [[tools."http:lombok"]]
 version = "1.18.48"
