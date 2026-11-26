@@ -19,7 +19,7 @@ export function TenantMembersPage() {
   );
 
   // 自分の役割を下げる、自分の所属を外すと、操作の後の一覧の再取得が 403 になる。
-  // 取得済みの一覧があると useSuspenseQuery は投げないため、ここで投げて route の errorComponent に渡す。
+  // 取得済みの一覧があると useSuspenseQuery は投げないため、ここで投げて RouteError に渡す。
   if (error instanceof ApiProblemError && error.status === 403) {
     throw error;
   }

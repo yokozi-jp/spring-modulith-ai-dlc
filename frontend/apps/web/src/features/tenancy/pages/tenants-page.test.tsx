@@ -142,13 +142,17 @@ describe("業務の画面のテナント", () => {
     expect(screen.queryByRole("button", { name: "再試行" })).toBeNull();
   });
 
-  it("業務の API が権限不足の 403 を返したら、再試行できる一般のエラーを出す", async () => {
+  it("業務の API が権限不足の 403 を返したら、権限がないことを伝えてホームへのリンクを出し、再試行を出さない", async () => {
     server.use(
       http.get("*/api/v1/products", () => problemResponse(403, "アクセス権限がありません")),
     );
     await renderRoute("/orders/new");
 
-    await expect(screen.findByRole("button", { name: "再試行" })).resolves.toBeTruthy();
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toContain("権限がありません");
+    expect(alert.textContent).toContain("このページを表示する権限がありません。");
+    expect(screen.getByRole("link", { name: "ホームへ戻る" }).getAttribute("href")).toBe("/");
+    expect(screen.queryByRole("button", { name: "再試行" })).toBeNull();
     expect(screen.queryByRole("link", { name: "テナントを選ぶ" })).toBeNull();
   });
 });

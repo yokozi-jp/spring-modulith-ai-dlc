@@ -16,6 +16,8 @@
   "errorHeading": "問題が発生しました",
   "errorDescription": "画面を表示できませんでした。もう一度お試しください。",
   "retry": "再試行",
+  "forbiddenHeading": "権限がありません",
+  "forbiddenDescription": "このページを表示する権限がありません。",
   "notFoundHeading": "ページが見つかりません",
   "notFoundDescription": "URL が正しいか確認してください。",
   "backToHome": "ホームへ戻る",
@@ -146,8 +148,6 @@
         "admin": "管理者",
         "member": "一般"
       },
-      "forbiddenHeading": "管理者だけが使える画面です",
-      "forbiddenDescription": "所属の管理は、テナントの管理者だけができます。",
       "notice": {
         "roleChanged": "役割を変更しました。",
         "removed": "所属を外しました。",

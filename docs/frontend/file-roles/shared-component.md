@@ -48,6 +48,7 @@ feature の中のコードを components へ移す条件は[共有コード](../
   backend の `title` を出すときは、見出しの要素にそのまま出し、catalog の文言と連結しない（[分岐と文言](../update-conflicts.md#分岐と文言)）。
 - `RouteError` の再試行は、`useQueryErrorResetBoundary` の `reset()` を呼んでから `router.invalidate()` を呼ぶ。
   テナントを選ぶ前の 403 は `isTenantNotSelected` で判定し、再試行の代わりにテナントを選ぶ画面へのリンクを出す。
+  それ以外の 403 は権限不足として、再試行の代わりにトップへのリンクを出す。
 - 状態の変化を読み上げる領域は `<output>` にする（[UIの書き方](../ui-and-style.md#uiの書き方)）。
   `ProblemNotice` は、通知がない間も `<output>` を描画しておき、中身だけを入れ替える。
 - button の見た目の link は `<Link className={buttonVariants(...)}>` で書く。
@@ -86,10 +87,10 @@ export function RoutePending() {
 ```
 
 典型的な例は、エラーの表示の `RouteError` である（`frontend/apps/web/src/components/route-error.tsx`）。
-`error.message` を出さず、テナントを選ぶ前の 403 だけはテナントを選ぶ画面へ案内する。
+`error.message` を出さず、テナントを選ぶ前の 403 はテナントを選ぶ画面へ案内し、権限不足の 403 は権限がないことを伝えてトップへのリンクを出す。
 
 ```tsx
-import { isTenantNotSelected } from "@frontend/api/api-error";
+import { ApiProblemError, isTenantNotSelected } from "@frontend/api/api-error";
 import { Button, buttonVariants } from "@frontend/ui/button";
 import { useQueryErrorResetBoundary } from "@tanstack/react-query";
 import { Link, useRouter } from "@tanstack/react-router";
@@ -110,6 +111,19 @@ export function RouteError({ error }: ErrorComponentProps) {
         <p className="text-muted-foreground">{t("tenancy.notSelectedDescription")}</p>
         <Link to="/tenants" className={buttonVariants()}>
           {t("tenancy.chooseTenant")}
+        </Link>
+      </section>
+    );
+  }
+
+  // 権限不足の 403 は、再試行しても変わらない。役割の構成が変わりうるため、必要な役割は書かない。
+  if (error instanceof ApiProblemError && error.status === 403) {
+    return (
+      <section className="flex flex-col items-start gap-4 px-6 py-16 sm:px-10" role="alert">
+        <h1 className="text-2xl font-semibold">{t("forbiddenHeading")}</h1>
+        <p className="text-muted-foreground">{t("forbiddenDescription")}</p>
+        <Link to="/" className={buttonVariants({ variant: "outline" })}>
+          {t("backToHome")}
         </Link>
       </section>
     );
