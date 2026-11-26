@@ -21,7 +21,10 @@ import com.example.demo.testkit.SharedTestConfiguration;
 import jakarta.servlet.http.Cookie;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +35,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,6 +47,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -71,7 +76,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
 /**
- * OIDC のログインから、所属を引いてテナントを選ぶまでを、実際の Security filter chain と DB のセッションで確かめる。
+ * OIDC のログインから、所属を引いてテナントを選ぶまでと、セッションの期間を、実際の Security filter chain と DB のセッションで確かめる。
  *
  * <p>IdP のトークンの endpoint と ID トークンの検証だけを {@link FakeIdp} に差し替え、ログインのコールバックは本物の {@code
  * OAuth2LoginAuthenticationFilter} を通す。Cookie はブラウザと同じく応答の {@code Set-Cookie} を次のリクエストに送る。
@@ -82,9 +87,10 @@ import org.springframework.web.util.UriUtils;
 @ExtendWith(CleanGeneratedTablesExtension.class)
 // MockMvc の期待値は andExpect で書き、AssertJ の assert を使わないテストがある。
 // 補助のメソッドは、Exception を宣言する MockMvc.perform を呼ぶ。
-// ログインと Cookie とセッションの補助を、流れを確かめるテストと同じクラスに置く。
+// ログインと Cookie とセッションの補助を、流れとセッションの期間を確かめるテストと同じクラスに置く。
 @SuppressWarnings({
   "PMD.AvoidDuplicateLiterals",
+  "PMD.CouplingBetweenObjects",
   "PMD.SignatureDeclareThrowsException",
   "PMD.TooManyMethods",
   "PMD.TooManyStaticImports",
@@ -133,6 +139,12 @@ class TenantSelectionTest {
 
   /** ログインが保存した OAuth2 の認可済みのクライアント。 */
   @Autowired private OAuth2AuthorizedClientRepository authorizedClients;
+
+  /** セッションの行の作成の時刻を書き換え、期間の列を読む JDBC。 */
+  @Autowired private JdbcTemplate jdbc;
+
+  /** アプリの現在時刻。 */
+  @Autowired private Clock clock;
 
   /** ブラウザが持つ Cookie。 */
   private final Map<String, String> cookies = new ConcurrentHashMap<>();
@@ -367,6 +379,131 @@ class TenantSelectionTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.type").value("/problems/validation-error"))
         .andExpect(jsonPath("$.errors[0].pointer").value("/tenantId"));
+  }
+
+  /**
+   * セッションの最長の期間と無操作の期間。
+   *
+   * <p>Spring Session は作成の時刻をアプリの Clock でなく自分の時計で決めるため、DB の行の作成の時刻を過去に書き換えて期間を過ぎさせる。
+   */
+  /* package */ @Nested
+  class SessionLifetimeTest {
+
+    /** 最長の期間（8 時間）を過ぎた、作ってからの経過時間。 */
+    private static final Duration PAST_MAX_LIFETIME = Duration.ofHours(9);
+
+    /** 最長の期間（8 時間）に満たない、作ってからの経過時間。 */
+    private static final Duration WITHIN_MAX_LIFETIME = Duration.ofHours(7);
+
+    @Test
+    @DisplayName("最長の期間を過ぎたセッションは、直前に操作していても 401 になり、DB の行が消える")
+    void sessionOlderThanMaxLifetimeIsInvalidated() throws Exception {
+      login(newSubject());
+      final String expired = sessionId();
+      createdAgo(expired, PAST_MAX_LIFETIME);
+
+      perform(get("/api/memberships")).andExpect(status().isUnauthorized());
+
+      assertThat(rowCount(expired)).as("期間を過ぎたセッションの行: sessionId=%s", expired).isZero();
+    }
+
+    @Test
+    @DisplayName("最長の期間に満たないセッションは、無操作の期間の中なら API を使える")
+    void sessionWithinMaxLifetimeIsAccepted() throws Exception {
+      login(newSubject());
+      createdAgo(sessionId(), WITHIN_MAX_LIFETIME);
+
+      perform(get("/api/memberships")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("テナントを選んでセッションの ID が変わっても作成の時刻は変わらず、最長の期間を過ぎると 401 になる")
+    void selectingATenantKeepsTheCreationTime() throws Exception {
+      final TwoTenants user = loginWithTwoTenants();
+      final long createdAt = creationTime(sessionId());
+
+      select(user.first()).andExpect(status().isNoContent());
+
+      final String selected = sessionId();
+      assertThat(creationTime(selected))
+          .as("テナントを選んだ後のセッションの作成の時刻: sessionId=%s", selected)
+          .isEqualTo(createdAt);
+      createdAgo(selected, PAST_MAX_LIFETIME);
+      perform(get(PRODUCTS)).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("最長の期間を過ぎて 401 になった後にログインし直すと、作成の時刻が今の新しいセッションで API を使える")
+    void loginAfterExpiryStartsANewSession() throws Exception {
+      final String subject = newSubject();
+      login(subject);
+      final String expired = sessionId();
+      createdAgo(expired, PAST_MAX_LIFETIME);
+      perform(get("/api/memberships")).andExpect(status().isUnauthorized());
+      final Instant beforeLogin = Instant.now(clock).truncatedTo(ChronoUnit.MILLIS);
+
+      login(subject);
+
+      final String renewed = sessionId();
+      assertThat(renewed).as("ログインし直した後のセッションの ID").isNotEqualTo(expired);
+      assertThat(Instant.ofEpochMilli(creationTime(renewed)))
+          .as("ログインし直した後のセッションの作成の時刻: sessionId=%s", renewed)
+          .isAfterOrEqualTo(beforeLogin);
+      perform(get("/api/memberships")).andExpect(status().isOk());
+    }
+
+    @Test
+    @DisplayName("ログインで作ったセッションの無操作の期間は 30 分である")
+    void newSessionHasThirtyMinutesIdleTimeout() throws Exception {
+      login(newSubject());
+      final String id = sessionId();
+
+      assertThat(
+              jdbc.queryForObject(
+                  "SELECT max_inactive_interval FROM modulith.spring_session WHERE session_id = ?",
+                  Integer.class,
+                  id))
+          .as("セッションの max_inactive_interval（秒）: sessionId=%s", id)
+          .isEqualTo(1800);
+    }
+
+    @Test
+    @DisplayName("ログインの応答のセッションの Cookie は Max-Age を持たず、ブラウザを閉じると消える")
+    void sessionCookieHasNoMaxAge() throws Exception {
+      final MvcResult callback = login(newSubject()).andReturn();
+
+      final Cookie cookie =
+          Objects.requireNonNull(
+              callback.getResponse().getCookie(SESSION_COOKIE), "ログインの応答にセッションの Cookie がない");
+      assertThat(cookie.getMaxAge()).as("セッションの Cookie の Max-Age").isEqualTo(-1);
+    }
+
+    /** セッションの行の作成の時刻を、今から {@code age} 前にする。 */
+    private void createdAgo(final String sessionId, final Duration age) {
+      jdbc.update(
+          "UPDATE modulith.spring_session SET creation_time = ? WHERE session_id = ?",
+          Instant.now(clock).minus(age).toEpochMilli(),
+          sessionId);
+    }
+
+    /** セッションの行の作成の時刻（エポックからのミリ秒）。 */
+    private long creationTime(final String sessionId) {
+      return Objects.requireNonNull(
+          jdbc.queryForObject(
+              "SELECT creation_time FROM modulith.spring_session WHERE session_id = ?",
+              Long.class,
+              sessionId),
+          () -> "セッションの行がない: sessionId=" + sessionId);
+    }
+
+    /** セッションの ID の行の数。 */
+    private int rowCount(final String sessionId) {
+      return Objects.requireNonNull(
+          jdbc.queryForObject(
+              "SELECT count(*) FROM modulith.spring_session WHERE session_id = ?",
+              Integer.class,
+              sessionId));
+    }
   }
 
   /** 2 つのテナント（A 商事、B 物産）の MEMBER の利用者でログインする。 */
