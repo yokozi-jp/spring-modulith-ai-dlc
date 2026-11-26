@@ -7,13 +7,7 @@ import { StatusScreen } from "@/components/status-screen";
 function LoggedOutPage() {
   const { t } = useTranslation();
 
-  return (
-    <StatusScreen
-      heading={t("loggedOutHeading")}
-      actionLabel={t("loginAgain")}
-      actionHref="/oauth2/authorization/web"
-    />
-  );
+  return <StatusScreen heading={t("loggedOutHeading")} />;
 }
 
 // 利用者をまたいで戻り先を残さない。

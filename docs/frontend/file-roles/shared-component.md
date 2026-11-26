@@ -21,7 +21,7 @@ tags: [convention, frontend, file-role]
 - **`app-shell.tsx`**：header、ログアウトの form、`<Outlet />` を持つアプリシェル。`routes/_authenticated/route.tsx` の component にする（[認証が要る画面とアプリシェル](../routing-and-state.md#認証が要る画面とアプリシェル)）。
 - **`route-pending.tsx`、`route-error.tsx`、`route-not-found.tsx`**：router の既定の Loading、Error、存在しない resource の表示。`router-defaults.ts` の `routerDefaults` に登録する（[状態表示の分担](../routing-and-state.md#状態表示の分担)）。
 - **`problem-notice.tsx`**：[lib](lib.md) の `notice.ts` が作った `Notice` を live region に出す通知。
-- **`status-screen.tsx`**：アプリシェルの外で、見出し、説明、ページ全体を遷移するリンクを出す画面。`/logged-out` などの route の component が使う。
+- **`status-screen.tsx`**：アプリシェルの外で、見出し、説明、もう一度ログインするリンクを出す画面。リンクはページ全体を遷移して `@frontend/api` の `loginPath` を開く。`/logged-out` と `/login-failed` の route の component が使う。
 
 アプリの共有componentは [UI primitive](ui-primitive.md) ではない。
 UI primitive は catalog の文言、router、API の型を扱わず、`packages/ui` に置く。

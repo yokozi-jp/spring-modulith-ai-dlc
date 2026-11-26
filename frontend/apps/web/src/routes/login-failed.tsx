@@ -8,12 +8,7 @@ function LoginFailedPage() {
   const { t } = useTranslation();
 
   return (
-    <StatusScreen
-      heading={t("loginFailedHeading")}
-      description={t("loginFailedDescription")}
-      actionLabel={t("loginAgain")}
-      actionHref="/oauth2/authorization/web"
-    />
+    <StatusScreen heading={t("loginFailedHeading")} description={t("loginFailedDescription")} />
   );
 }
 

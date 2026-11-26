@@ -1,18 +1,9 @@
+import { loginPath } from "@frontend/api/api-error";
 import { buttonVariants } from "@frontend/ui/button";
 import { useTranslation } from "react-i18next";
 
-/** アプリシェルの外で、状態の見出しと説明と、ページ全体を遷移するリンクを出す画面。 */
-export function StatusScreen({
-  heading,
-  description,
-  actionLabel,
-  actionHref,
-}: {
-  heading: string;
-  description?: string;
-  actionLabel: string;
-  actionHref: string;
-}) {
+/** アプリシェルの外で、状態の見出しと説明と、もう一度ログインするリンクを出す画面。 */
+export function StatusScreen({ heading, description }: { heading: string; description?: string }) {
   const { t } = useTranslation();
 
   return (
@@ -25,8 +16,8 @@ export function StatusScreen({
             <p className="text-muted-foreground">{description}</p>
           )}
           {/* ログインは backend の OAuth2 の入口なので、router の Link ではなく全画面遷移にする。 */}
-          <a href={actionHref} className={buttonVariants({ variant: "outline" })}>
-            {actionLabel}
+          <a href={loginPath} className={buttonVariants({ variant: "outline" })}>
+            {t("loginAgain")}
           </a>
         </section>
       </main>
