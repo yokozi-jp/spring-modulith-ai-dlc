@@ -133,4 +133,5 @@
 - [ADR-131: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す](ADR-131-archive-removed-child-rows-in-table-writer.md)（Proposed, 2026-11-25）
 - [ADR-132: 配信するセキュリティヘッダーに CORP と COOP を足し、HSTS を ADR-014 に揃える](ADR-132-add-corp-and-coop-to-delivered-security-headers.md)（Proposed, 2026-11-25）
 - [ADR-133: OpenTelemetry の semantic conventions に指標の名前と属性を揃える](ADR-133-align-metrics-with-opentelemetry-semantic-conventions.md)（Proposed, 2026-11-26）
+- [ADR-134: HTTP のアクセスログを出さず、要求の記録をトレースと指標で読む](ADR-134-read-http-requests-from-traces-and-metrics-without-access-log.md)（Proposed, 2026-11-26）
 - [ADR-135: セッションに 8 時間の最長の期間を足し、無操作の 30 分を明示する](ADR-135-add-absolute-session-lifetime-and-explicit-idle-timeout.md)（Proposed, 2026-11-26）
