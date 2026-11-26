@@ -7,11 +7,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.Mockito;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
@@ -20,15 +18,14 @@ import org.springframework.boot.validation.autoconfigure.ValidationAutoConfigura
 import org.springframework.context.annotation.Configuration;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.EventPublication;
-import org.springframework.modulith.events.core.PublicationTargetIdentifier;
-import org.springframework.modulith.events.core.TargetEventPublication;
 
 /**
  * 外部システムの停止と回復のシナリオ（docs/nfr/quality-attribute-scenarios.md の「外部システムの停止と回復」）が許容する停止の長さが、{@code
  * application.yaml} の再投入の方針の待ち時間の和と一致することを検証する。
  *
- * <p>倍率、待ち時間の上限、回数の上限は {@code application.yaml} から読み、{@code wait-age} だけは {@code .env.example}
- * の開始値（PT1M）に置く。 設定を変えるとこのテストが失敗するので、シナリオの数値を同じ変更で直す。
+ * <p>倍率、待ち時間の上限、回数の上限は {@code application.yaml} から読む。 待ち時間の一覧か回数が変わる変更はテストが失敗するので、シナリオの数値を同じ変更で直す。
+ * {@code wait-age} は {@code .env.example} の開始値（PT1M）をテストに書いており、{@code .env.example} を変えても失敗しない。
+ * {@code in-flight-staleness} と {@code interval} は、設定の検証を通すためだけに置く。
  */
 // テストのリスナーの受信メソッドは on と命名する規約のため。
 // ApplicationContextRunner の run に渡す callback の中で assert するため、PMD はテストメソッドの assert を検出できない。
@@ -108,13 +105,8 @@ class ResubmissionDowntimeToleranceTest {
   /** 最初の配信から {@code lastAttempt} まで失敗が続き、{@code completionAttempts} 回試行した FAILED の出版。 */
   private static EventPublication failed(
       final String listenerId, final int completionAttempts, final Instant lastAttempt) {
-    final TargetEventPublication publication =
-        Mockito.mock(TargetEventPublication.class, Mockito.CALLS_REAL_METHODS);
-    Mockito.doReturn(PublicationTargetIdentifier.of(listenerId))
-        .when(publication)
-        .getTargetIdentifier();
-    return ResubmissionTestSupport.stubPublication(
-        publication, UUID.randomUUID(), completionAttempts, FIRST_FAILURE, lastAttempt);
+    return ResubmissionTestSupport.stubTargetPublication(
+        listenerId, completionAttempts, FIRST_FAILURE, lastAttempt);
   }
 
   /** 再投入の設定値だけを bean にする。 */
