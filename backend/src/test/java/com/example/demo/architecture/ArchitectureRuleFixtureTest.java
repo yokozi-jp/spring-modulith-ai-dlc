@@ -5,12 +5,6 @@ import static com.example.demo.architecture.ConformingRules.JOOQ_PACKAGE;
 import static com.example.demo.architecture.ViolatingFixtures.VIOLATING;
 import static com.example.demo.architecture.ViolatingFixtures.VIOLATING_CLASSES;
 import static com.example.demo.architecture.ViolatingFixtures.row;
-import static java.util.Map.entry;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.mapping;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -23,12 +17,9 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import errorfixture.presentation.web.ErrorFixtureFailure;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
-import java.util.TreeMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Future;
@@ -275,77 +266,16 @@ class ArchitectureRuleFixtureTest {
   }
 
   @Test
-  @DisplayName("@ArchTest の規則は、違反の行と rulesFor() の両方に載るか、理由を付けて除外する")
+  @DisplayName("@ArchTest の規則は、違反の行と ConformingRules の両方に同じ規則で載るか、理由を付けて除外する")
   void everyRuleIsRegisteredOrExempted() {
-    final Map<String, List<String>> owners =
-        ArchTestFields.ruleFields().stream()
-            .collect(
-                groupingBy(
-                    ArchTestFields.RuleField::name,
-                    TreeMap::new,
-                    mapping(ArchTestFields.RuleField::owner, toList())));
-    final Set<String> violating =
-        eachRuleDetectsItsViolatingFixture().map(FixtureRow::ruleName).collect(toSet());
-    final Map<String, Set<String>> registrations =
-        Map.of(
-            "eachRuleDetectsItsViolatingFixture の行",
-            violating,
-            "rulesFor()",
-            ConformingRules.rulesFor(CONFORMING).keySet());
-    final Map<String, String> exemptions = FixtureExemptions.REASONS;
-    final List<String> problems = new ArrayList<>();
+    final RuleRegistrationCheck check =
+        new RuleRegistrationCheck(
+            ArchTestFields.ruleFields(),
+            eachRuleDetectsItsViolatingFixture().toList(),
+            ConformingRules.rulesFor(CONFORMING),
+            FixtureExemptions.REASONS);
 
-    owners.entrySet().stream()
-        .filter(owner -> owner.getValue().size() > 1)
-        .forEach(owner ->
-            problems.add(
-                owner.getKey()
-                    + "："
-                    + owner.getValue()
-                    + " に同じ名前の @ArchTest がある。登録を規則の名前で照らすため。直し方：どちらかの名前を変える"));
-    for (final String name : owners.keySet()) {
-      final String missing =
-          registrations.entrySet().stream()
-              .filter(registration -> !registration.getValue().contains(name))
-              .map(Map.Entry::getKey)
-              .sorted()
-              .collect(joining("と "));
-      if (exemptions.containsKey(name) && missing.isEmpty()) {
-        problems.add(
-            name
-                + "：両方に載るのに FixtureExemptions にある。除外が後の登録の漏れを隠さないようにするため。"
-                + "直し方：FixtureExemptions から消す");
-      } else if (!exemptions.containsKey(name) && !missing.isEmpty()) {
-        problems.add(
-            name
-                + "："
-                + missing
-                + " にない。規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめるため。"
-                + "直し方：ないほうに足す（違反の行には違反フィクスチャのクラスも足す）。"
-                + "フィクスチャで確かめないときは、FixtureExemptions に理由を付けて足す");
-      }
-    }
-    Stream.concat(
-            registrations.entrySet().stream(),
-            Stream.of(entry("FixtureExemptions", exemptions.keySet())))
-        .forEach(registration ->
-            registration.getValue().stream()
-                .filter(name -> !owners.containsKey(name))
-                .forEach(name ->
-                    problems.add(
-                        name
-                            + "："
-                            + registration.getKey()
-                            + " にあるが、この名前の @ArchTest の規則がない。誤った名前や消した規則の登録を残さないため。"
-                            + "直し方：@ArchTest のフィールドの名前に直すか、登録を消す")));
-    exemptions.forEach((name, reason) -> {
-      if (reason.isBlank()) {
-        problems.add(
-            name + "：FixtureExemptions の理由が空。除外した理由を後から確かめられるようにするため。直し方：フィクスチャで確かめない理由を書く");
-      }
-    });
-
-    assertThat(problems)
+    assertThat(check.problems())
         .as("@ArchTest の規則の登録に誤りがある（docs/backend/architecture-tests.md の「規則を確かめるフィクスチャ」）")
         .isEmpty();
   }

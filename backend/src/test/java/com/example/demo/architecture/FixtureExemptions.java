@@ -5,8 +5,8 @@ import static java.util.Map.entry;
 import java.util.Map;
 
 /**
- * {@link ArchitectureRuleFixtureTest} の違反の行と {@code rulesFor()} の両方には載せない {@code @ArchTest}
- * の規則と、載せない理由。
+ * {@link ArchitectureRuleFixtureTest} の違反の行と {@link ConformingRules} のどちらにも載せない {@code @ArchTest}
+ * の規則と、載せない理由。片方にでも載せると {@link RuleRegistrationCheck} が失敗する。
  */
 final class FixtureExemptions {
 
