@@ -96,7 +96,7 @@ Controller の中の `@PreAuthorize` が拒否したときのログは、2 つ�
 
 利用者とテナントを指す ID は、アプリが採番した `user.id`（利用者の ID）と `tenant.id`（テナントの `public_id`）だけを渡す（「[テナントと利用者](#テナントと利用者)」）。
 
-ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、404、409、422 の problem type（`problem.type`）、テナントと利用者の ID（`tenant.id`、`user.id`）、trace と span の相関情報、業務上必要な内部 ID である。
+ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、403、404、409、422 の problem type（`problem.type`）、テナントと利用者の ID（`tenant.id`、`user.id`）、trace と span の相関情報、業務上必要な内部 ID である。
 イベント出版の定期の再投入と手での 1 回の再投入は、業務上必要な内部 ID として出版の ID、イベントの型とリスナーの完全修飾名、試行の回数（`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`）と、1 回の実行の件数と、回数の上限を超えて `FAILED` に残った出版の件数（`event_publication.resubmitted.count`、`event_publication.over_limit.count`）と、手での 1 回の再投入の結果の件数（`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`）を出す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 イベントの本文（`serialized_event`）は読まず、ログへ渡さない。
 内部 ID と氏名などの表示値を同じ event へ載せない。

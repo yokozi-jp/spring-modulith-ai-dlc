@@ -49,7 +49,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
   /** 409 の種類のログの属性名（version、lock、unique）。 */
   private static final String CONFLICT_KIND = "conflict.kind";
 
-  /** 404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-127）。 */
+  /** 403、404、409、422 のログの属性名。応答の type と同じ値を入れる（ADR-127、ADR-134）。 */
   private static final String PROBLEM_TYPE = "problem.type";
 
   /** Problem Details の共通フィールドを生成する。 */
@@ -68,10 +68,7 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
     return problem(exception, HttpStatus.UNAUTHORIZED, request);
   }
 
-  /**
-   * 権限が不足する API リクエストを 403 の about:blank に、CSRF token の失敗、別のオリジンからの更新の拒否、テナントを選ぶ前の拒否をそれぞれ専用の type
-   * に変換する。
-   */
+  /** 権限が不足する API リクエストを 403 の about:blank に変換する。専用の type を持つ拒否は、その type の 403 に変換する。 */
   @ExceptionHandler(AccessDeniedException.class)
   /* package */ @Nullable ResponseEntity<Object> handleAccessDeniedException(
       final AccessDeniedException exception, final WebRequest request) {
@@ -267,6 +264,12 @@ public class ApiExceptionHandler extends ResponseEntityExceptionHandler {
         || ex instanceof HandlerMethodValidationException
         || ex instanceof ConstraintViolationException) {
       log.atWarn().addKeyValue(STATUS_CODE, status.value()).log("API validation failed");
+    } else if (ex instanceof AccessDeniedException) {
+      // 403 の原因（CSRF の失敗、別のオリジンからの更新、テナントを選ぶ前など）を type で見分ける（ADR-134）。
+      log.atInfo()
+          .addKeyValue(STATUS_CODE, status.value())
+          .addKeyValue(PROBLEM_TYPE, problemType(body))
+          .log("API client error");
     } else {
       log.atInfo().addKeyValue(STATUS_CODE, status.value()).log("API client error");
     }
