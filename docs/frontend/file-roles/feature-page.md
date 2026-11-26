@@ -23,7 +23,7 @@ Loading、Error、存在しない resource の表示は、画面ではなく rou
 ## 置き場所と命名
 
 - `frontend/apps/web/src/features/<feature>/pages/` に置く。
-  画面が一つの feature でも `pages/` を作る。`*-page.tsx` が `pages/` の外にあると、`task fe-check` の配置の検査が失敗にする。
+  画面が一つの feature でも `pages/` を作る。`*-page.tsx` が `pages/` の外にあると、`task fe-verify` の配置の検査が失敗にする。
 - 同じ feature の component、Hook、module は、`../` を使えないため `@/features/<feature>/...` の alias で import する（`import/no-relative-parent-imports`）。
 - ファイル名は、画面を表す名詞に `-page` を付けた kebab-case にする（`orders-page.tsx`、`order-new-page.tsx`、`order-detail-page.tsx`、`tenants-page.tsx`、`tenant-members-page.tsx`）。
 - component の名前は、ファイル名を PascalCase にした名前にする（`OrdersPage`、`OrderNewPage`）。

@@ -133,15 +133,13 @@ hookを通らない書き換えの最終の検出は、`routeTree.gen.ts` を再
 
 React componentはfunction componentとHooksで実装する。
 local UI stateにはReactの組み込みHook、server stateにはTanStack Query、URL stateにはTanStack Router、form stateにはTanStack Formを使う。
-custom Hookは、再利用するstateful logic、外部systemとの同期、または画面のmutation、form、通知の状態の分離を、具体的な用途名で表せる場合に、featureの `hooks/` に置く。
-呼び出し元が一つの画面だけでもよい。再利用の有無は判断しない。
+featureのcustom Hookは、具体的な用途名で表せる場合に、featureの `hooks/` に置く。
+画面のmutation、form、通知の状態をcomponentから分けるHookを含み、呼び出し元が一つの画面だけでもよい。再利用の有無は判断しない。
 custom Hookの定義（`use` で始まる関数宣言）は `hooks/` にだけ書く。
 純粋な変換は通常の関数にしてmoduleに置き、生成Hookをそのまま転送するだけのwrapper Hookやトップレベル `hooks` ディレクトリは作らない。
 
-配置は検査で守る。
-`*-page.tsx` が `pages/` の外にあること、featureの直下に `.tsx` があること、`hooks/` に `use-*.ts` 以外があることは、`frontend/lint/feature-layout.test.js` が失敗にする。
-`hooks/` の外のHookの定義は、jsPluginの `react-rules/no-hook-definition` が報告する。
-moduleからのReactのimportと、Hookから画面とcomponentへのimportは、`no-restricted-imports` のoverrideが報告する。
+この配置はOxlintとテストで検査する。
+規約は[フロントエンドのルーティングと状態管理](../frontend/routing-and-state.md#react-hooksと状態)に、検査の中身は[フロントエンドのLint設定](../frontend/lint-config.md#ファイルの範囲ごとの制限)に置く。
 
 Orvalの設定、生成Task、生成物のGit管理は[ADR-052](ADR-052-commit-openapi-contract-and-check-generated-client.md)に従う。
 生成clientには `client: 'react-query'`、`httpClient: 'fetch'`、`mode: 'tags-split'` を使い、schemaもtag単位に分割する。

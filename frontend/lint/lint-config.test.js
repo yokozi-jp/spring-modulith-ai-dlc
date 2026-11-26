@@ -58,6 +58,28 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
       expect(codesIn("features/order/own-feature.ts")).toStrictEqual([]);
     });
 
+    it("hooks/ から画面、component、共有の component の import を禁止する", () => {
+      expect(countIn("features/order/hooks/page-import.ts", "eslint(no-restricted-imports)")).toBe(
+        3,
+      );
+    });
+
+    // 禁止する書き方は、React 本体と部分 path、react-dom、react-i18next、TanStack の react-*、@frontend/ui、lucide-react、画面と component と Hook の alias と ./ の 15 個である。
+    it("feature の直下の module から React と React の package、同じ feature の画面と component と Hook の import を禁止する", () => {
+      expect(countIn("features/order/module-react.ts", "eslint(no-restricted-imports)")).toBe(15);
+    });
+
+    it("module のテストでは、React の import と補助の Hook の定義を許可する", () => {
+      expect(codesIn("features/order/module-react.test.ts")).toStrictEqual([]);
+    });
+
+    it("form.ts と queries.ts は TanStack の react-* を使えるが、React 本体は禁止する", () => {
+      expect(codesIn("features/order/form.ts")).toStrictEqual([]);
+      expect(codesIn("features/order/queries.ts")).toStrictEqual([]);
+      expect(countIn("features/customer/form.ts", "eslint(no-restricted-imports)")).toBe(1);
+      expect(codesIn("features/customer/queries.ts")).toStrictEqual([]);
+    });
+
     // 実物のアプリが 1 つの間は、apps/web の設定を複製した fixture のアプリで、規則が apps/* に効くことを確かめる。
     it("別のアプリでも、別の feature の import と、feature から route の import を禁止する", () => {
       expect(
@@ -218,7 +240,17 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
     });
   });
 
-  describe("Effect", () => {
+  describe("React の規則", () => {
+    it("hooks/ の外の custom Hook の定義を禁止する", () => {
+      expect(
+        countIn("features/order/hook-in-component.tsx", "react-rules(no-hook-definition)"),
+      ).toBe(1);
+    });
+
+    it("hooks/ の中の custom Hook の定義を許可する", () => {
+      expect(codesIn("features/order/hooks/use-order-draft.ts")).toStrictEqual([]);
+    });
+
     it("名前付き import、別名の import、member 参照、分割代入、再 export の Effect Hook を禁止する", () => {
       expect(countIn("features/order/effect.tsx", "react-rules(no-effect)")).toBe(6);
     });
@@ -366,29 +398,5 @@ describe("fixture に適用したプロジェクトの lint 設定", () => {
     it("kebab-case のファイル名を許可する", () => {
       expect(codesIn("features/order/order-summary.tsx")).toStrictEqual([]);
     });
-  });
-});
-
-describe("fixture に適用した feature の中の役割の lint 設定", () => {
-  it("hooks/ の外の custom Hook の定義を禁止する", () => {
-    expect(countIn("features/order/hook-in-component.tsx", "react-rules(no-hook-definition)")).toBe(
-      1,
-    );
-  });
-
-  it("hooks/ の中の custom Hook の定義を許可する", () => {
-    expect(codesIn("features/order/hooks/use-order-draft.ts")).toStrictEqual([]);
-  });
-
-  it("hooks/ から画面、component、共有の component の import を禁止する", () => {
-    expect(countIn("features/order/hooks/page-import.ts", "eslint(no-restricted-imports)")).toBe(3);
-  });
-
-  it("module から React、react-i18next、TanStack の react-query と react-router、feature の Hook の import を禁止する", () => {
-    expect(countIn("features/order/module-react.ts", "eslint(no-restricted-imports)")).toBe(4);
-  });
-
-  it("module から @tanstack/react-form の import を許可する", () => {
-    expect(codesIn("features/order/form.ts")).toStrictEqual([]);
   });
 });

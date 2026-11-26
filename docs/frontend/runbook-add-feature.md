@@ -25,7 +25,7 @@ tags: [runbook, frontend, feature]
 8. local UI state、server state、URL state、form stateを対応する既存機構へ割り当てる。
 9. 利用者向けの固定文言を追加または変更する場合は、[国際化](i18n.md)に従い、`src/i18n/locales/`の`ja.json`と`en.json`を同じ変更で更新する。
 10. 新しいファイルを作るときは、[ファイルの役割](file-roles/index.md)で役割を選び、その文書のチェックリストで点検する。
-11. custom Hookは、再利用、外部system同期、または画面のmutation、form、通知の状態の分離がある場合に、`hooks/`へ追加する。共通化は、具体的な再利用が存在する場合だけ追加する。
+11. custom Hookは、具体的な用途名で表せるときに`hooks/`へ追加する（[React Hooksと状態](routing-and-state.md#react-hooksと状態)）。共通化は、具体的な再利用が存在する場合だけ追加する。
 12. 対象コードの隣へ最小のtestを追加し、[Lintとテストのリファレンス](../tooling/lint-and-test.md#フロントエンド)に従って`task fe-verify`を実行する。
 
 ## APIやbackendの変更が要るときの確認

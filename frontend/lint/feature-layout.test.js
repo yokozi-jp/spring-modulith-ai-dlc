@@ -6,10 +6,14 @@ import { describe, expect, it } from "vite-plus/test";
 const featuresRoot = fileURLToPath(new URL("../apps/web/src/features", import.meta.url));
 const roleDirectories = new Set(["pages", "components", "hooks"]);
 
-/** @typedef {{ directory: string | undefined, name: string, isTest: boolean, isPage: boolean }} Entry */
+/** @typedef {{ directory: string | undefined, depth: number, name: string, isTest: boolean, isPage: boolean }} Entry */
 
 /** @type {Array<{ applies: (entry: Entry) => boolean, message: string }>} */
 const rules = [
+  {
+    applies: ({ depth }) => depth === 0,
+    message: "features/ の直下には feature のディレクトリだけを置く",
+  },
   {
     applies: ({ directory, name }) => directory === undefined && name.endsWith(".tsx"),
     message: "feature の直下に .tsx を置かない。画面は pages/、component は components/ へ置く",
@@ -17,6 +21,11 @@ const rules = [
   {
     applies: ({ directory }) => directory !== undefined && !roleDirectories.has(directory),
     message: "feature の直下のディレクトリは pages、components、hooks だけにする",
+  },
+  {
+    applies: ({ directory, depth }) =>
+      (directory === "pages" || directory === "hooks") && depth > 2,
+    message: "pages/ と hooks/ の下にサブディレクトリを作らない",
   },
   {
     applies: ({ directory, isPage }) => isPage && directory !== "pages",
@@ -41,10 +50,11 @@ const rules = [
 function layoutViolations(files) {
   return files.flatMap((file) => {
     const [, ...inFeature] = file.split("/");
-    const name = String(inFeature.at(-1));
+    const name = inFeature.at(-1) ?? file;
     /** @type {Entry} */
     const entry = {
       directory: inFeature.length > 1 ? inFeature[0] : undefined,
+      depth: inFeature.length,
       name,
       isTest: /\.test\.tsx?$/u.test(name),
       isPage: name.endsWith("-page.tsx"),
@@ -85,6 +95,9 @@ describe("feature のファイルの配置", () => {
       "orders/hooks/orders-page.tsx",
       "orders/pages/orders-table.tsx",
       "orders/hooks/format.ts",
+      "orders/pages/sub/orders-page.tsx",
+      "orders/hooks/sub/use-orders.ts",
+      "stray-page.tsx",
     ])("%s を禁止する", (file) => {
       expect(layoutViolations([file])).toHaveLength(1);
     });

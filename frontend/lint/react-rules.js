@@ -78,7 +78,8 @@ export const noHookDefinition = {
   create(context) {
     return {
       FunctionDeclaration(node) {
-        if (hookName.test(nameOf(node.id))) {
+        const name = node.id?.name;
+        if (typeof name === "string" && hookName.test(name)) {
           context.report({ node: node.id, messageId: "hook" });
         }
       },

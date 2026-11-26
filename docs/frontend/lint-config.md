@@ -77,19 +77,20 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
 そのため禁止の一覧をルートの`vite.config.ts`の定数に分け、overrideごとに組み合わせている。
 同じファイルに複数のoverrideが一致すると、後のoverrideのoptionだけが効くので、overrideの並び順を変えるときは組み合わせ結果を確かめる。
 
-| 対象のファイル                     | `no-restricted-imports`                                 | `no-restricted-globals`と`no-restricted-properties` |
-| ---------------------------------- | ------------------------------------------------------- | --------------------------------------------------- |
-| すべて（top-level）                | Base UI、テスト用部品、テレメトリSDK                    | HTML sink、network                                  |
-| `apps/web/src/{api,i18n}/**`       | 共有層、Base UI、テスト用部品、テレメトリSDK            | top-levelを引き継ぐ                                 |
-| `apps/web/src/components/**`       | 共有層、component、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
-| `apps/web/src/lib/**`              | lib、Base UI、テスト用部品、テレメトリSDK               | top-levelを引き継ぐ                                 |
-| `apps/web/src/lib/telemetry.ts`    | lib、Base UI、テスト用部品                              | top-levelを引き継ぐ                                 |
-| `apps/web/src/features/**`         | feature、Base UI、テスト用部品、テレメトリSDK           | top-levelを引き継ぐ                                 |
-| `apps/web/src/features/*/hooks/**` | feature、hook、Base UI、テスト用部品、テレメトリSDK     | top-levelを引き継ぐ                                 |
-| `apps/web/src/features/*/*.ts`     | feature、module、Base UI、テスト用部品、テレメトリSDK   | top-levelを引き継ぐ                                 |
-| `packages/ui/**`                   | テスト用部品、テレメトリSDK                             | top-levelを引き継ぐ                                 |
-| `packages/api/**`                  | Base UI、テスト用部品、テレメトリSDK                    | HTML sinkだけ                                       |
-| テストファイルと`src/testing/**`   | Base UI、テレメトリSDK                                  | top-levelを引き継ぐ                                 |
+| 対象のファイル                              | `no-restricted-imports`                                                                    | `no-restricted-globals`と`no-restricted-properties` |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------- |
+| すべて（top-level）                         | Base UI、テスト用部品、テレメトリSDK                                                       | HTML sink、network                                  |
+| `apps/web/src/{api,i18n}/**`                | 共有層、Base UI、テスト用部品、テレメトリSDK                                               | top-levelを引き継ぐ                                 |
+| `apps/web/src/components/**`                | 共有層、component、Base UI、テスト用部品、テレメトリSDK                                    | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/**`                       | lib、Base UI、テスト用部品、テレメトリSDK                                                  | top-levelを引き継ぐ                                 |
+| `apps/web/src/lib/telemetry.ts`             | lib、Base UI、テスト用部品                                                                 | top-levelを引き継ぐ                                 |
+| `apps/web/src/features/**`                  | feature、Base UI、テスト用部品、テレメトリSDK                                              | top-levelを引き継ぐ                                 |
+| `apps/web/src/features/*/hooks/**`          | feature、画面とcomponent、Base UI、テスト用部品、テレメトリSDK                             | top-levelを引き継ぐ                                 |
+| `apps/web/src/features/*/*.ts`              | feature、React、React package、画面、component、hook、Base UI、テスト用部品、テレメトリSDK | top-levelを引き継ぐ                                 |
+| `apps/web/src/features/*/{form,queries}.ts` | feature、React、画面、component、hook、Base UI、テスト用部品、テレメトリSDK                | top-levelを引き継ぐ                                 |
+| `packages/ui/**`                            | テスト用部品、テレメトリSDK                                                                | top-levelを引き継ぐ                                 |
+| `packages/api/**`                           | Base UI、テスト用部品、テレメトリSDK                                                       | HTML sinkだけ                                       |
+| テストファイルと`src/testing/**`            | Base UI、テレメトリSDK                                                                     | top-levelを引き継ぐ                                 |
 
 各禁止の中身は次のとおりである。
 
@@ -100,10 +101,16 @@ packageの`vite.config.ts`に`lint`か`fmt`があると、`vp lint`をpackageで
   `lib`は依存の最下層であり、UIを参照しない。
 - **feature**：`@/routes/**`、`@/routeTree.gen`。
   routeの情報は`getRouteApi`で取る。
-- **hook**：`@/features/*/pages/**`、`@/features/*/components/**`、`@/components/**`。
+- **画面とcomponent（hook用）**：`@/features/*/pages/**`、`@/features/*/components/**`、`./pages/**`、`./components/**`、`@/components/**`。
   Hookは画面とcomponentに依存しない。
-- **module**：`react`、`react-dom`、`react-i18next`、`@tanstack/react-query`、`@tanstack/react-router`、`@/features/*/pages/**`、`@/features/*/components/**`、`@/features/*/hooks/**`。
-  featureの直下の`.ts`はReactを使わない関数だけを置く。`form.ts`の`@tanstack/react-form`は禁止の外である。
+  `../`のimportは`import/no-relative-parent-imports`が禁じる。
+- **React（module用）**：`react`、`react/**`、`react-dom`、`react-dom/**`、`react-i18next`。
+  featureの直下の`.ts`はReactを使わない関数だけを置く。
+- **React package（module用）**：`@tanstack/react-*`、`@frontend/ui/**`、`lucide-react`。
+  Reactに依存するpackageを名前で列挙しているので、新しいpackageを足したら`vite.config.ts`の`reactLibraryImports`にも足す。
+- **画面、component、hook（module用）**：`@/features/*/{pages,components,hooks}/**`と、`./pages/**`、`./components/**`、`./hooks/**`。
+- **`form.ts`と`queries.ts`**：Reactと画面、component、hookは禁止し、`@tanstack/react-form`と`@tanstack/react-query`は許可する。
+  別の役割であり、moduleではない（[feature の module](file-roles/feature-module.md)）。
 - **Base UI**：`@base-ui/**`。
   `@frontend/ui`からimportする。`packages/ui/**`のproduction sourceだけが許す。
 - **テスト用部品**：`msw`、`msw/**`、`@frontend/api/mocks/**`、`@/testing/**`、`@testing-library/**`。
@@ -132,11 +139,22 @@ linkとbuttonの入れ子は、jsPluginの`ui-composition/no-button-in-link`が�
 `react`からの名前付きimportと再export、default importの名前（`React.useEffect`）の参照、分割代入を報告する。
 自前の関数で包んだEffectは検出しない。
 
-custom Hookの定義（`use`で始まる関数宣言）は、jsPluginの`react-rules/no-hook-definition`が`apps/*/src/features/**`で禁じ、`features/*/hooks/**`だけで外す。
-関数宣言だけを見る。`const useX = () => {}`は`func-style`が禁じる。
+featureのcustom Hookの定義（`use`で始まる関数宣言）は、jsPluginの`react-rules/no-hook-definition`が`apps/*/src/features/**`で禁じ、`features/*/hooks/**`とテストファイルだけで外す。
+テストファイルでは、`renderHook`のwrapperなどの補助のHookを書ける。
+関数宣言だけを見る。`const useX = () => {}`は`func-style`が禁じる。`createFormHook`が返す`useAppForm`は関数宣言ではないので対象外である。
+`features/`の外には効かない。
 
-featureの直下のファイルの置き場所は、Lintではなく`frontend/lint/feature-layout.test.js`が検査する。
-直下に`.tsx`を置かないこと、`*-page.tsx`を`pages/`にだけ置くこと、`hooks/`に`use-*.ts`だけを置くことを、パスの一覧で確かめる。
+featureのファイルの置き場所は、Lintではなく`frontend/lint/feature-layout.test.js`が検査する。
+検査は`task fe-verify`とCIで走り、`task fe-check`では走らない。
+次の規則を、パスの一覧に対して確かめる。
+
+- `features/`の直下にファイルを置かない。
+- featureの直下に`.tsx`を置かない。
+- featureの直下のディレクトリは`pages`、`components`、`hooks`だけにする。
+- `pages/`と`hooks/`の下にサブディレクトリを作らない。
+- `*-page.tsx`は`pages/`にだけ置く。
+- `pages/`に置くのは`*-page.tsx`とテストだけにする。
+- `hooks/`に置くのは`use-*.ts`とテストだけにする。
 
 組み合わせた結果は、`frontend/lint/lint-config.test.js`が`frontend/lint/fixtures/`の違反例と正しい例を実際の設定でLintして確かめる。
 

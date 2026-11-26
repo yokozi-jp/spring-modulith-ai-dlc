@@ -53,22 +53,26 @@ const featureImports = {
   group: ["@/routes/**", "@/routeTree.gen"],
   message: "Use getRouteApi instead of importing a route.",
 };
-// module は React を使わない純粋な関数だけを置く（docs/frontend/file-roles/feature-module.md）。form.ts の @tanstack/react-form は対象外である。
-const moduleImports = {
-  group: [
-    "react",
-    "react-dom",
-    "react-i18next",
-    "@tanstack/react-query",
-    "@tanstack/react-router",
-    "@/features/*/pages/**",
-    "@/features/*/components/**",
-    "@/features/*/hooks/**",
-  ],
-  message: "A feature module must not use React or depend on pages, components or Hooks.",
+// 同じ feature の画面、component、Hook は、alias と、feature の直下の ./ の両方で禁じる。../ は import/no-relative-parent-imports が禁じる。
+const pageGlobs = ["@/features/*/pages/**", "./pages/**"];
+const componentGlobs = ["@/features/*/components/**", "./components/**"];
+const hookGlobs = ["@/features/*/hooks/**", "./hooks/**"];
+const featureUiImports = {
+  group: [...pageGlobs, ...componentGlobs, ...hookGlobs],
+  message: "Do not depend on the feature's pages, components or Hooks from a module.",
+};
+const reactImports = {
+  group: ["react", "react/**", "react-dom", "react-dom/**", "react-i18next"],
+  message: "Do not use React here (docs/frontend/file-roles/feature-module.md).",
+};
+// ponytail: React に依存する package を名前で列挙する。新しい React 依存の package を足したら、ここにも足す。
+const reactLibraryImports = {
+  group: ["@tanstack/react-*", "@frontend/ui/**", "lucide-react"],
+  message:
+    "A feature module must not use React libraries (docs/frontend/file-roles/feature-module.md).",
 };
 const hookImports = {
-  group: ["@/features/*/pages/**", "@/features/*/components/**", "@/components/**"],
+  group: [...pageGlobs, ...componentGlobs, "@/components/**"],
   message: "A feature Hook must not depend on pages or components.",
 };
 const baseUiImports = {
@@ -84,6 +88,8 @@ const telemetrySdkImports = {
   group: ["@grafana/*"],
   message: "Call the telemetry SDK only through src/lib/telemetry.ts (ADR-068).",
 };
+
+const featurePatterns = [featureImports, baseUiImports, testOnlyImports, telemetrySdkImports];
 
 // better-tailwindcss の規則。entryPoint を option で渡すため、規則の一覧をここに持つ。
 const tailwindRuleNames = [
@@ -319,50 +325,35 @@ export default defineConfig({
       {
         files: ["apps/*/src/features/**"],
         rules: {
-          "no-restricted-imports": [
-            "error",
-            { patterns: [featureImports, baseUiImports, testOnlyImports, telemetrySdkImports] },
-          ],
+          "no-restricted-imports": ["error", { patterns: featurePatterns }],
+          // custom Hook は hooks/ にだけ書く（下の override が hooks/ だけで外す）。
+          "react-rules/no-hook-definition": "error",
         },
-      },
-      // custom Hook は hooks/ にだけ書く。hooks/ の中は、画面と component に依存しない。
-      {
-        files: ["apps/*/src/features/**"],
-        rules: { "react-rules/no-hook-definition": "error" },
       },
       {
         files: ["apps/*/src/features/*/hooks/**"],
         rules: {
           "react-rules/no-hook-definition": "off",
-          "no-restricted-imports": [
-            "error",
-            {
-              patterns: [
-                featureImports,
-                hookImports,
-                baseUiImports,
-                testOnlyImports,
-                telemetrySdkImports,
-              ],
-            },
-          ],
+          "no-restricted-imports": ["error", { patterns: [...featurePatterns, hookImports] }],
         },
       },
-      // feature の直下の .ts は module である。テストは、後ろのテストの override が制限を置き換える。
+      // feature の直下の .ts は module で、React を使わない。テストは、後ろのテストの override が制限を置き換える。
       {
         files: ["apps/*/src/features/*/*.ts"],
         rules: {
           "no-restricted-imports": [
             "error",
-            {
-              patterns: [
-                featureImports,
-                moduleImports,
-                baseUiImports,
-                testOnlyImports,
-                telemetrySdkImports,
-              ],
-            },
+            { patterns: [...featurePatterns, reactImports, reactLibraryImports, featureUiImports] },
+          ],
+        },
+      },
+      // form.ts は @tanstack/react-form、queries.ts は @tanstack/react-query を使う。React 本体と画面、component、Hook には依存しない。
+      {
+        files: ["apps/*/src/features/*/{form,queries}.ts"],
+        rules: {
+          "no-restricted-imports": [
+            "error",
+            { patterns: [...featurePatterns, reactImports, featureUiImports] },
           ],
         },
       },
@@ -421,6 +412,8 @@ export default defineConfig({
         ],
         rules: {
           "no-restricted-imports": ["error", { patterns: [baseUiImports, telemetrySdkImports] }],
+          // renderHook の wrapper など、テストの補助の Hook を許す。
+          "react-rules/no-hook-definition": "off",
         },
       },
     ],

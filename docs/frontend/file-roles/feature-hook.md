@@ -18,8 +18,8 @@ mutation は生成 Hook で送り、画面遷移と通知は `mutate` の callba
 Hook を作る条件、名前、置き場所の正文は [React Hooksと状態](../routing-and-state.md#react-hooksと状態)と [Hookの名前とファイル](../routing-and-state.md#hookの名前とファイル)にある。
 
 Hook は、呼び出し元が一つの画面だけでも作る。
-再利用の有無は、置き場所の判断に使わない。
-画面の mutation、form、通知の状態は `hooks/` の Hook に置き、`hooks/` の外に custom Hook を定義しない（[ADR-032](../../adr/ADR-032-organize-frontend-by-business-feature.md)）。
+再利用の有無は、置き場所の判断に使わない（[ADR-032](../../adr/ADR-032-organize-frontend-by-business-feature.md)）。
+`form.ts` の `useAppForm` と `withFieldGroup` は、`createFormHook` が返す値であり関数宣言ではないので、`hooks/` の外にあってよい（[feature の form の組み立て](feature-form.md)）。
 
 今の feature の Hook は、次のどれかを持つ。
 
