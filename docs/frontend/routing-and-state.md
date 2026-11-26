@@ -69,7 +69,7 @@ URLのpathとparameterの命名は[フロントエンドのURL設計](url-design
 layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` を描画する。
 
 テナントを選んだ後だけ出す業務の画面は、pathless layoutの `_authenticated/_tenant` の下に置く。
-`_tenant/route.tsx` の `beforeLoad` が選んだテナント（`GET /api/current-tenant`）を読み、typeが `/problems/tenant-not-selected` の403なら `/tenants` へ移す。
+`_tenant/route.tsx` の `beforeLoad` が選んだテナント（`GET /api/v1/current-tenant`）を読み、typeが `/problems/tenant-not-selected` の403なら `/tenants` へ移す。
 テナントを選ぶ画面の `_authenticated/tenants.tsx` は、ログインが要り、テナントが要らないため、`_tenant` の外に置く。
 テナントを選んだ後は、routerで遷移せず、文書を `/` で読み直す。
 選ぶ前に読んだ状態を持ち越さず、focusを文書の先頭に戻すためである。

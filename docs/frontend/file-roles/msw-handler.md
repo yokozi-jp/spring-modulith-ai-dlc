@@ -17,7 +17,7 @@ API を使う component test は、HTTP の境界を MSW で置き換え、Orval
 **MSW の handler と fixture** は、その置き換えのために複数のテストが共有する server、応答の値、handler を足す関数である。
 1 つのテストファイルだけが使う handler は、そのテストファイルに書く（`features/orders/orders-page.test.tsx` の `serveOrders`）。
 
-- `apps/web/src/testing/msw.ts`：`apps/web` の全テストが共有する server。選んだテナントの API（`GET /api/current-tenant`）だけを既定で応える
+- `apps/web/src/testing/msw.ts`：`apps/web` の全テストが共有する server。選んだテナントの API（`GET /api/v1/current-tenant`）だけを既定で応える
 - `packages/api/src/testing/msw.ts`：`@frontend/api` の全テストが共有する server。既定の handler を持たない
 - `apps/web/src/testing/orders.ts`：注文の画面のテストが共有する固定の値、応答、handler を足す関数
 - `apps/web/src/testing/tenancy.ts`：テナントの画面のテストが共有する固定の値と、テナントを選ぶ前の 403 の応答

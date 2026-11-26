@@ -79,7 +79,7 @@ describe("注文の詳細の画面", () => {
   });
 
   it.each([404, 400])("詳細が %i なら not found を表示する", async (status) => {
-    server.use(http.get("*/api/orders/:orderId", () => problemResponse(status, "Not Found")));
+    server.use(http.get("*/api/v1/orders/:orderId", () => problemResponse(status, "Not Found")));
 
     await renderRoute(detailPath);
 
@@ -158,7 +158,7 @@ describe("注文の詳細の画面", () => {
     const update = createGate();
     serveDetail(draftOrder());
     const bodies = serveUpdate("post", path, noContent);
-    server.use(http.post(`*/api/orders/:orderId/${path}`, () => update.promise, { once: true }));
+    server.use(http.post(`*/api/v1/orders/:orderId/${path}`, () => update.promise, { once: true }));
     const { user } = await renderRoute(detailPath);
     await user.click(await screen.findByRole("button", { name }));
 

@@ -120,7 +120,7 @@ class ApiErrorContractTest {
   void methodNotAllowedAdvertisesDeclaredMethods() throws Exception {
     final String allow =
         mockMvc
-            .perform(delete("/api/error-fixture/items").with(csrf()).with(oidcLogin()))
+            .perform(delete("/api/v1/error-fixture/items").with(csrf()).with(oidcLogin()))
             .andExpect(status().isMethodNotAllowed())
             .andReturn()
             .getResponse()
@@ -138,36 +138,41 @@ class ApiErrorContractTest {
         Arguments.of("本文の入力検証", invalidBody(), 400, VALIDATION_ERROR, validation),
         Arguments.of(
             "パラメータの入力検証",
-            get("/api/error-fixture/items?limit=0"),
+            get("/api/v1/error-fixture/items?limit=0"),
             400,
             VALIDATION_ERROR,
             validation),
         Arguments.of(
             "ConstraintViolation",
-            get("/api/error-fixture/constraint-violation"),
+            get("/api/v1/error-fixture/constraint-violation"),
             400,
             VALIDATION_ERROR,
             validation),
-        Arguments.of("未処理例外", get("/api/error-fixture/unhandled"), 500, "about:blank", "サーバー内部エラー"),
         Arguments.of(
-            "404", get("/api/error-fixture/not-found?id=a"), 404, "about:blank", "リソースが見つかりません"),
+            "未処理例外", get("/api/v1/error-fixture/unhandled"), 500, "about:blank", "サーバー内部エラー"),
         Arguments.of(
-            "権限不足の 403", get("/api/error-fixture/forbidden"), 403, "about:blank", "アクセス権限がありません"),
+            "404", get("/api/v1/error-fixture/not-found?id=a"), 404, "about:blank", "リソースが見つかりません"),
+        Arguments.of(
+            "権限不足の 403",
+            get("/api/v1/error-fixture/forbidden"),
+            403,
+            "about:blank",
+            "アクセス権限がありません"),
         Arguments.of(
             "409",
-            get("/api/error-fixture/conflict"),
+            get("/api/v1/error-fixture/conflict"),
             409,
             "/problems/unique-violation",
             "同じ値がすでに使われています"),
         Arguments.of(
             "422",
-            get("/api/error-fixture/unprocessable"),
+            get("/api/v1/error-fixture/unprocessable"),
             422,
             "/problems/error-fixture/rejected",
             "処理できない内容です"),
         Arguments.of(
             "405",
-            delete("/api/error-fixture/items").with(csrf()),
+            delete("/api/v1/error-fixture/items").with(csrf()),
             405,
             "about:blank",
             "許可されていないメソッドです"),
@@ -184,7 +189,7 @@ class ApiErrorContractTest {
             "about:blank",
             badRequest),
         Arguments.of(
-            "型の不一致", get("/api/error-fixture/items?limit=abc"), 400, "about:blank", badRequest));
+            "型の不一致", get("/api/v1/error-fixture/items?limit=abc"), 400, "about:blank", badRequest));
   }
 
   @Test
@@ -227,21 +232,22 @@ class ApiErrorContractTest {
 
   private static Stream<Arguments> methodValidationCases() {
     return Stream.of(
-        Arguments.of("パラメータ", get("/api/error-fixture/items?limit=0"), List.of("/limit")),
+        Arguments.of("パラメータ", get("/api/v1/error-fixture/items?limit=0"), List.of("/limit")),
         Arguments.of(
             "本文とほかの制約のある引数",
-            post("/api/error-fixture/items-with-limit?limit=1")
+            post("/api/v1/error-fixture/items-with-limit?limit=1")
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"name\":\"x\",\"items\":[{\"code\":\"too-long\"}]}"),
             List.of("/items/0/code")),
         Arguments.of(
             "リストのクエリパラメータの要素",
-            get("/api/error-fixture/names").queryParam("names", "", "ok"),
+            get("/api/v1/error-fixture/names").queryParam("names", "", "ok"),
             List.of("/names/0")),
         // Spring MVC は引数をまたぐ違反だけでは例外にしない（spring-framework#33271）。
         // 引数の違反（to < 0）と一緒に起こし、引数をまたぐ違反が "" になることを確かめる。
-        Arguments.of("引数をまたぐ制約", get("/api/error-fixture/range?from=2&to=-1"), List.of("", "/to")));
+        Arguments.of(
+            "引数をまたぐ制約", get("/api/v1/error-fixture/range?from=2&to=-1"), List.of("", "/to")));
   }
 
   @Test
@@ -249,7 +255,7 @@ class ApiErrorContractTest {
   void constraintViolationErrorsHavePointers() throws Exception {
     mockMvc
         .perform(
-            get("/api/error-fixture/constraint-violation")
+            get("/api/v1/error-fixture/constraint-violation")
                 .with(oidcLogin())
                 .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
         .andExpect(status().isBadRequest())
@@ -272,16 +278,16 @@ class ApiErrorContractTest {
 
   private static Stream<Arguments> businessFailureTitleCases() {
     return Stream.of(
-        Arguments.of("/api/error-fixture/not-found?id=a", 404, "Not Found"),
-        Arguments.of("/api/error-fixture/unprocessable", 422, "Unprocessable Content"));
+        Arguments.of("/api/v1/error-fixture/not-found?id=a", 404, "Not Found"),
+        Arguments.of("/api/v1/error-fixture/unprocessable", 422, "Unprocessable Content"));
   }
 
   @ParameterizedTest(name = "{0}")
   @ValueSource(
       strings = {
-        "/api/error-fixture/not-found?id=secret-key",
-        "/api/error-fixture/conflict",
-        "/api/error-fixture/unprocessable"
+        "/api/v1/error-fixture/not-found?id=secret-key",
+        "/api/v1/error-fixture/conflict",
+        "/api/v1/error-fixture/unprocessable"
       })
   @DisplayName("404、409、422 の本文は例外のメッセージとクラス名を含まない")
   void businessFailuresHideExceptionMessages(final String path) throws Exception {
@@ -302,7 +308,7 @@ class ApiErrorContractTest {
       responses.add(
           mockMvc
               .perform(
-                  get("/api/error-fixture/not-found")
+                  get("/api/v1/error-fixture/not-found")
                       .queryParam("id", id)
                       .with(oidcLogin())
                       .header(HttpHeaders.ACCEPT_LANGUAGE, "ja"))
@@ -328,9 +334,9 @@ class ApiErrorContractTest {
   @ParameterizedTest(name = "{0}")
   @ValueSource(
       strings = {
-        "/api/error-fixture/unhandled",
-        "/api/error-fixture/illegal-argument",
-        "/api/error-fixture/no-such-element"
+        "/api/v1/error-fixture/unhandled",
+        "/api/v1/error-fixture/illegal-argument",
+        "/api/v1/error-fixture/no-such-element"
       })
   @DisplayName("JDK の例外は 500 になり、本文に例外のメッセージ、クラス名、スタックトレースを含まない")
   void jdkExceptionsAreInternalServerErrors(final String path) throws Exception {
@@ -350,7 +356,7 @@ class ApiErrorContractTest {
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors").doesNotExist());
     mockMvc
-        .perform(get("/api/error-fixture/items?limit=abc").with(oidcLogin()))
+        .perform(get("/api/v1/error-fixture/items?limit=abc").with(oidcLogin()))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.errors").doesNotExist());
   }
@@ -368,7 +374,7 @@ class ApiErrorContractTest {
 
     final int errorsBefore = capturedLogRecords.withBody("Unhandled API exception").size();
     mockMvc
-        .perform(get("/api/error-fixture/unhandled").with(oidcLogin()))
+        .perform(get("/api/v1/error-fixture/unhandled").with(oidcLogin()))
         .andExpect(status().isInternalServerError());
     assertEquals(
         errorsBefore + 1,
@@ -388,7 +394,7 @@ class ApiErrorContractTest {
     final Set<String> businessFailureAttributes =
         Set.of("exception.type", "exception.message", "exception.stacktrace", "problem.type");
     mockMvc
-        .perform(get("/api/error-fixture/not-found?id=a").with(oidcLogin()))
+        .perform(get("/api/v1/error-fixture/not-found?id=a").with(oidcLogin()))
         .andExpect(status().isNotFound());
     assertEquals(
         "about:blank",
@@ -397,7 +403,7 @@ class ApiErrorContractTest {
             .get(PROBLEM_TYPE),
         "404 の type");
     mockMvc
-        .perform(get("/api/error-fixture/unprocessable").with(oidcLogin()))
+        .perform(get("/api/v1/error-fixture/unprocessable").with(oidcLogin()))
         .andExpect(status().isUnprocessableContent());
     assertEquals(
         "/problems/error-fixture/rejected",
@@ -407,7 +413,7 @@ class ApiErrorContractTest {
         "422 の type");
 
     mockMvc
-        .perform(get("/api/error-fixture/conflict").with(oidcLogin()))
+        .perform(get("/api/v1/error-fixture/conflict").with(oidcLogin()))
         .andExpect(status().isConflict());
     final LogRecordData conflict =
         assertLogged(
@@ -436,7 +442,7 @@ class ApiErrorContractTest {
   @DisplayName("405 で PageNotFound の WARN を記録しない")
   void methodNotAllowedDoesNotLogPageNotFound() throws Exception {
     mockMvc
-        .perform(delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()))
+        .perform(delete("/api/v1/error-fixture/items").with(oidcLogin()).with(csrf()))
         .andExpect(status().isMethodNotAllowed());
 
     assertTrue(
@@ -449,7 +455,7 @@ class ApiErrorContractTest {
   void problemTraceIdMatchesLoggedTraceId() throws Exception {
     final String body =
         mockMvc
-            .perform(delete("/api/error-fixture/items").with(oidcLogin()).with(csrf()))
+            .perform(delete("/api/v1/error-fixture/items").with(oidcLogin()).with(csrf()))
             .andExpect(status().isMethodNotAllowed())
             .andReturn()
             .getResponse()
@@ -481,7 +487,7 @@ class ApiErrorContractTest {
   }
 
   private static MockHttpServletRequestBuilder postItems() {
-    return post("/api/error-fixture/items").with(csrf());
+    return post("/api/v1/error-fixture/items").with(csrf());
   }
 
   private static MockHttpServletRequestBuilder invalidBody() {

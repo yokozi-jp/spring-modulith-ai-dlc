@@ -33,7 +33,7 @@ import org.springframework.web.filter.ForwardedHeaderFilter;
 class CrossOriginRequestFilterTest {
 
   /** {@code /api/**} の中の、更新系の要求を受ける path。 */
-  private static final String ORDERS = "/api/orders";
+  private static final String ORDERS = "/api/v1/orders";
 
   /** {@code Sec-Fetch-Site} の header の名前。 */
   private static final String FETCH_SITE = "Sec-Fetch-Site";

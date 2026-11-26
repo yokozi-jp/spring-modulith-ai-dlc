@@ -23,7 +23,7 @@ export const getListPaymentsResponseMock = (overrideResponse: Partial<Extract<Pa
 
 
 export const getListPaymentsMockHandler = (overrideResponse?: PaymentSummaryListResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<PaymentSummaryListResponse> | PaymentSummaryListResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/api/payments', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+  return http.get('*/api/v1/payments', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined

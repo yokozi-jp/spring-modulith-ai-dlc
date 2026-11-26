@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: APIの互換性と廃止
-description: APIの改修が後方互換かどうかの判定、バージョンの粒度、APIのバージョンとリリース版の関係、OpenAPIのinfo.versionの上げ方、廃止予定の示し方と削除の条件を定める規約。既存APIの契約を変更するとき、APIを廃止するときに読む。
+description: パスへのバージョンの書き方、APIの改修が後方互換かどうかの判定、バージョンの粒度、APIのバージョンとリリース版の関係、OpenAPIのinfo.versionの上げ方、廃止予定の示し方と削除の条件を定める規約。Controllerを作るとき、既存APIの契約を変更するとき、APIを廃止するときに読む。
 tags: [convention, web-api, versioning, future-arch-guidelines]
 ---
 
@@ -13,8 +13,24 @@ APIのバージョンはメジャーバージョンの粒度で管理し、リ�
 
 ## 前提
 
-バージョンをパスへ導入する時期、導入の方法、廃止時の応答ヘッダーは[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が定める。
-この文書は、改修が後方互換かどうかの判定と、廃止の進め方を定める。
+バージョンの導入の方法と廃止時の応答ヘッダーは[ADR-013](../adr/ADR-013-standardize-http-api-contracts.md)が定め、導入の時期と実装は[ADR-138](../adr/ADR-138-introduce-api-v1-with-spring-api-versioning.md)が定める。
+この文書は、パスへのバージョンの書き方と、改修が後方互換かどうかの判定、廃止の進め方を定める。
+
+## パスへのバージョンの書き方
+
+業務のAPIはすべて`/api/v1/...`で公開する。
+`WebApiVersionConfig`が、`/api/`で始まるパスの次の区間をバージョンとして読む。
+
+- Controllerは、クラスに`@RequestMapping(path = "/api/v{version}/<リソース>", version = "1")`と書く。
+  メソッドのmappingには`/api/`の絶対のパスを書かない。クラスの`version`を迂回する。
+  パスの`v`は文字として書き、`version`は正の整数のメジャーバージョンにする（`1.1`や`1+`は書かない）。
+- `version`を書かないmappingはどのバージョンにも一致するので、必ず書く。`ApiVersionArchTest`が検査する。
+- リクエストのバージョンは`v`と正の整数だけを受ける。`WebApiVersionConfig`の厳格なparserが、`vX1`、`v01`、`v1.0`、`v0`を400にする。Springの既定のparserはこれらをv1として読む。
+- 契約のパスは`/api/v<メジャー番号>/`で始める。springdocが`{version}`を`version`の値で置き換える。Spectralの`path-api-version`が、`^/api/v[1-9][0-9]*/`で検査する。
+- セキュリティの`requestMatchers`が使うパスは、`/api/v{version}/...`の形にして、どのバージョンにも同じ認可を掛ける。
+- 対応するバージョンの一覧は、Controllerに書いた`version`から決まる。対応しないバージョン（`/api/v2/...`など）は400になる。
+- バージョンのない`/api/...`は、どのmappingにも一致せず404になる。
+- v2を足すときは、新しいControllerに`version = "2"`を書く。契約に`/api/v1/`と`/api/v2/`を並べてよい。
 
 ## 後方互換の判定
 
@@ -47,8 +63,7 @@ OpenAPIの`info.version`は、パスのバージョンとは別の、契約の�
 
 - 値は`OpenApiConfig.CONTRACT_VERSION`で手で管理し、初期値を`0.1.0`にする。
 - 後方互換な追加ではMINORを上げ、後方互換を壊す変更ではMAJORを上げる。
-- `/api/v1`を導入するときに`1.0.0`にする。
-- `1.0.0`にするまでは、後方互換を壊す変更でもMINORを上げる。
+- `/api/v1`の導入で`1.0.0`にした。
 - APIのバージョンと同じく、リリース版の番号と連動させない。
 
 版の上げ忘れは機械で検出できないため、Pull Requestのチェックリストで確かめる。
@@ -61,6 +76,7 @@ APIの廃止を決めたら、次を行う。
 1. 利用者への影響を調査し、周知と移行時期の調整を行う。
 2. OpenAPIの対象operationに`deprecated: true`を設定する。
 3. 応答にADR-013が定める`Deprecation`、`Sunset`、`Link`ヘッダーを付ける。`Deprecation`の値はRFC 9745の形式（`@`とUNIX時刻）にする。
+   最初の廃止のときに、`WebApiVersionConfig`へSpringの`StandardApiVersionDeprecationHandler`を設定してヘッダーを付ける。
 
 独立したクライアントには、`Deprecation`ヘッダーを受け取ったら警告として記録するよう、あらかじめ求めておく。
 

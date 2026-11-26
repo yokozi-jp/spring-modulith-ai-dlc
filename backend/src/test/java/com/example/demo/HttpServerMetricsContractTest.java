@@ -40,8 +40,11 @@ class HttpServerMetricsContractTest {
   /** HTTP の受信の時間の Timer。 */
   private static final String HTTP_SERVER_DURATION = "http.server.request.duration";
 
-  /** 注文を 1 件読む API の route。 */
-  private static final String ORDER_ROUTE = "/api/orders/{orderId}";
+  /** 注文を 1 件読む API の URL。 */
+  private static final String ORDER_URL = "/api/v1/orders/{orderId}";
+
+  /** 注文の GET を受けた Controller の route。バージョンは {@code v{version}} のまま {@code http.route} に載る。 */
+  private static final String ORDER_ROUTE = "/api/v{version}/orders/{orderId}";
 
   /** semantic conventions が推奨する、HTTP の受信の時間の bucket の境界（秒）。 */
   private static final List<Double> SEMCONV_BUCKET_BOUNDS_SECONDS =
@@ -64,7 +67,7 @@ class HttpServerMetricsContractTest {
   void recordOrderNotFound() throws Exception {
     mockMvc
         .perform(
-            MockMvcRequestBuilders.get(ORDER_ROUTE, UUID.randomUUID()).with(AppUsers.oidcLogin()))
+            MockMvcRequestBuilders.get(ORDER_URL, UUID.randomUUID()).with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isNotFound());
     orderNotFoundTimer =
         meterRegistry

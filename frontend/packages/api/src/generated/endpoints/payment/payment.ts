@@ -97,7 +97,7 @@ export const getListPaymentsUrl = (params: ListPaymentsParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/payments?${stringifiedParams}` : `/api/payments`
+  return stringifiedParams.length > 0 ? `/api/v1/payments?${stringifiedParams}` : `/api/v1/payments`
 }
 
 /**
@@ -121,7 +121,7 @@ export const listPayments = async (params: ListPaymentsParams, options?: Paramet
 
 export const getListPaymentsQueryKey = (params?: ListPaymentsParams,) => {
     return [
-    `/api/payments`, ...(params ? [params] : [])
+    `/api/v1/payments`, ...(params ? [params] : [])
     ] as const;
     }
 

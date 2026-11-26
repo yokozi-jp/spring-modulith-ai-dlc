@@ -74,27 +74,30 @@ class ApiContractTest {
   @ParameterizedTest(name = "{0} {1}")
   @ArgumentsSource(ContractCaseArguments.class)
   @DisplayName("未認証の各 operation は WWW-Authenticate 付きの 401 Problem Details を返す")
-  @ContractCase(method = RequestMethod.GET, path = "/api/orders", status = 401)
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 401)
-  @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 401)
-  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 401)
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 401)
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 401)
-  @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 401)
-  @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 401)
-  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 401)
-  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 401)
-  @ContractCase(method = RequestMethod.GET, path = "/api/memberships", status = 401)
-  @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant", status = 401)
-  @ContractCase(method = RequestMethod.PUT, path = "/api/current-tenant", status = 401)
-  @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant/members", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/orders", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/orders", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/orders/{orderId}", status = 401)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/v1/orders/{orderId}/lines", status = 401)
+  @ContractCase(
+      method = RequestMethod.POST,
+      path = "/api/v1/orders/{orderId}/confirm",
+      status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/orders/{orderId}/cancel", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/payments", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/products", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/products/{productId}", status = 401)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/products", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/memberships", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/current-tenant", status = 401)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/v1/current-tenant", status = 401)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/current-tenant/members", status = 401)
   @ContractCase(
       method = RequestMethod.PUT,
-      path = "/api/current-tenant/members/{userId}",
+      path = "/api/v1/current-tenant/members/{userId}",
       status = 401)
   @ContractCase(
       method = RequestMethod.DELETE,
-      path = "/api/current-tenant/members/{userId}",
+      path = "/api/v1/current-tenant/members/{userId}",
       status = 401)
   void unauthenticatedOperationReturnsUnauthorized(final String method, final String path)
       throws Exception {
@@ -109,19 +112,22 @@ class ApiContractTest {
   @ParameterizedTest(name = "{0} {1}")
   @ArgumentsSource(ContractCaseArguments.class)
   @DisplayName("CSRF トークンのない更新の operation は 403 Problem Details を返す")
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 403)
-  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 403)
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 403)
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
-  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 403)
-  @ContractCase(method = RequestMethod.PUT, path = "/api/current-tenant", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/orders", status = 403)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/v1/orders/{orderId}/lines", status = 403)
+  @ContractCase(
+      method = RequestMethod.POST,
+      path = "/api/v1/orders/{orderId}/confirm",
+      status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/orders/{orderId}/cancel", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/products", status = 403)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/v1/current-tenant", status = 403)
   @ContractCase(
       method = RequestMethod.PUT,
-      path = "/api/current-tenant/members/{userId}",
+      path = "/api/v1/current-tenant/members/{userId}",
       status = 403)
   @ContractCase(
       method = RequestMethod.DELETE,
-      path = "/api/current-tenant/members/{userId}",
+      path = "/api/v1/current-tenant/members/{userId}",
       status = 403)
   void updateWithoutCsrfTokenReturnsForbidden(final String method, final String path)
       throws Exception {
@@ -136,25 +142,28 @@ class ApiContractTest {
   @ParameterizedTest(name = "{0} {1}")
   @ArgumentsSource(ContractCaseArguments.class)
   @DisplayName("テナントを選ぶ前の利用者が業務の operation を呼ぶと、専用の type の 403 Problem Details を返す")
-  @ContractCase(method = RequestMethod.GET, path = "/api/orders", status = 403)
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 403)
-  @ContractCase(method = RequestMethod.GET, path = "/api/orders/{orderId}", status = 403)
-  @ContractCase(method = RequestMethod.PUT, path = "/api/orders/{orderId}/lines", status = 403)
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/confirm", status = 403)
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders/{orderId}/cancel", status = 403)
-  @ContractCase(method = RequestMethod.GET, path = "/api/payments", status = 403)
-  @ContractCase(method = RequestMethod.GET, path = "/api/products", status = 403)
-  @ContractCase(method = RequestMethod.GET, path = "/api/products/{productId}", status = 403)
-  @ContractCase(method = RequestMethod.POST, path = "/api/products", status = 403)
-  @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant", status = 403)
-  @ContractCase(method = RequestMethod.GET, path = "/api/current-tenant/members", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/orders", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/orders", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/orders/{orderId}", status = 403)
+  @ContractCase(method = RequestMethod.PUT, path = "/api/v1/orders/{orderId}/lines", status = 403)
+  @ContractCase(
+      method = RequestMethod.POST,
+      path = "/api/v1/orders/{orderId}/confirm",
+      status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/orders/{orderId}/cancel", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/payments", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/products", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/products/{productId}", status = 403)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/products", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/current-tenant", status = 403)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/current-tenant/members", status = 403)
   @ContractCase(
       method = RequestMethod.PUT,
-      path = "/api/current-tenant/members/{userId}",
+      path = "/api/v1/current-tenant/members/{userId}",
       status = 403)
   @ContractCase(
       method = RequestMethod.DELETE,
-      path = "/api/current-tenant/members/{userId}",
+      path = "/api/v1/current-tenant/members/{userId}",
       status = 403)
   void operationBeforeTenantSelectionReturnsTenantNotSelected(
       final String method, final String path) throws Exception {
@@ -297,7 +306,7 @@ class ApiContractTest {
   void conflictExceptionReturnsProblemDetailsWithoutImplementationDetails() throws Exception {
     final String body =
         mockMvc
-            .perform(get("/api/conflict-fixture/stale").with(oidcLogin()))
+            .perform(get("/api/v1/conflict-fixture/stale").with(oidcLogin()))
             .andExpect(status().isConflict())
             .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
             .andExpect(header().string(HttpHeaders.CONTENT_LANGUAGE, "ja"))
@@ -322,7 +331,7 @@ class ApiContractTest {
     final String body =
         mockMvc
             .perform(
-                get("/api/conflict-fixture/locked")
+                get("/api/v1/conflict-fixture/locked")
                     .with(oidcLogin())
                     .header(HttpHeaders.ACCEPT_LANGUAGE, "en-US"))
             .andExpect(status().isConflict())
@@ -345,7 +354,7 @@ class ApiContractTest {
   @DisplayName("ConflictException ではない IllegalStateException は 409 にならず 500 のままである")
   void illegalStateExceptionStaysInternalServerError() throws Exception {
     mockMvc
-        .perform(get("/api/conflict-fixture/illegal-state").with(oidcLogin()))
+        .perform(get("/api/v1/conflict-fixture/illegal-state").with(oidcLogin()))
         .andExpect(status().isInternalServerError())
         .andExpect(jsonPath("$.status").value(500));
   }

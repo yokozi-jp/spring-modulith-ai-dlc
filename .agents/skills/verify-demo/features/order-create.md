@@ -10,7 +10,7 @@
 - `create-validation`：空の客先注文番号、商品の未選択、範囲外の数量で、欄の下に誤りの文言を出し、作成しない。
 - `create-duplicate`：使用済みの客先注文番号で作ると、「この客先注文番号は既に使われている可能性があります。…」を出す。
 - `create-on-sale-only`：商品の選択肢は販売中の商品だけで、販売終了の商品を出さない。
-- `create-csrf`：画面の作成は `X-XSRF-TOKEN` を付けて成功し、token のない `POST /api/orders` は 403 になる。
+- `create-csrf`：画面の作成は `X-XSRF-TOKEN` を付けて成功し、token のない `POST /api/v1/orders` は 403 になる。
 
 ## How to get to it (user POV)
 
@@ -46,8 +46,8 @@ Preconditions:
   `helpers.listProducts(page.request)` で `salesStatus` が `DISCONTINUED` の商品を 1 つ選ぶ。
   `/orders/new` の `getByLabel("商品")` に、その商品名の `option` が 0 件で、販売中の商品名の `option` が 1 件ある。
 - **CSRF（`create-csrf`）。**
-  画面の作成の `network.log` に `POST /api/orders 201` がある。
-  `page.request.post("/api/orders", { data: ... })`（token なし）は 403 を返し、その客先注文番号の行は `sql` でできていない。
+  画面の作成の `network.log` に `POST /api/v1/orders 201` がある。
+  `page.request.post("/api/v1/orders", { data: ... })`（token なし）は 403 を返し、その客先注文番号の行は `sql` でできていない。
 
 ## Gotchas
 

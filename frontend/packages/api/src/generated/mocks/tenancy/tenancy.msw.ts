@@ -29,7 +29,7 @@ export const getListMembershipsResponseMock = (overrideResponse: Partial<Extract
 
 
 export const getFindCurrentTenantMockHandler = (overrideResponse?: MembershipResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<MembershipResponse> | MembershipResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/api/current-tenant', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+  return http.get('*/api/v1/current-tenant', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -41,7 +41,7 @@ export const getFindCurrentTenantMockHandler = (overrideResponse?: MembershipRes
 }
 
 export const getSelectTenantMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.put>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
-  return http.put('*/api/current-tenant', async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
+  return http.put('*/api/v1/current-tenant', async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,
@@ -51,7 +51,7 @@ export const getSelectTenantMockHandler = (overrideResponse?: void | ((info: Par
 }
 
 export const getListTenantMembersMockHandler = (overrideResponse?: TenantMembersDetailsResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<TenantMembersDetailsResponse> | TenantMembersDetailsResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/api/current-tenant/members', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+  return http.get('*/api/v1/current-tenant/members', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -63,7 +63,7 @@ export const getListTenantMembersMockHandler = (overrideResponse?: TenantMembers
 }
 
 export const getRemoveTenantMemberMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.delete>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
-  return http.delete('*/api/current-tenant/members/:userId', async (info: Parameters<Parameters<typeof http.delete>[1]>[0]) => {
+  return http.delete('*/api/v1/current-tenant/members/:userId', async (info: Parameters<Parameters<typeof http.delete>[1]>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,
@@ -73,7 +73,7 @@ export const getRemoveTenantMemberMockHandler = (overrideResponse?: void | ((inf
 }
 
 export const getChangeTenantMemberRoleMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.put>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
-  return http.put('*/api/current-tenant/members/:userId', async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
+  return http.put('*/api/v1/current-tenant/members/:userId', async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,
@@ -83,7 +83,7 @@ export const getChangeTenantMemberRoleMockHandler = (overrideResponse?: void | (
 }
 
 export const getListMembershipsMockHandler = (overrideResponse?: MembershipListResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<MembershipListResponse> | MembershipListResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/api/memberships', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+  return http.get('*/api/v1/memberships', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined

@@ -33,7 +33,7 @@ JSON-RPCは採用しない。
 
 ## 名前の表記
 
-- **パスのリソース名**：kebab-caseの複数形にする（`/api/delivery-schedules`）。複数形かどうかは自分で点検し、kebab-caseはSpectralのpath-kebab-caseとpath-kebab-case-resourceで検査する。
+- **パスのリソース名**：kebab-caseの複数形にする（`/api/v1/delivery-schedules`）。複数形かどうかは自分で点検し、kebab-caseはSpectralのpath-kebab-caseとpath-kebab-case-resourceで検査する。
 - **カスタムメソッド名**：camelCaseにする（後述）。
 - **独自のヘッダー名**：kebab-caseとし、`x-`接頭辞を付ける（`x-debug-enabled`）。標準化済みまたは標準化中のヘッダーは、その名前をそのまま使う（`Idempotency-Key`）。
 - **JSONの項目名**：ADR-013が定める`nextCursor`や`traceId`と同じcamelCaseにする。

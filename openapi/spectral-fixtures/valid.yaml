@@ -11,7 +11,7 @@ tags:
 security:
   - sessionCookie: []
 paths:
-  /api/sample-orders:
+  /api/v1/sample-orders:
     post:
       tags:
         - sample-order
@@ -46,7 +46,7 @@ paths:
           $ref: "#/components/responses/UnprocessableContentProblem"
         "500":
           $ref: "#/components/responses/InternalServerErrorProblem"
-  /api/sample-orders/{sampleOrderId}:
+  /api/v1/sample-orders/{sampleOrderId}:
     get:
       tags:
         - sample-order
@@ -126,7 +126,7 @@ paths:
         "204":
           description: サンプル注文を取り消した
   # path-kebab-case はカスタムメソッドの camelCase を末尾に許す
-  /api/sample-orders/{sampleOrderId}/markShipped:
+  /api/v1/sample-orders/{sampleOrderId}/markShipped:
     post:
       tags:
         - sample-order
@@ -148,7 +148,7 @@ paths:
         "4XX":
           $ref: "#/components/responses/BadRequestProblem"
   # idempotency-key-required は x-idempotency-key が none の operation を除く
-  /api/current-tenant:
+  /api/v1/current-tenant:
     put:
       tags:
         - sample-order

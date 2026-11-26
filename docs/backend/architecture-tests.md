@@ -16,6 +16,7 @@ ArchUnitとPMDの失敗メッセージは、理由、直し方、規約の文書
 
 ```text
 backend/src/test/java/com/example/demo/architecture/
+├── ApiVersionArchTest.java
 ├── ApplicationModuleArchitectureTest.java
 ├── ArchitectureRuleFixtureTest.java
 ├── ArchitectureRuleMessageTest.java
@@ -172,6 +173,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `backend/src/test/java/archfixture/conforming/`：規約どおりの`ordering`モジュール、`inventory`モジュール、`payment`モジュール、`shared`モジュールの最小の例。すべての規則が誤検出しないことを確かめる。
   `ordering`の`JooqOrderRepository`が`shared.persistence`の型を使い、`shared`のルートは`package-info.java`だけを持つ。
 - `backend/src/test/java/archfixture/violating/`：規則ごとに違反するクラスを置く。各クラスのJavadocに違反する規則名を書く。パラメータ化テストが、規則ごとに対応する違反クラスの完全修飾名を含む失敗を確かめる。
+- `backend/src/test/java/archfixture/eventcontract/`と`backend/src/test/resources/archfixture-events/`：イベントの互換の規則にわざと違反する型と、シナリオごとのfixtureを置く。`EventContractViolationTest`が、各規則が違反を見つけることを確かめる。全件の`EventContractTest`の対象には載せない（[クラスの役割：イベント](class-roles/event.md)の「対応するテスト」）。
 
 フィクスチャは`com.example.demo`の外に置く。
 そのため、Springのコンポーネントスキャン、Spring Modulithの`ApplicationModules`、プロダクション向けの`@AnalyzeClasses(packagesOf = DemoApplication.class)`は、フィクスチャを読まない。
@@ -403,6 +405,12 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
   `@Operation`の拡張に`x-idempotency-key: none`を付けたメソッドは除く。
   `@RequestMapping(method = ...)`で書いたマッピングは検出しない。
 - `idempotentCommandHandlersExecuteThroughIdempotency`：`*CommandHandler`の、引数のCommandが`IdempotentCommand`である`handle`は、その中で`Idempotency.execute`を呼ぶ。
+
+`ApiVersionArchTest`は、`/api/`のControllerがAPIのバージョンを宣言することを検査する（[ADR-138](../adr/ADR-138-introduce-api-v1-with-spring-api-versioning.md)）。
+
+- `apiControllersDeclareVersion`：`@Controller`（`@RestController`を含む）のうち、クラスかメソッドのmappingのパスが`/api/`で始まるものは、クラスのパスを`/api/v{version}/`で始め、正の整数のメジャーバージョンの`version`を宣言する。
+  `version`を書かないmappingはどのバージョンにも一致し、パスに`v{version}`がないとバージョンを読む区間がずれる。
+  メソッドのmappingに`/api/`の絶対のパスを書くと、クラスの`version`を迂回するので違反にする。
 
 ## DB
 

@@ -123,10 +123,10 @@ class TenantSelectionTest {
   private static final String TENANT_ALREADY_SELECTED = "/problems/tenancy/tenant-already-selected";
 
   /** 選んだテナントの API。 */
-  private static final String CURRENT_TENANT = "/api/current-tenant";
+  private static final String CURRENT_TENANT = "/api/v1/current-tenant";
 
   /** テナントが決まっている必要がある業務の API。 */
-  private static final String PRODUCTS = "/api/products";
+  private static final String PRODUCTS = "/api/v1/products";
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
@@ -151,11 +151,11 @@ class TenantSelectionTest {
 
   @Test
   @DisplayName("所属のない利用者は、ログインの後も所属の一覧が空で、業務の API と選んだテナントの API は専用の type の 403 になる")
-  @ContractCase(method = RequestMethod.GET, path = "/api/memberships", status = 200)
+  @ContractCase(method = RequestMethod.GET, path = "/api/v1/memberships", status = 200)
   void noMembershipLeavesTenantUnselected() throws Exception {
     login(newSubject());
 
-    perform(get("/api/memberships"))
+    perform(get("/api/v1/memberships"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items").isEmpty());
     perform(get(PRODUCTS))
@@ -205,7 +205,7 @@ class TenantSelectionTest {
     perform(get(PRODUCTS))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.type").value(TENANT_NOT_SELECTED));
-    perform(get("/api/memberships"))
+    perform(get("/api/v1/memberships"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[*].tenantName", contains("A 商事", "B 物産")))
         .andExpect(
@@ -295,7 +295,7 @@ class TenantSelectionTest {
     perform(get(CURRENT_TENANT))
         .andExpect(status().isForbidden())
         .andExpect(jsonPath("$.type").value(TENANT_NOT_SELECTED));
-    perform(get("/api/memberships"))
+    perform(get("/api/v1/memberships"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.items[*].tenantName", contains("B 物産")));
   }
@@ -402,7 +402,7 @@ class TenantSelectionTest {
       final String expired = sessionId();
       createdAgo(expired, PAST_MAX_LIFETIME);
 
-      perform(get("/api/memberships")).andExpect(status().isUnauthorized());
+      perform(get("/api/v1/memberships")).andExpect(status().isUnauthorized());
 
       assertThat(rowCount(expired)).as("期間を過ぎたセッションの行: sessionId=%s", expired).isZero();
     }
@@ -413,7 +413,7 @@ class TenantSelectionTest {
       login(newSubject());
       createdAgo(sessionId(), WITHIN_MAX_LIFETIME);
 
-      perform(get("/api/memberships")).andExpect(status().isOk());
+      perform(get("/api/v1/memberships")).andExpect(status().isOk());
     }
 
     @Test
@@ -439,7 +439,7 @@ class TenantSelectionTest {
       login(subject);
       final String expired = sessionId();
       createdAgo(expired, PAST_MAX_LIFETIME);
-      perform(get("/api/memberships")).andExpect(status().isUnauthorized());
+      perform(get("/api/v1/memberships")).andExpect(status().isUnauthorized());
       final Instant beforeLogin = Instant.now(clock).truncatedTo(ChronoUnit.MILLIS);
 
       login(subject);
@@ -449,7 +449,7 @@ class TenantSelectionTest {
       assertThat(Instant.ofEpochMilli(creationTime(renewed)))
           .as("ログインし直した後のセッションの作成の時刻: sessionId=%s", renewed)
           .isAfterOrEqualTo(beforeLogin);
-      perform(get("/api/memberships")).andExpect(status().isOk());
+      perform(get("/api/v1/memberships")).andExpect(status().isOk());
     }
 
     @Test

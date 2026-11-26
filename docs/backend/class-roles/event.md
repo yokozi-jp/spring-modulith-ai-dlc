@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：イベント
-description: 他モジュールへ状態の変化を通知するモジュールルートの record（イベント）の定義、置き場所と命名、必須の記述、依存、発行と受信の例、テスト、アンチパターン、作成時のチェックリストを定める。イベントを作るとき、イベントの発行と受信の場所を確かめるときに読む。
+description: 他モジュールへ状態の変化を通知するモジュールルートの record（イベント）の定義、置き場所と命名、必須の記述、依存、発行と受信の例、テスト、アンチパターン、作成時のチェックリストと、保存した出版を読めなくしない変更の規則と fixture の作り方を定める。イベントを作るとき、イベントの component や名前を変えるとき、イベントの発行と受信の場所を確かめるときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -49,6 +49,13 @@ tags: [convention, backend, class-role]
 - 受信は `<Event>Listener` の `@ApplicationModuleListener` を付けた `on` メソッドで行う。
 - record に Javadoc を書く。
 - ルートのパッケージの `package-info.java` は[参照のインタフェース](feature-queries.md)と共有する。
+- イベントを変えるときは、`@Nullable` の component を足すことだけをする。
+  足す component をプリミティブにしない。
+  受信側は、足した component が `null` の出版も処理する（足す前に保存した出版は `null` で読める）。
+- component の削除、名前の変更、型の変更と、record の名前とパッケージの変更はしない。
+  そうしたいときは、新しい型のイベントを足す。
+  古い型の出版が DB に残る間は、古い型と、それを受けるリスナーと fixture を残す。
+  変更の規則の理由は [ADR-137](../../adr/ADR-137-guard-event-json-compatibility-with-versioned-fixtures.md) に示す。
 
 ## 依存してよい型、してはいけない型
 
@@ -114,12 +121,50 @@ public void on(final OrderPlaced event) {
 
 ## 対応するテスト
 
-専用のテストは作らない。
+`@ApplicationModuleListener` で受けるイベントは、過去の各版の JSON を fixture に置き、`EventContractTest` が今の型で読めることを確かめる。
+fixture は `backend/src/test/resources/events/<型の完全な名前>.v<n>.json` に置く。
+`n` は 1 から始め、先頭に 0 を付けない。
+fixture の中身は、その版の値を `application.yaml` の `spring.jackson` の設定で JSON にしたもので、Spring Modulith が出版に保存する形と同じである。
+
+`EventContractTest` は、次のときに失敗し、fixture の名前と直し方を失敗のメッセージに示す。
+
+- リスナーが受ける型に `v1` の fixture がない、版が欠ける、またはファイル名が `<型の完全な名前>.v<n>.json` の形でない。
+- fixture の名前の型を読み込めない、またはその型を受けるリスナーがない（型の名前かパッケージの変更）。
+- fixture を `EventSerializer` で読めない。
+- 読んで書き直した JSON が、JSON の木として fixture と違う（component の削除、名前の変更、プリミティブの追加、`spring.jackson` の変更）。
+- 読んだ値の `@Nullable` でない component が `null` である（必須の component の追加）。
+- 最も新しい版の fixture を読んだ値に `null` の component がある（次の版の fixture の足し忘れ）。
+
+`EventContractTest` が見つけない変更もある。
+
+- fixture は各版で一つの値しか持たないため、component の型の変更は、その値が新しい型で読めないか、書き直すと変わるときだけ見つかる。
+  `long` を `int` に変えても、fixture の値が `100` なら通る。
+  DB に `5000000000` の出版が残っていれば、デプロイの後に読めない。
+- component の削除と名前の変更、型の名前とパッケージの変更は、変える前の版の fixture が残る間だけ見つかる。
+  fixture を一緒に書き換えるか消すとテストは通るため、pre-push の [`task test-weakening`](../../tooling/lint-and-test.md) が書き換えと削除を警告し、レビューで止める。
+- 同じ名前のまま単位や意味を変える変更は、JSON の形が変わらないため見つからない。
+
+検査が違反を見つけることは、`EventContractViolationTest` がわざと違反する型と fixture で確かめる。
+fixture のテストのほかに、イベントの専用のテストは作らない。
 ArchUnit が形を検査し、この record を使う側のテストが中身を確かめる。
 
 イベントの発行は、発行する CommandHandler の `@ApplicationModuleTest` で `AssertablePublishedEvents` を使って確かめる。
 受信は、受信側の Listener の `@ApplicationModuleTest` で `Scenario` を使って確かめる。
 書き方は[バックエンドのDBテスト](../testing-database.md)の「Spring Modulithのイベント」に従う。
+
+### fixture の作り方
+
+イベントを足すか変えるときは、同じ変更で次の版の fixture を次の手順で作る。
+
+1. `v1` は、今の型の値を Spring Modulith の `EventSerializer` で JSON に書いて作る。
+   fixture がないと `EventContractTest` が失敗し、置く場所のパスを失敗のメッセージに示す。
+2. 次の版は、前の版の fixture を写し、足した component に実際の値を入れて作る。
+   今の型のすべての component に値を入れる。
+3. component の型に範囲があるときは、境界の値を入れる。
+   たとえば、`long` の component には `int` に収まらない数を、文字列には許す最も長い文字列を入れる。
+
+書き間違いは、`EventContractTest` が読んで書き直した JSON と fixture を比べて見つける。
+過去の fixture は書き換えも削除もしない。
 
 ## アンチパターン
 
@@ -146,5 +191,14 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - [ ] `infrastructure` の下には `persistence` と `client` 以外のパッケージを作らない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 受信側は `application` の `<Event>Listener` の `on` に `@ApplicationModuleListener` を付けて受ける。［ArchUnit で検査：ClassRoleArchTest.moduleListenersAreApplicationListeners］
 - [ ] 受信側の `on` は、自モジュールの CommandHandler をちょうど一つ呼ぶ。［ArchUnit で検査：ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler］
+- [ ] イベントを変えるときは `@Nullable` の component を足すことだけをし、プリミティブを足さない。［テストで検査：EventContractTest］
+- [ ] component の削除と名前の変更をしない。［テストで検査：EventContractTest（変える前の版の fixture が残る間だけ）］
+- [ ] component の型を変えない。［自分で点検（EventContractTest は、fixture の値が新しい型で読めないか、書き直すと変わるときだけ見つける）］
+- [ ] record の名前とパッケージを変えない。変えたいときは新しい型のイベントを足す。［テストで検査：EventContractTest（変える前の版の fixture が残る間だけ）］
+- [ ] `@ApplicationModuleListener` で受けるイベントに、`v1` から版の欠けない fixture を `<型の完全な名前>.v<n>.json` の名前で置く。［テストで検査：EventContractTest］
+- [ ] イベントを足すか変える変更で、今の型のすべての component に値を入れた次の版の fixture を足す。［テストで検査：EventContractTest］
+- [ ] 範囲のある型の component には、fixture に境界の値を入れる。［自分で点検］
+- [ ] 過去の fixture を書き換えも削除もしない。［自分で点検（pre-push の `task test-weakening` が警告する）］
+- [ ] 受信側は、足した component が `null` の出版も処理する。［自分で点検］
 - [ ] record に Javadoc を書く。［自分で点検］
 - [ ] ルートのパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］

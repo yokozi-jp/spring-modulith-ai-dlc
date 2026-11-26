@@ -46,6 +46,8 @@ Listener は Infrastructure の Adapter でもない。
   理由は[アンチパターン](#アンチパターン)に示す。
   Spring Boot の起動の完了のようなフレームワークのイベントを受ける必要が出たら、先にこの規則と、`ClassRoleArchTest` の `eventListenersAreApplicationModuleListeners` と `applicationListenerIsNotImplemented` を変える。
 - `on` はイベントの値で [Command](command.md) を作り（`new ReserveStockCommand(event.orderId())`）、CommandHandler の `handle` を一回呼ぶ。
+- イベントに後から足した `@Nullable` の component は、足す前に保存した出版を再投入すると `null` で届く。
+  `on` と呼ぶ CommandHandler は、その component が `null` のイベントも処理する（[イベント](event.md)の「必須の記述」）。
 - `@Transactional` を付けない。
   `@ApplicationModuleListener` がトランザクションを開く。
 - 依存は呼ぶ CommandHandler 一つだけにし、package-private のコンストラクタで受け取る。
@@ -53,6 +55,8 @@ Listener は Infrastructure の Adapter でもない。
 - `on` は短い名前であり、package-private のクラスの public メソッドでもあるため、クラスに `@SuppressWarnings({"PMD.ShortMethodName", "PMD.PublicMemberInNonPublicType"})` を理由のコメントと一緒に付ける。
 - 同じイベントを二回以上受けても結果が変わらないよう、呼ぶ CommandHandler を冪等にする。
   冪等にする方法と重複の判定の書き方は[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)に従う。
+- イベントの値で状態を決めず、呼ぶ CommandHandler が処理のときに今の状態を読んで判定する。
+  イベントは発行の順に届くと限らない（[順序保証と冪等性](../../integration/async-ordering-and-idempotency.md)の「プロセスの中のイベント」）。
 - Listener を足したら、同じ変更で冪等性の入力例を足す（[冪等性の入力例](#冪等性の入力例)）。
 - 受信に失敗したイベント出版はレジストリに `FAILED` で残り、[非同期処理の失敗時の再試行と回復](../../integration/async-failure-recovery.md)の `FailedEventPublications` の手順で再投入する。
   定期のジョブが、リスナーの方針の待ち時間を過ぎた出版を回数の上限まで自動で再投入する（[ADR-079](../../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
@@ -163,6 +167,12 @@ class OrderPlacedListenerTest {
 }
 ```
 
+### 順序のテスト
+
+発行側の状態が先に進んだ後にイベントが届くテストを書く。
+`OrderConfirmedListenerTest.cancelledOrderIsNotCharged` は、注文を取り消した後に `OrderConfirmed` を発行し、請求も決済記録もなく、出版が完了になることを確かめる。
+観点は[非同期処理のテスト](../../integration/async-testing.md)の「順序のテスト」に従う。
+
 ### 冪等性の入力例
 
 全件の結合テスト `ListenerIdempotencyTest` は、すべての Listener に同じイベントを順に 2 回と同時に 2 回届け、入力例のない Listener があると失敗する（[非同期処理のテスト](../../integration/async-testing.md)の「冪等性のテスト」）。
@@ -268,10 +278,12 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 - [ ] クラスに `@Transactional` を付けない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.transactionalIsNotDeclaredAtClassLevel］
 - [ ] 発行側のモジュールのルートのイベントだけを使い、内部パッケージの型を使わない。［Spring Modulith で検査：ApplicationModuleArchitectureTest］
 - [ ] 名前をイベントの名前に `Listener` を付けた形にし、イベントごとに一つ作る。［自分で点検］
+- [ ] イベントに後から足した `@Nullable` の component が `null` の出版も処理する。［自分で点検］
 - [ ] 他のクラスから呼ばず、interface も実装しない。［ArchUnit で検査：ClassRoleArchTest.listenersAreNotCalled、ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces］
 - [ ] 呼ぶ CommandHandler は、重複を DB が直列にする操作（`INSERT ... ON CONFLICT DO NOTHING`、`lock_no` を WHERE に書く `TableWriter.update`、`SELECT ... FOR UPDATE` の後の判定）で判定し、重複を処理済みとして正常に終える（`TableWriter.update` の 0 件の更新は、種類 `version` の `ConflictException` だけを catch して読み直す）。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] 同じイベントの 2 回目の配信は、外部システムを呼ばないか、1 回目と同じ引数で呼ぶ。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] Listener の入力例を足す。［結合テストで検査：ListenerIdempotencyTest］
+- [ ] 発行側の状態が先に進んだ後に届いたイベントのテストを書く（例は `OrderConfirmedListenerTest.cancelledOrderIsNotCharged`）。［自分で点検］
 - [ ] Runbook の[リスナーごとの失敗の原因と直し方](../../observability/runbook-event-publication-resubmission.md#リスナーごとの失敗の原因と直し方)の表に、このリスナーの行を足す。［自分で点検］
 - [ ] 冪等キーを持たない外部システムを呼ぶなら、`@ResubmissionPolicy` の方針に `abandon-after-attempts: 1` を書くか決める。［自分で点検］
 - [ ] 入力例の前提が、Listener の業務の本筋の処理を通る（脇の道で 1 行だけ変えて通していない）。［自分で点検］

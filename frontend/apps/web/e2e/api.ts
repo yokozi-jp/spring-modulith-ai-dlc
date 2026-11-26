@@ -13,8 +13,8 @@ export async function listPayments(
   request: APIRequestContext,
   orderId: string,
 ): Promise<{ status: string; amount: number }[]> {
-  const response = await request.get(`/api/payments?orderId=${orderId}`);
-  expect(response.status(), `GET /api/payments?orderId=${orderId}`).toBe(200);
+  const response = await request.get(`/api/v1/payments?orderId=${orderId}`);
+  expect(response.status(), `GET /api/v1/payments?orderId=${orderId}`).toBe(200);
   const body = await readJson<{ items: { status: string; amount: number }[] }>(response);
   return body.items;
 }

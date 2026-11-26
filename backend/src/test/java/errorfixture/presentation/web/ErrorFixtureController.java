@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 // 1 つの入口が 1 つの例外を投げる形にそろえるため、メソッドの数の上限を外す。
 @SuppressWarnings("PMD.TooManyMethods")
 @RestController
-@RequestMapping("/api/error-fixture")
+@RequestMapping(path = "/api/v{version}/error-fixture", version = "1")
 class ErrorFixtureController {
 
   /** ConstraintViolationException を作る Validator。 */

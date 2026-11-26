@@ -113,7 +113,7 @@ export const getListOrdersUrl = (params?: ListOrdersParams,) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/orders?${stringifiedParams}` : `/api/orders`
+  return stringifiedParams.length > 0 ? `/api/v1/orders?${stringifiedParams}` : `/api/v1/orders`
 }
 
 /**
@@ -137,7 +137,7 @@ export const listOrders = async (params?: ListOrdersParams, options?: Parameters
 
 export const getListOrdersQueryKey = (params?: ListOrdersParams,) => {
     return [
-    `/api/orders`, ...(params ? [params] : [])
+    `/api/v1/orders`, ...(params ? [params] : [])
     ] as const;
     }
 
@@ -311,7 +311,7 @@ export const getDraftOrderUrl = () => {
 
 
 
-  return `/api/orders`
+  return `/api/v1/orders`
 }
 
 /**
@@ -437,7 +437,7 @@ export const getFindOrderByIdUrl = (orderId: string,) => {
 
 
 
-  return `/api/orders/${orderId}`
+  return `/api/v1/orders/${orderId}`
 }
 
 /**
@@ -461,7 +461,7 @@ export const findOrderById = async (orderId: string, options?: Parameters<typeof
 
 export const getFindOrderByIdQueryKey = (orderId: string,) => {
     return [
-    `/api/orders/${orderId}`
+    `/api/v1/orders/${orderId}`
     ] as const;
     }
 
@@ -640,7 +640,7 @@ export const getCancelOrderUrl = (orderId: string,) => {
 
 
 
-  return `/api/orders/${orderId}/cancel`
+  return `/api/v1/orders/${orderId}/cancel`
 }
 
 /**
@@ -777,7 +777,7 @@ export const getConfirmOrderUrl = (orderId: string,) => {
 
 
 
-  return `/api/orders/${orderId}/confirm`
+  return `/api/v1/orders/${orderId}/confirm`
 }
 
 /**
@@ -914,7 +914,7 @@ export const getChangeOrderLinesUrl = (orderId: string,) => {
 
 
 
-  return `/api/orders/${orderId}/lines`
+  return `/api/v1/orders/${orderId}/lines`
 }
 
 /**

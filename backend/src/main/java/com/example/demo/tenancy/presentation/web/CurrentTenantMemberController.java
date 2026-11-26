@@ -28,12 +28,16 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>対象のテナントは、リクエストの値ではなく、セッションで選んだテナントから取る。管理者のロールの判定は {@link TenantSecurityCustomizer} が行う。
  */
 @RestController
-@RequestMapping(CurrentTenantMemberController.PATH)
+@RequestMapping(path = CurrentTenantMemberController.PATH, version = "1")
 @Tag(name = "tenancy", description = "テナントと所属の API")
 class CurrentTenantMemberController {
 
-  /** 選んだテナントの所属の一覧のパス。 */
-  /* package */ static final String PATH = "/api/current-tenant/members";
+  /**
+   * 選んだテナントの所属の一覧のパス。
+   *
+   * <p>mapping と {@code requestMatchers} に渡すパスのテンプレートで、URL ではない。
+   */
+  /* package */ static final String PATH = "/api/v{version}/current-tenant/members";
 
   /** 選んだテナントの所属の参照。 */
   private final TenancyQueries tenancyQueries;

@@ -93,7 +93,7 @@ export const getListProductsUrl = () => {
 
 
 
-  return `/api/products`
+  return `/api/v1/products`
 }
 
 /**
@@ -117,7 +117,7 @@ export const listProducts = async ( options?: Parameters<typeof apiFetch>[1]): P
 
 export const getListProductsQueryKey = () => {
     return [
-    `/api/products`
+    `/api/v1/products`
     ] as const;
     }
 
@@ -286,7 +286,7 @@ export const getRegisterProductUrl = () => {
 
 
 
-  return `/api/products`
+  return `/api/v1/products`
 }
 
 /**
@@ -412,7 +412,7 @@ export const getFindProductByIdUrl = (productId: string,) => {
 
 
 
-  return `/api/products/${productId}`
+  return `/api/v1/products/${productId}`
 }
 
 /**
@@ -436,7 +436,7 @@ export const findProductById = async (productId: string, options?: Parameters<ty
 
 export const getFindProductByIdQueryKey = (productId: string,) => {
     return [
-    `/api/products/${productId}`
+    `/api/v1/products/${productId}`
     ] as const;
     }
 

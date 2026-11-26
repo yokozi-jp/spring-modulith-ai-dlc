@@ -70,7 +70,7 @@ Spring Securityの`SimpleUrlAuthenticationFailureHandler`は使わない。
 理由は[ADR-101](../adr/ADR-101-keep-tenants-and-roles-in-app-database.md)にある。
 
 - ログインの成功の処理（`TenantSelectionSuccessHandler`）は、所属が1つならそのテナントを選ぶ。所属がないか2つ以上なら選ばない。
-- SPAは`GET /api/memberships`で所属の一覧を読み、`PUT /api/current-tenant`の本文でテナントのIDを送って選ぶ。所属がなければ、所属を待つ画面を出す。
+- SPAは`GET /api/v1/memberships`で所属の一覧を読み、`PUT /api/v1/current-tenant`の本文でテナントのIDを送って選ぶ。所属がなければ、所属を待つ画面を出す。
 - バックエンドは、送られたテナントのIDを所属の表で確かめる。所属にないテナントと、テナントを選んだ後にもう一度選ぶ要求は422にする。テナントを切り替えるには、ログインし直す。
 - テナントを選ぶと、セッションのIDを作り直してから、テナントの`public_id`と所属の役割を持つ権限（`TenantMembershipAuthority`）を足した認証をセッションに保存する。権限の名前は、役割から`ROLE_ADMIN`か`ROLE_MEMBER`にする。
 - テナントを選んだかどうかは、認証がこの権限を持つかどうかだけで表し、セッションの属性に別の値を持たない。書き換えは`TenantSession`だけが行う。
@@ -193,7 +193,7 @@ IdPのレルムの役割とグループは使わない。
 
 ## テナントの所属の管理
 
-選んだテナントの所属の一覧、役割の変更、所属の取り外しは、`/api/current-tenant/members`の配下にあり、テナントの管理者だけが呼べる。
+選んだテナントの所属の一覧、役割の変更、所属の取り外しは、`/api/v1/current-tenant/members`の配下にあり、テナントの管理者だけが呼べる。
 `tenancy`の`TenantSecurityCustomizer`が、このパスに`hasRole("ADMIN")`を課す。
 `ROLE_ADMIN`は`TenantSelectionFilter`が引き直した所属の役割から来るため、役割の変更と取り外しは、その利用者の次のリクエストから効く。
 管理者でない利用者には、`about:blank`の403を返す。

@@ -68,7 +68,7 @@ class ObservabilityContractTest {
   private static final AttributeKey<String> PROBLEM_TYPE = AttributeKey.stringKey("problem.type");
 
   /** 注文の API のパスの前半。 */
-  private static final String ORDERS_PATH = "/api/orders/";
+  private static final String ORDERS_PATH = "/api/v1/orders/";
 
   /** HTTP の受信の span の、要求のパスの属性（OpenTelemetry の semantic conventions）。 */
   private static final String URL_PATH = "url.path";
@@ -189,7 +189,8 @@ class ObservabilityContractTest {
 
     mockMvc
         .perform(
-            MockMvcRequestBuilders.get("/api/orders/{orderId}", orderId).with(AppUsers.oidcLogin()))
+            MockMvcRequestBuilders.get("/api/v1/orders/{orderId}", orderId)
+                .with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isNotFound());
 
     final Attributes attributes =
@@ -214,7 +215,8 @@ class ObservabilityContractTest {
 
     mockMvc
         .perform(
-            MockMvcRequestBuilders.get("/api/orders/{orderId}", orderId).with(AppUsers.oidcLogin()))
+            MockMvcRequestBuilders.get("/api/v1/orders/{orderId}", orderId)
+                .with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isNotFound());
 
     final List<SpanData> spans =
@@ -252,7 +254,7 @@ class ObservabilityContractTest {
   @DisplayName(
       "認可が拒否した 403 のログは、about:blank の problem.type と user.id を持ち、拒否がテナントの束縛の外で記録されるので tenant.id を持たない")
   void authorizationDenialLogCarriesUserWithoutTenant() throws Exception {
-    final String path = "/api/current-tenant/members/" + UUID.randomUUID();
+    final String path = "/api/v1/current-tenant/members/" + UUID.randomUUID();
 
     mockMvc
         .perform(MockMvcRequestBuilders.get(path).with(AppUsers.oidcLogin()))
@@ -352,7 +354,7 @@ class ObservabilityContractTest {
     return records.getFirst().getAttributes();
   }
 
-  /** {@code GET /api/orders/{orderId}} が 404 を返した要求の {@code http.server.request.duration}。 */
+  /** {@code GET /api/v1/orders/{orderId}} が 404 を返した要求の {@code http.server.request.duration}。 */
   private Attributes singleRecordAttributes(final String event) {
     final List<LogRecordData> records = capturedLogRecords.withBody(event);
     assertEquals(1, records.size(), () -> "body=" + event + " の LogRecord 件数");

@@ -27,7 +27,7 @@ async function createProduct(
   const productCode = `E2E-${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
   const productName = `E2E 商品 ${productCode}`;
   const csrf = await findCookie(page.context(), "__Host-XSRF-TOKEN");
-  const response = await page.request.post("/api/products", {
+  const response = await page.request.post("/api/v1/products", {
     headers: { "X-XSRF-TOKEN": csrf.value, ...idempotencyKeyHeaders() },
     data: {
       productCode,
@@ -39,7 +39,7 @@ async function createProduct(
   const { location } = response.headers();
   if (response.status() !== 201 || location === undefined) {
     throw new Error(
-      `POST /api/products が ${response.status()} を返しました：${await response.text()}`,
+      `POST /api/v1/products が ${response.status()} を返しました：${await response.text()}`,
     );
   }
   const productId = location.slice(location.lastIndexOf("/") + 1);

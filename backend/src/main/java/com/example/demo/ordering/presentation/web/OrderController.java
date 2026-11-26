@@ -34,7 +34,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 // 起きる応答（404、409、422）をハンドラごとに @ApiResponse で書くため、同じ文字列を繰り返す。
 @SuppressWarnings("PMD.AvoidDuplicateLiterals")
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping(path = "/api/v{version}/orders", version = "1")
 @Tag(name = "ordering", description = "注文の API")
 class OrderController {
 

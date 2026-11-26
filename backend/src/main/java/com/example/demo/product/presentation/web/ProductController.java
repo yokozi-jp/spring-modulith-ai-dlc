@@ -24,7 +24,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** 商品の HTTP API。 */
 @RestController
-@RequestMapping("/api/products")
+@RequestMapping(path = "/api/v{version}/products", version = "1")
 @Tag(name = "product", description = "商品の API")
 class ProductController {
 

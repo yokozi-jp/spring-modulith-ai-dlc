@@ -32,16 +32,17 @@ import org.springframework.test.web.servlet.ResultMatcher;
 class OpenApiAnnotationConventionTest {
 
   /** 注文の受付。 */
-  private static final String PLACE = "$.paths['/api/sample-orders'].post";
+  private static final String PLACE = "$.paths['/api/v1/sample-orders'].post";
 
   /** 注文の一覧。 */
-  private static final String LIST = "$.paths['/api/sample-orders'].get";
+  private static final String LIST = "$.paths['/api/v1/sample-orders'].get";
 
   /** 注文の詳細。 */
-  private static final String FIND = "$.paths['/api/sample-orders/{sampleOrderId}'].get";
+  private static final String FIND = "$.paths['/api/v1/sample-orders/{sampleOrderId}'].get";
 
   /** 注文の取消。 */
-  private static final String CANCEL = "$.paths['/api/sample-orders/{sampleOrderId}/cancel'].post";
+  private static final String CANCEL =
+      "$.paths['/api/v1/sample-orders/{sampleOrderId}/cancel'].post";
 
   /** サンプル Controller の全 operation。 */
   private static final List<String> OPERATIONS = List.of(PLACE, LIST, FIND, CANCEL);
