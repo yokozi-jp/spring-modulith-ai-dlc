@@ -43,6 +43,22 @@ IdPを移るときは、組と利用者の対応づけだけを書き換え、�
 - `AppUserPrincipal`でない`OidcUser`を保存していた版から上げるとき。消さないと、そのセッションが切れるまで書き込みが失敗する。
 - `SignInOidcUserService`が返す`OidcUser`のクラスか、選んだテナントの権限のクラス（`TenantMembershipAuthority`）を持たない版へ切り戻すとき、またはそれらのクラスを移動、改名するとき。消さないと、セッションを読めずにリクエストが500になる。
 
+## ログインの失敗
+
+ログインのコールバックが失敗すると、バックエンドは302でSPAの`/login-failed`へ移す。
+IdPがエラーを返したとき、認可リクエストを持つセッションがないとき、`SignInOidcUserService`がIDトークンの`iss`と`sub`を拒否したときが当たる。
+`/login-failed`は`_authenticated`の外の画面でAPIを呼ばないので、401からログインへ移る流れは、ログインが失敗し続けてもこの画面で止まる。
+この画面は戻り先を消さないので、もう一度ログインに成功すると、ログインの前に開いていた画面へ戻る。
+
+`LoginFailureHandler`は、失敗ごとに`OAuth2 login failed`をINFOで1件残し、OAuth2のerror codeを`error.type`に入れる。
+RFC 6749のerror codeに使える文字だけの64文字までの値を残し、それ以外は`_OTHER`にする（[可観測性データの規約](../observability/conventions.md)）。
+IdPが書く`error_description`と例外のmessageは、ログ、URL、セッションのどれにも置かない。
+失敗の種類もURLに載せないので、履歴とRefererに残らない。
+
+Spring Securityの`SimpleUrlAuthenticationFailureHandler`は使わない。
+このhandlerはセッションがあれば例外をセッションへ保存する。
+コールバックの時点では認可リクエストを保存したセッションが必ずあるので、`error_description`を含む例外がDBのセッションに残るためである。
+
 ## テナントを選ぶ
 
 ログインした利用者は、所属するテナントを1つ選んでから業務のAPIを使う。
