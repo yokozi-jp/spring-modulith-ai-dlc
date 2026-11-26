@@ -2,6 +2,7 @@ import { ApiProblemError } from "@frontend/api/api-error";
 import { apiFetch } from "@frontend/api/api-fetch";
 import { idempotencyKeyHeaders } from "@frontend/api/idempotency-key";
 import { MutationObserver, QueryObserver } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vite-plus/test";
 
@@ -85,6 +86,35 @@ async function mutateWhileRefetchIsHeld(status: 204 | 409) {
   return { query, mutation, result, release: items.release };
 }
 
+const okUrl = "http://localhost/api/ok";
+
+function unauthorized() {
+  return HttpResponse.json(
+    { type: "about:blank", title: "Unauthorized", status: 401 },
+    { status: 401, headers: { "Content-Type": "application/problem+json" } },
+  );
+}
+
+/** okUrl は成功を返し、itemsUrl は 401 を返す。 */
+function serveUnauthorizedItems() {
+  server.use(
+    http.get(okUrl, () => HttpResponse.json({ ok: true })),
+    // oxlint-disable-next-line unicorn/no-null -- 204 は本文を持てない。
+    http.post(okUrl, () => new HttpResponse(null, { status: 204 })),
+    http.get(itemsUrl, unauthorized),
+    http.post(itemsUrl, unauthorized),
+  );
+}
+
+function send(queryClient: QueryClient, kind: "query" | "mutation", url: string) {
+  if (kind === "query") {
+    return queryClient.query({ queryKey: [url], queryFn: () => apiFetch(url, {}) });
+  }
+  return new MutationObserver(queryClient, {
+    mutationFn: () => apiFetch(url, { method: "POST" }),
+  }).mutate();
+}
+
 describe("createQueryClient", () => {
   const assign = vi.fn<(url: string) => void>();
 
@@ -93,6 +123,15 @@ describe("createQueryClient", () => {
     vi.stubGlobal("document", { cookie: "" });
     // 更新系の apiFetch が送信先の origin を location と比べるため、Node に location を置く。
     vi.stubGlobal("location", { href: "http://localhost/", origin: "http://localhost", assign });
+    assign.mockReset();
+    // ログインへの遷移の 30 秒の抑止は sessionStorage に記録するので、テストごとに空の storage にする。
+    const items = new Map<string, string>();
+    vi.stubGlobal("sessionStorage", {
+      // oxlint-disable-next-line unicorn/no-null -- Storage.getItem の仕様どおり、値がなければ null を返す。
+      getItem: (key: string) => items.get(key) ?? null,
+      setItem: (key: string, value: string) => items.set(key, value),
+      removeItem: (key: string) => items.delete(key),
+    });
   });
 
   it("mutation の成功の後に描画中の query を取り直し、終わるまで pending を保つ", async () => {
@@ -118,24 +157,37 @@ describe("createQueryClient", () => {
     expect(query.getCurrentResult().data).toMatchObject({ data: { fetchCount: 2 } });
   });
 
-  // 30 秒の遷移ガードの記録は module 内に残る。2 件目の 401 は遷移しないため、このファイルで 401 を確かめるのはこの 1 件にする。
-  it("mutation の 401 でログインへ遷移する。描画中の query の再取得に頼らない", async () => {
-    server.use(
-      http.post(itemsUrl, () =>
-        HttpResponse.json(
-          { type: "about:blank", title: "Unauthorized", status: 401 },
-          { status: 401, headers: { "Content-Type": "application/problem+json" } },
-        ),
-      ),
-    );
-    const mutation = new MutationObserver(createTestQueryClient(), {
-      mutationFn: () => apiFetch<{ status: number }>(itemsUrl, { method: "POST" }),
-    });
+  it.each(["query", "mutation"] as const)(
+    "API の成功の前の %s の 401 では、ログインへ遷移する",
+    async (failing) => {
+      serveUnauthorizedItems();
 
-    await expect(mutation.mutate()).rejects.toMatchObject({ status: 401 });
+      // mutation は、描画中の query の再取得に頼らず、mutation の失敗だけで遷移する。
+      await expect(send(createTestQueryClient(), failing, itemsUrl)).rejects.toMatchObject({
+        status: 401,
+      });
 
-    expect(assign).toHaveBeenCalledExactlyOnceWith("/oauth2/authorization/web");
-  });
+      expect(assign).toHaveBeenCalledExactlyOnceWith("/oauth2/authorization/web");
+    },
+  );
+
+  it.each([
+    ["query", "query"],
+    ["query", "mutation"],
+    ["mutation", "query"],
+    ["mutation", "mutation"],
+  ] as const)(
+    "%s の成功の後の %s の 401 では、ログインではなく有効期限切れの画面へ遷移する",
+    async (succeeding, failing) => {
+      serveUnauthorizedItems();
+      const queryClient = createTestQueryClient();
+      await send(queryClient, succeeding, okUrl);
+
+      await expect(send(queryClient, failing, itemsUrl)).rejects.toMatchObject({ status: 401 });
+
+      expect(assign).toHaveBeenCalledExactlyOnceWith("/session-expired");
+    },
+  );
 
   it("mutation の 503 の後、同じ Idempotency-Key で再試行し、204 で成功する", async () => {
     const keys = serveUpdates(problem(503, "about:blank"), () => respondToUpdate(204));

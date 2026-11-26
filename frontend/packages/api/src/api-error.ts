@@ -55,11 +55,8 @@ function writeRedirectedAt(redirectedAt: number): void {
   }
 }
 
-/** query と mutation の失敗が 401 なら、直前に遷移していなければログインへ遷移する。 */
-export function redirectToLoginOnUnauthorized(error: unknown): void {
-  if (!(error instanceof ApiProblemError) || error.status !== 401) {
-    return;
-  }
+/** 直前に遷移していなければ、戻り先を保存してログインへ遷移する。 */
+function redirectToLogin(): void {
   const now = Date.now();
   const redirectedAt = readRedirectedAt();
   // 数値でない保存値（NaN や Infinity）は遷移していないとして扱う。
@@ -69,6 +66,37 @@ export function redirectToLoginOnUnauthorized(error: unknown): void {
   writeRedirectedAt(now);
   saveReturnTo();
   globalThis.location.assign(loginPath);
+}
+
+/** 同じ文書で API の成功の後に 401 を受けたときに移る画面。 */
+export const sessionExpiredPath = "/session-expired";
+
+/**
+ * query と mutation の 401 の遷移先を決める。状態は QueryClient ごとに持つ。
+ * 同じ文書で API が成功した後の 401 は、有効期限切れの画面へ移る。最初の 401 は、直前に遷移していなければログインへ移る。
+ */
+export function createUnauthorizedRedirect(): {
+  recordSuccess: () => void;
+  redirectToLoginOnUnauthorized: (error: unknown) => void;
+} {
+  let succeeded = false;
+  return {
+    recordSuccess: () => {
+      succeeded = true;
+    },
+    redirectToLoginOnUnauthorized: (error) => {
+      if (!(error instanceof ApiProblemError) || error.status !== 401) {
+        return;
+      }
+      if (!succeeded) {
+        redirectToLogin();
+        return;
+      }
+      // ログインへ移らないので、遷移を繰り返すことはない。30 秒の抑止はログインへの遷移だけに掛ける。
+      saveReturnTo();
+      globalThis.location.assign(sessionExpiredPath);
+    },
+  };
 }
 
 /** 同じ Idempotency-Key の要求をサーバーが処理している 409 の problem type（ADR-126）。 */

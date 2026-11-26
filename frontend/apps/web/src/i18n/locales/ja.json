@@ -24,6 +24,8 @@
   "loginAgain": "もう一度ログイン",
   "loginFailedHeading": "ログインできませんでした",
   "loginFailedDescription": "もう一度お試しください。",
+  "sessionExpiredHeading": "ログインの有効期限が切れました",
+  "sessionExpiredDescription": "もう一度ログインしてください。直前の操作は完了していない可能性があります。",
   "notice": {
     "generalTitle": "操作を完了できませんでした",
     "generalFailure": "時間をおいてもう一度お試しください。",
