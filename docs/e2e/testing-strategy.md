@@ -118,6 +118,8 @@ setup project は、`storageState` を持たない browser context で `/oauth2/
   ただし中身の Cookie は失敗時の trace に入る。
   その Cookie は後片付けで破棄した環境のものである。
 
+ログインの失敗は、認可リクエストのないコールバックを直接開く `login-failed.spec.ts` が、配信点の proxy を通って `/login-failed` の画面に着くことで確かめる。
+
 ## 書き方
 
 - 要素は role と accessible name で探す。

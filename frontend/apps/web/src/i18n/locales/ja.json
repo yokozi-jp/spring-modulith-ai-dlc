@@ -22,6 +22,8 @@
   "logout": "ログアウト",
   "loggedOutHeading": "ログアウトしました",
   "loginAgain": "もう一度ログイン",
+  "loginFailedHeading": "ログインできませんでした",
+  "loginFailedDescription": "もう一度お試しください。",
   "notice": {
     "generalTitle": "操作を完了できませんでした",
     "generalFailure": "時間をおいてもう一度お試しください。",

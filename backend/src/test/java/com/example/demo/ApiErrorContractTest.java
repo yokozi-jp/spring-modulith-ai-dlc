@@ -15,13 +15,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.example.demo.testkit.CapturedLogRecords;
+import com.example.demo.testkit.ReinstallLogAppenderExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import errorfixture.presentation.web.ErrorFixture;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
 import io.opentelemetry.api.trace.TraceId;
-import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,9 +28,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.hamcrest.Matchers;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -55,6 +54,7 @@ import tools.jackson.databind.node.ObjectNode;
   "PMD.TooManyStaticImports",
   "PMD.UnitTestShouldIncludeAssert"
 })
+@ExtendWith(ReinstallLogAppenderExtension.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import({SharedTestConfiguration.class, ErrorFixture.class})
@@ -82,15 +82,6 @@ class ApiErrorContractTest {
 
   /** OTLP へ送る直前の LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
-
-  /** このコンテキストの OpenTelemetry。 */
-  @Autowired private OpenTelemetry openTelemetry;
-
-  @BeforeEach
-  void installAppender() {
-    // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
-    OpenTelemetryAppender.install(openTelemetry);
-  }
 
   @ParameterizedTest(name = "{0}")
   @MethodSource("problemCases")

@@ -6,10 +6,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.example.demo.shared.events.ListenerIds;
 import com.example.demo.testkit.CapturedLogRecords;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
-import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Instant;
 import java.util.List;
@@ -67,9 +65,6 @@ class FailedPublicationGaugesTest {
   /** OTLP へ送る LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
 
-  /** この文脈の OpenTelemetry。 */
-  @Autowired private OpenTelemetry openTelemetry;
-
   /** Gauge を読むための、このテストだけのレジストリ。 */
   private SimpleMeterRegistry meterRegistry;
 
@@ -78,8 +73,6 @@ class FailedPublicationGaugesTest {
 
   @BeforeEach
   void setUp() {
-    // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
-    OpenTelemetryAppender.install(openTelemetry);
     meterRegistry = new SimpleMeterRegistry();
     gauges = new FailedPublicationGauges(dsl, meterRegistry, policies);
   }

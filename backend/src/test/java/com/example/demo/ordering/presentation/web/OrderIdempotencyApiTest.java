@@ -26,12 +26,11 @@ import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.IdempotencyKeys;
+import com.example.demo.testkit.ReinstallLogAppenderExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import com.example.demo.testkit.UniqueCodes;
 import io.micrometer.observation.ObservationRegistry;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
-import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Duration;
 import java.time.Instant;
@@ -79,13 +78,13 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 // HTTP、DB、ログ、observation を 1 つの要求の流れで確かめるため、結合するクラスの数の上限を外す。
 @SuppressWarnings({
   "PMD.AvoidDuplicateLiterals",
-  "PMD.CouplingBetweenObjects",
   "PMD.DoNotUseThreads",
   "PMD.SignatureDeclareThrowsException",
   "PMD.TooManyMethods",
   "PMD.TooManyStaticImports",
   "PMD.UnitTestShouldIncludeAssert"
 })
+@ExtendWith(ReinstallLogAppenderExtension.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @RecordApplicationEvents
@@ -111,9 +110,6 @@ class OrderIdempotencyApiTest {
   /** API が出したログ。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
 
-  /** ログの appender の送り先にする、このコンテキストの OpenTelemetry。 */
-  @Autowired private OpenTelemetry openTelemetry;
-
   /** 1 つ目の要求のトランザクションの、DB のバックエンドのプロセス ID。 */
   private final AtomicInteger holderPid = new AtomicInteger();
 
@@ -128,8 +124,6 @@ class OrderIdempotencyApiTest {
 
   @BeforeEach
   void registerProduct() {
-    // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
-    OpenTelemetryAppender.install(openTelemetry);
     pen = TestProducts.onSale(dsl, UniqueCodes.next("P"), "120.00");
   }
 

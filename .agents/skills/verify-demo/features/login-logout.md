@@ -9,12 +9,14 @@
 - `auth-session`：ログインの前後で `__Host-APP_SESSION` の Cookie の値が変わり、`/api/missing` が 401 でなく 404 を返す。
 - `auth-logout`：「ログアウト」で「ログアウトしました」の画面に着き、古い `__Host-APP_SESSION` で `/api/**` を呼ぶと 401 になる。
 - `auth-login-again`：ログアウト後の「もう一度ログイン」から、再び Keycloak の画面へ移る。
+- `auth-login-failed`：ログインのコールバックが失敗すると、`/login-failed` の「ログインできませんでした」の画面に着く。URL に失敗の種類が載らず、英語の「Please sign in」が出ない。「もう一度ログイン」から Keycloak の画面へ移る。backend のログに `OAuth2 login failed` と `error.type` が残り、IdP が書いた説明が残らない。
 
 ## How to get to it (user POV)
 
 - ブラウザで `/oauth2/authorization/web` を開く（ログインの入口）。
 - 認証済みの画面のヘッダーの「ログアウト」ボタンを押す。
 - 「ログアウトしました」の画面の「もう一度ログイン」を押す。
+- IdP が拒否して戻ってくる `/login/oauth2/code/web?error=...` を開く（ログインの失敗）。
 
 ## Driving it with drive.mjs
 
@@ -40,6 +42,20 @@ Preconditions:
 - **もう一度ログイン（`auth-login-again`）。**
   「もう一度ログイン」を押す。
   URL の origin が `idpOrigin` になり、Keycloak の `Username or email` の欄が見える。
+
+`node .kiro/skills/verify-demo/scripts/drive.mjs .kiro/skills/verify-demo/journeys/login-failed.mjs` が、次を順に実行する（`auth-login-failed`）。
+`journeys/login-failed.mjs` も `export const login = false` を宣言する。
+
+- **IdP が拒否した場合。**
+  `/oauth2/authorization/web` から Keycloak の画面へ移り、URL の `state` を取る。
+  Keycloak が拒否したときと同じ `error=access_denied` と、`error_description` に `uniqueCode` の目印を付けた query で、`webOrigin` の `/login/oauth2/code/web` を開く。
+  URL が `webOrigin` の `/login-failed`（query なし）になり、`heading`「ログインできませんでした」が見え、「Please sign in」が見えない。
+- **認可リクエストがない場合。**
+  同じ page で `/login/oauth2/code/web?code=x&state=y` を開くと、同じ画面に着く。
+- **もう一度ログイン。**
+  「もう一度ログイン」を押すと、URL の origin が `idpOrigin` になる。
+- **ログ。**
+  `stack.sh down` が書く `build/verify/logs/` の backend のログに、`OAuth2 login failed` の `error.type` の `access_denied` と `authorization_request_not_found` があり、目印の文字列がない。
 
 ## Gotchas
 

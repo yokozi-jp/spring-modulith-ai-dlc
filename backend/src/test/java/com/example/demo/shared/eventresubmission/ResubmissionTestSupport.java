@@ -11,6 +11,7 @@ import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CleanGeneratedTablesExtension;
 import com.example.demo.testkit.CommittedDatabaseTest;
+import com.example.demo.testkit.ReinstallLogAppenderExtension;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
@@ -35,6 +36,7 @@ import net.javacrumbs.shedlock.core.SimpleLock;
 import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
@@ -56,6 +58,7 @@ final class ResubmissionTestSupport {
   /* package */ @Target(ElementType.TYPE)
   @Retention(RetentionPolicy.RUNTIME)
   @CommittedDatabaseTest
+  @ExtendWith(ReinstallLogAppenderExtension.class)
   @Import(ProbeConfiguration.class)
   @TestPropertySource(
       properties = {
