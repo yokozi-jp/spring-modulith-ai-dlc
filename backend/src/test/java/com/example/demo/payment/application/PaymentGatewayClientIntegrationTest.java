@@ -189,24 +189,17 @@ class PaymentGatewayClientIntegrationTest {
         .isEqualTo(CircuitBreaker.State.CLOSED);
   }
 
-  @Test
-  @DisplayName("応答が呼び出しのタイムアウト 2 秒を超えれば、決済記録を作らず、出版は FAILED、attempts 1 で残る")
-  void timeoutLeavesPublicationFailed(final Scenario scenario) {
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"timeout", "connection reset"})
+  @DisplayName("応答が呼び出しのタイムアウト 2 秒を超えるか接続が切られれば、1 回だけ呼ばれ、決済記録を作らず、出版は FAILED、attempts 1 で残る")
+  void ioFailureLeavesPublicationFailed(final String failure, final Scenario scenario) {
+    // どちらも Client が投げ直す一時障害である。Client の中で再試行せず、やり直しはイベント出版の再投入だけが行う（ADR-079）。
     final String orderId = fixture.draftedOrderId();
-    stubCharge(orderId, succeeded(orderId).withFixedDelay(3000));
-
-    fixture.confirmAndAwait(
-        scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
-
-    assertFailedOnce(orderId);
-  }
-
-  @Test
-  @DisplayName("接続が切られれば 1 回だけ呼ばれ、決済記録を作らず、出版は FAILED、attempts 1 で残る")
-  void connectionResetLeavesPublicationFailed(final Scenario scenario) {
-    // 接続の失敗は Client が投げ直す一時障害である。Client の中で再試行せず、やり直しはイベント出版の再投入だけが行う（ADR-079）。
-    final String orderId = fixture.draftedOrderId();
-    stubCharge(orderId, WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER));
+    stubCharge(
+        orderId,
+        "timeout".equals(failure)
+            ? succeeded(orderId).withFixedDelay(3000)
+            : WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER));
 
     fixture.confirmAndAwait(
         scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));

@@ -51,10 +51,10 @@ import org.springframework.security.oauth2.core.endpoint.PkceParameterNames;
 @Import(SharedTestConfiguration.class)
 class DemoApplicationTest {
 
-  /** 決済代行の Client の Resilience4j の instance の名前。 */
+  /** 決済代行の Client の、Resilience4j の instance の名前とタイムアウトのプロパティの接頭辞。 */
   private static final String PAYMENT_GATEWAY = "payment-gateway";
 
-  /** メールの送信の Client の Resilience4j の instance の名前。 */
+  /** メールの送信の Client の、Resilience4j の instance の名前とタイムアウトのプロパティの接頭辞。 */
   private static final String MAIL_SENDER = "mail-sender";
 
   /** UTC 固定を検証する対象のアプリケーション {@code Clock}。 */

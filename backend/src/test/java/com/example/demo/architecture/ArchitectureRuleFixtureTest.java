@@ -6,6 +6,7 @@ import static com.example.demo.architecture.ViolatingFixtures.row;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import archfixture.violating.ordering.application.GuardedChargeOrderCommandHandler;
 import com.example.demo.shared.concurrency.ConflictException;
 import com.example.demo.shared.failure.BusinessRuleViolationException;
 import com.example.demo.shared.failure.NotFoundException;
@@ -272,6 +273,17 @@ class ArchitectureRuleFixtureTest {
         .as(ruleName)
         .isInstanceOf(AssertionError.class)
         .hasMessageContaining(violatingClass);
+  }
+
+  @Test
+  @DisplayName(
+      "springRetryIsNotUsedOnExternalSystemPath は、外部システムに依存しない CommandHandler の @Retryable を検出しない")
+  void springRetryRuleAllowsCommandHandlerWithoutExternalSystem() {
+    assertThatThrownBy(() ->
+            ResilienceRulesArchTest.springRetryIsNotUsedOnExternalSystemPath.check(
+                VIOLATING_CLASSES))
+        .isInstanceOf(AssertionError.class)
+        .hasMessageNotContaining(GuardedChargeOrderCommandHandler.class.getName());
   }
 
   private static Stream<Arguments> eachRuleDetectsItsViolatingFixture() {
@@ -600,9 +612,9 @@ class ArchitectureRuleFixtureTest {
         ClassRoleArchTest.eventPublisherIsUsedOnlyByCommandHandlers,
         ClassRoleArchTest.commandHandlersAndListenersDoNotImplementInterfaces,
         ClassRoleArchTest.listenersAreNotCalled,
-        ClassRoleArchTest.resilience4jRetryAndTimeLimiterAreNotUsed,
-        ClassRoleArchTest.retryableIsNotUsedOnExternalSystemPath,
-        ClassRoleArchTest.circuitBreakerIsUsedOnlyOnClients,
+        ResilienceRulesArchTest.resilience4jRetryAndTimeLimiterAreNotUsed,
+        ResilienceRulesArchTest.springRetryIsNotUsedOnExternalSystemPath,
+        ResilienceRulesArchTest.circuitBreakerIsUsedOnlyOnClients,
         ProxyRulesArchTest.pointcutsNarrowTargetsWithWithin,
         ProxyRulesArchTest.aspectsDeclareOrder,
         ProxyRulesArchTest.transactionManagementIsNotRedeclared,

@@ -78,6 +78,12 @@ class PackageByFeatureOnionArchitectureTest {
   /** Domain Model のパッケージ。 */
   private static final String DOMAIN_MODEL_PACKAGE = "..domain.model..";
 
+  /** 外部システムの Client のパッケージのパターン。 */
+  /* package */ static final String CLIENT_PACKAGE = "..infrastructure.client..";
+
+  /** 外部システムの Client の名前の接尾辞。 */
+  /* package */ static final String CLIENT = "Client";
+
   /**
    * Domain の外部システムのインタフェース。{@code domain.model} の interface のうち、Repository、アノテーション、{@code
    * package-info}、sealed interface（結果を表す値）以外。
@@ -353,9 +359,9 @@ class PackageByFeatureOnionArchitectureTest {
           .and()
           .implement(EXTERNAL_SYSTEM_INTERFACE)
           .should()
-          .haveSimpleNameEndingWith("Client")
+          .haveSimpleNameEndingWith(CLIENT)
           .andShould()
-          .resideInAPackage("..infrastructure.client..")
+          .resideInAPackage(CLIENT_PACKAGE)
           .allowEmptyShould(true)
           .because(
               "URL、JSON の形、タイムアウト、サーキットブレーカーを Client だけが扱い、"

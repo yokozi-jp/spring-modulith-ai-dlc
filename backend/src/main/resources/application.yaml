@@ -256,9 +256,9 @@ idempotency-key:
 payment-gateway:
   base-url: ${PAYMENT_GATEWAY_BASE_URL}
   # ADR-019 の開始値。環境で変えないため固定値にする。
-  # Listener はトランザクションの中で決済代行を呼ぶ（ADR-050）ため、
-  # (connect-timeout + read-timeout) × retry の試行回数 + 再試行の待ちの合計を、
-  # どの環境でも DB_IDLE_IN_TRANSACTION_TIMEOUT_MS より短くする（ADR-055）。DemoApplicationTest が確かめる。
+  # Listener はトランザクションの中で決済代行を呼ぶ（ADR-050）。Client は再試行せず 1 回だけ呼ぶ（ADR-079）ため、
+  # 最悪の時間の connect-timeout + read-timeout を、どの環境でも DB_IDLE_IN_TRANSACTION_TIMEOUT_MS より短くする（ADR-055）。
+  # DemoApplicationTest が確かめる。
   connect-timeout: 1s
   read-timeout: 2s
 

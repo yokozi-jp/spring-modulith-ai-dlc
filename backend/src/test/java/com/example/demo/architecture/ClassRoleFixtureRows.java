@@ -13,7 +13,7 @@ final class ClassRoleFixtureRows {
   private static final String REFLECTIVE_READER =
       "ordering.infrastructure.persistence.ReflectiveOrderReader";
 
-  /** Resilience4j の retry と TimeLimiter を使う違反フィクスチャのクラス名。 */
+  /** Client の中で再試行する違反フィクスチャのクラス名。 */
   private static final String RETRYING_CLIENT =
       "ordering.infrastructure.client.RetryingPaymentClient";
 
@@ -280,31 +280,35 @@ final class ClassRoleFixtureRows {
             "ordering.application.OrderPaymentCharger"),
         row(
             "resilience4jRetryAndTimeLimiterAreNotUsed: @Retry",
-            ClassRoleArchTest.resilience4jRetryAndTimeLimiterAreNotUsed,
+            ResilienceRulesArchTest.resilience4jRetryAndTimeLimiterAreNotUsed,
             RETRYING_CLIENT + ".charge("),
         row(
             "resilience4jRetryAndTimeLimiterAreNotUsed: @TimeLimiter",
-            ClassRoleArchTest.resilience4jRetryAndTimeLimiterAreNotUsed,
+            ResilienceRulesArchTest.resilience4jRetryAndTimeLimiterAreNotUsed,
             RETRYING_CLIENT + ".quote("),
         row(
-            "retryableIsNotUsedOnExternalSystemPath: Client",
-            ClassRoleArchTest.retryableIsNotUsedOnExternalSystemPath,
-            "ordering.infrastructure.client.RetryablePaymentClient.charge("),
+            "springRetryIsNotUsedOnExternalSystemPath: Client のクラスの @Retryable",
+            ResilienceRulesArchTest.springRetryIsNotUsedOnExternalSystemPath,
+            "ordering.infrastructure.client.RetryablePaymentClient"),
         row(
-            "retryableIsNotUsedOnExternalSystemPath: 外部システムを呼ぶ CommandHandler のクラス",
-            ClassRoleArchTest.retryableIsNotUsedOnExternalSystemPath,
-            "ordering.application.RetryableChargeOrderCommandHandler"),
+            "springRetryIsNotUsedOnExternalSystemPath: Client の RetryTemplate",
+            ResilienceRulesArchTest.springRetryIsNotUsedOnExternalSystemPath,
+            RETRYING_CLIENT + ".refund("),
         row(
-            "retryableIsNotUsedOnExternalSystemPath: Listener",
-            ClassRoleArchTest.retryableIsNotUsedOnExternalSystemPath,
+            "springRetryIsNotUsedOnExternalSystemPath: 外部システムを呼ぶ CommandHandler のメソッドの合成アノテーション",
+            ResilienceRulesArchTest.springRetryIsNotUsedOnExternalSystemPath,
+            "ordering.application.ChargeOrderCommandHandler.handle("),
+        row(
+            "springRetryIsNotUsedOnExternalSystemPath: Listener のメソッドの @Retryable",
+            ResilienceRulesArchTest.springRetryIsNotUsedOnExternalSystemPath,
             "ordering.application.OrderRefundedListener.on("),
         row(
             "circuitBreakerIsUsedOnlyOnClients: CommandHandler のメソッド",
-            ClassRoleArchTest.circuitBreakerIsUsedOnlyOnClients,
+            ResilienceRulesArchTest.circuitBreakerIsUsedOnlyOnClients,
             "ordering.application.GuardedChargeOrderCommandHandler.handle("),
         row(
             "circuitBreakerIsUsedOnlyOnClients: Client でないクラス",
-            ClassRoleArchTest.circuitBreakerIsUsedOnlyOnClients,
+            ResilienceRulesArchTest.circuitBreakerIsUsedOnlyOnClients,
             "ordering.infrastructure.client.PaymentGatewayBreaker"),
         row(
             "eventPublisherIsUsedOnlyByCommandHandlers: Controller",

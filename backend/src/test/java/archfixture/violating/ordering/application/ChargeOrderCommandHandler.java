@@ -6,7 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 外部システムのインタフェースに依存する CommandHandler。これ自体は規約どおり。
+ * 外部システムのインタフェースに依存する CommandHandler。違反：springRetryIsNotUsedOnExternalSystemPath（{@code handle} に
+ * {@code @Retryable} の合成アノテーションを付ける）。
  *
  * <p>externalSystemCommandHandlersAreDependedOnlyByListeners が、この CommandHandler を呼ぶ {@code
  * ChargeOrderController} と {@code ChargeOrderListener} を検出する。
@@ -23,6 +24,7 @@ public class ChargeOrderCommandHandler {
   }
 
   /** 注文の代金を請求し、決済 ID を返す。 */
+  @RetryOnFailure
   @Transactional
   public ChargeOrderResult handle(final ChargeOrderCommand command) {
     return new ChargeOrderResult(paymentGateway.charge(new OrderId(command.orderId())));
