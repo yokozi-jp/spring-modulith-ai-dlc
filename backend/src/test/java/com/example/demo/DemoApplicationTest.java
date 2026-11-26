@@ -147,18 +147,30 @@ class DemoApplicationTest {
   }
 
   @Test
-  @DisplayName("アプリケーション executor の同時実行数は、DB の接続の pool の半分以下に制限する")
-  void applicationExecutorConcurrencyLeavesConnectionsForRequests() {
+  @DisplayName("アプリケーション executor は同時実行数に上限を置かず、DB の接続の pool が唯一の制限になる")
+  void applicationExecutorHasNoConcurrencyLimit() {
     assertTrue(
         applicationTaskExecutor instanceof SimpleAsyncTaskExecutor,
         "仮想スレッドの executor が SimpleAsyncTaskExecutor であること");
     // executor は Spring が閉じるため、ローカル変数に取らずに読む。
-    final int limit = ((SimpleAsyncTaskExecutor) applicationTaskExecutor).getConcurrencyLimit();
+    assertEquals(
+        SimpleAsyncTaskExecutor.UNBOUNDED_CONCURRENCY,
+        ((SimpleAsyncTaskExecutor) applicationTaskExecutor).getConcurrencyLimit(),
+        "同時実行数に上限がないこと。上限を足すと、リスナーを渡す要求のスレッドが空きを待つ（ADR-141）");
+  }
+
+  @Test
+  @DisplayName("再投入の 1 回の件数は、DB の接続の pool の半分以下に制限する")
+  void resubmissionMaxPerRunLeavesConnectionsForRequests() {
+    final int maxPerRun =
+        applicationContext
+            .getEnvironment()
+            .getRequiredProperty("event-publication.resubmission.max-per-run", Integer.class);
     final int poolSize = hikariDataSource.getMaximumPoolSize();
 
     assertTrue(
-        limit >= 1 && limit * 2 <= poolSize,
-        () -> "同時実行数 " + limit + " が 1 以上で、pool " + poolSize + " の半分以下であること");
+        maxPerRun >= 1 && maxPerRun * 2 <= poolSize,
+        () -> "再投入の件数 " + maxPerRun + " が 1 以上で、pool " + poolSize + " の半分以下であること");
   }
 
   @Test

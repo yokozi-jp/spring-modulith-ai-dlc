@@ -92,7 +92,7 @@ HTTP API の冪等性キーも Exactly once を保証しないため、同じ考
 Spring Modulith のイベントは FIFO ではなく、同じ集約のイベントでも届く順序を保証しない。
 理由は次の三つである。
 
-- **同時実行**：非同期のリスナーは同時に 2 つまで動く（`spring.task.execution.simple.concurrency-limit`）。先に発行したイベントの処理が、後のイベントの処理と重なる。
+- **同時実行**：非同期のリスナーは同時に複数動く（上限は DB の接続の pool だけである。[非同期処理の流量制御と性能](async-flow-control.md)）。先に発行したイベントの処理が、後のイベントの処理と重なる。
 - **再投入**：失敗した出版は、定期のジョブが後から再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。再投入した古いイベントは、その間に届いた新しいイベントより後に処理される。
 - **追い越し**：Spring Modulith のリファレンスも、再投入のときに後のイベントが前のイベントを追い越しうると書く（Working with Application Events の「Serializing Event Externalization」）。
 

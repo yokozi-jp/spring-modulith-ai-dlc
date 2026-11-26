@@ -554,7 +554,7 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
-  @DisplayName("定期の実行を有効にしても、@Async の Listener は concurrency-limit を持つ applicationTaskExecutor で動く")
+  @DisplayName("定期の実行を有効にしても、@Async の Listener は上限のない applicationTaskExecutor で動く")
   void schedulingKeepsAsyncListenersOnTheApplicationTaskExecutor() {
     runnerWithResubmitter()
         .withConfiguration(
@@ -562,8 +562,7 @@ class EventPublicationResubmissionConfigTest {
                 TaskExecutionAutoConfiguration.class, TaskSchedulingAutoConfiguration.class))
         .withPropertyValues(
             ENABLE_SCHEDULING,
-            "spring.threads.virtual.enabled=true",
-            "spring.task.execution.simple.concurrency-limit=2")
+            "spring.threads.virtual.enabled=true")
         .run(context -> {
           assertThat(context).hasSingleBean(TaskScheduler.class);
           // Spring Boot 4.1 は taskExecutor の別名を作らず、@Async の executor を AsyncConfigurer で渡す。
@@ -572,7 +571,7 @@ class EventPublicationResubmissionConfigTest {
           assertThat(
                   ((SimpleAsyncTaskExecutor) context.getBean("applicationTaskExecutor"))
                       .getConcurrencyLimit())
-              .isEqualTo(2);
+              .isEqualTo(SimpleAsyncTaskExecutor.UNBOUNDED_CONCURRENCY);
         });
   }
 

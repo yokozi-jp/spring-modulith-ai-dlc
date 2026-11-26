@@ -50,13 +50,8 @@ spring:
   task:
     execution:
       propagate-context: true
-      # 非同期の Listener の同時実行数の上限（docs/integration/async-flow-control.md）。
-      # Listener は DB 接続を使い、決済代行を待つ間も接続を持つため、同期リクエストの接続を残すよう、
-      # 最小の pool（テストの DB_POOL_MAXIMUM_SIZE=4）の半分にする。DemoApplicationTest が pool の半分以下であることを確かめる。
-      # ponytail: 上限に達すると SimpleAsyncTaskExecutor は、コミットの後に Listener を投入する要求のスレッドを、接続を持ったまま待たせる。
-      # 負荷試験で本番の pool の大きさが決まったら、pool から導いた環境変数にする。
-      simple:
-        concurrency-limit: 2
+      # 非同期の Listener の同時実行数に上限は置かない。DB の接続の pool が唯一の制限である（ADR-141、docs/integration/async-flow-control.md）。
+      # 接続を待つ Listener は connection-timeout で失敗し、再投入が拾う。要求のスレッドは executor の空きを待たない。
 
   # DB
   datasource:
@@ -179,7 +174,7 @@ spring:
       # 閾値を書くと起動に失敗する（EventPublicationResubmissionConfig.StalenessMonitorProperties）。
       # 同じ処理は、定期の再投入と手での 1 回の再投入が ShedLock のロックの中で、再投入の前に 1 文の UPDATE で行う（StalePublications）。
       # 閾値は event-publication.resubmission の wait-age（PUBLISHED）と in-flight-staleness（PROCESSING と RESUBMITTED）である。
-      # 最初の配信が concurrency-limit の空きを待つ間に wait-age を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
+      # 最初の配信が接続の pool の空きを待つ間に wait-age を過ぎた出版は重ねて再投入しうる。リスナーの冪等性に頼る。
       # 再投入の回数の上限。この回数目の再投入で失敗した出版を ABANDONED にして archive へ移す（ADR-079）。
       # Spring Modulith は失敗した試行の前に読んだ completion_attempts と比べ、最初の配信と 1 回目の再投入をどちらも 1 と比べるため、2 以上にする。
       # 定期の再投入もこの値を超えた出版を再投入しない。2 未満なら起動に失敗する。
@@ -209,8 +204,11 @@ event-publication:
     # 前の回の終わりから次の回までの間隔。ロックを持つ下限はこの半分にする。
     interval: ${EVENT_PUBLICATION_RESUBMISSION_INTERVAL}
     # 以下は環境で変えないため固定値にする。
-    max-per-run: 100
-    # ロックを持つ上限。1 回の実行（古い出版を FAILED に戻す処理と max-per-run 件の再投入。concurrency-limit の空きを待つ間も含む）の最長より十分に長くし、interval より長くする。
+    # 再投入した出版は、同時に全件が DB の接続を取りに行く。Listener の同時実行数に上限がないため、この値で同時に動く数を絞る。
+    # 最小の pool（テストの DB_POOL_MAXIMUM_SIZE=4）の半分にし、同期リクエストの接続を残す。DemoApplicationTest が pool の半分以下であることを確かめる（ADR-141）。
+    # ponytail: 再投入の流量は interval あたり max-per-run 件になる。本番の pool が決まったら増やす。ジョブを Web と別のインスタンスで動かせば、この制限は外せる（#792）。
+    max-per-run: 2
+    # ロックを持つ上限。1 回の実行（古い出版を FAILED に戻す処理と max-per-run 件の再投入）の最長より十分に長くし、interval より長くする。
     # 再投入の候補を選ぶのは実行の開始からこの半分までで、古い出版を FAILED に戻す処理の時間もこの半分に入る。
     # in-flight-staleness はこの 2 倍より長くするため、変えたら in-flight-staleness も見直す。
     lock-at-most-for: PT10M

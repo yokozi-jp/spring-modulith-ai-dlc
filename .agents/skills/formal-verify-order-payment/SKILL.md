@@ -157,7 +157,7 @@ git diff --name-only --diff-filter=A "$(sed -n 's/^同期コミット：`\([0-9a
 `RecordMatchesGateway` の TLC の経路は次のとおり。
 
 1. 注文を確定し、最初の配信が始まる（`markProcessing`）。
-2. 再投入のジョブが、古い出版として出版を `FAILED` にする（最初の配信が `concurrency-limit` の空きを待つ間に `wait-age` を過ぎた場合など、`application.yaml` の注記にある場合）。
+2. 再投入のジョブが、古い出版として出版を `FAILED` にする（最初の配信が終わらないまま `wait-age` を過ぎた場合など、`application.yaml` の注記にある場合）。
 3. 最初の配信が `POST /v1/charges` を送り、決済代行が判定を始める。
 4. `EventPublicationResubmitter` が出版を `markResubmitted` で `RESUBMITTED` にし、二度目の配信が同じ `Idempotency-Key` で請求し、決済代行が 409 を返す。
 5. `PaymentGatewayClient.contractError` が 409 を契約の不備として `ChargeOutcome.failed()` にし（`PaymentGatewayClientTest.contractErrorReturnsFailed` が 409 でこれを確かめている）、`FAILED` の決済記録をコミットする。

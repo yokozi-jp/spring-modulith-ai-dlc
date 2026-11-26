@@ -26,19 +26,27 @@ DB を使うコンシューマーの同時実行数は、DB 接続の予算に�
 構成要素が増えるほど運用の費用が増えるためである。
 
 Spring Modulith の非同期リスナーは、アプリケーションの task executor で実行される。
-仮想スレッドはスレッドの費用を下げるが DB 接続を増やさないため、DB を使うリスナーの同時実行数は HikariCP の接続予算に収め、同期リクエストが使う接続を残す（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
+仮想スレッドはスレッドの費用を下げるが DB 接続を増やさないため、DB を使うリスナーの同時実行は HikariCP の接続予算に収まる（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
 
-このリポジトリは `application.yaml` の `spring.task.execution.simple.concurrency-limit` を 2 にする。
-仮想スレッドの `SimpleAsyncTaskExecutor` は、この値で同時に動くリスナーの数を制限する。
-値は最小の接続の pool（テストの `DB_POOL_MAXIMUM_SIZE` の 4）の半分で、残りの接続を同期リクエストに残す。
-`DemoApplicationTest` は、上限が 1 以上で pool の半分以下であることを確かめる。
-上限に達すると、コミットの後にリスナーを投入する要求のスレッドは、接続を持ったまま空きを待つ。
-`reject-tasks-when-limit-reached` で断ると出版が未完了のまま残るため、断らずに待たせる。
-本番の pool の大きさを負荷試験で決めたら、上限を pool から導いた環境変数にする。
+このリポジトリは executor に同時実行数の上限を置かず、DB の接続の pool（`DB_POOL_MAXIMUM_SIZE`）を、リスナーの同時実行の唯一の制限にする（[ADR-141](../adr/ADR-141-limit-listener-concurrency-by-connection-pool-only.md)）。
+`spring.task.execution.simple.concurrency-limit` は書かない。
+上限があると、上限に達した間、コミットの後にリスナーを渡す要求のスレッドが、接続を持ったまま空きを待つためである。
+`DemoApplicationTest` は、executor に上限がないことを確かめる。
+
+接続を取れないリスナーは、`connection-timeout`（5 秒）で失敗する。
+出版は `FAILED` に戻り、再投入が拾う。失敗は再投入の回数（`abandon-after-attempts`）を 1 回消費する。
+リスナーが pool を使い切ると、同期リクエストの接続の取得も待たされ、5 秒を超えると失敗する。
+リスナーを渡す要求のスレッドが空きを待たない代わりに、この待ちを受け入れる。
+
+同期リクエストの接続を残す仕組みは、再投入の 1 回の件数（`max-per-run`）だけである。
+再投入した出版は同時に全件が接続を取りに行くので、値は最小の pool（テストの `DB_POOL_MAXIMUM_SIZE` の 4）の半分にする。
+`DemoApplicationTest` は、`max-per-run` が 1 以上で pool の半分以下であることを確かめる。
+本番の pool の大きさを負荷試験で決めたら、値を見直す。
+再投入のジョブを Web と別のインスタンスで動かせば、この制限は外せる（[#792](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/792)）。
 
 失敗したイベント出版の再投入のロック（ShedLock）は DB の表の行で持ち、ロックの間も接続を固定しない（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-再投入したリスナーは同じ `concurrency-limit` の中で動き、上限に達するとジョブのスレッドが空きを待つ。
-ロックを持つ上限（`lock-at-most-for`）は、この待ちを含む 1 回の実行（`max-per-run` 件）の最長より長くする。
+再投入したリスナーは、ジョブの JVM の executor で動く。executor に上限がないため、ジョブは件数（`max-per-run`）を渡した時点で戻る。
+ロックを持つ上限（`lock-at-most-for`）は、1 回の実行（`max-per-run` 件）の最長より長くする。
 
 ## 受信方式ごとの流量制御
 
