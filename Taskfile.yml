@@ -1580,8 +1580,8 @@ tasks:
         ' "$out/frontend-csp.json" >/dev/null; then
           fail "CSP の報告の属性、resource 属性、scope の属性、件数のいずれかが期待値と一致しません。"
         fi
-        # 通常の経路で OTTL の文が失敗しないこと。型や値が不正な入力は guard が先に除くので、失敗するのは文を壊したときと想定外の入力だけである。
-        # csp_parse は JSON でない本文を捨てるので error_mode を silent にしている。check/check.yaml が warn の間引きを止めるので、失敗は 1 件も漏れない。
+        # fixture が通す入力で、OTTL の文が 1 つも失敗しないこと。guard の欠落や文の誤りは、error_mode: ignore の warn に出る。
+        # transform/frontend_csp_parse だけは silent なので、この検査の対象外である。
         collector_logs="$({{.DOCKER}} logs "$container" 2>&1)"
         if printf '%s' "$collector_logs" | grep -qF 'failed to execute statement'; then
           fail "Collector の processor で、OTTL の文の実行が失敗しました。"

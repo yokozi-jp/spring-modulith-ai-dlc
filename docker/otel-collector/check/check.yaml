@@ -11,11 +11,6 @@ exporters:
     path: /out/frontend-csp.json
 
 service:
-  telemetry:
-    logs:
-      # 既定は同じ message の warn を 1 秒に 10 件までに間引く。間引くと、statement の失敗が見えなくなる。
-      sampling:
-        enabled: false
   pipelines:
     logs:
       exporters: [file/check]

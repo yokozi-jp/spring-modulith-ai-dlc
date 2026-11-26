@@ -22,7 +22,9 @@
         ]
       }
     },
-    { "type": "", "value": "invalid exception", "timestamp": "2026-10-06T00:00:00.500Z" }
+    { "type": "", "value": "invalid exception", "timestamp": "2026-10-06T00:00:00.500Z" },
+    { "type": "Error", "timestamp": "2026-10-06T00:00:00.600Z" },
+    { "type": "Error", "value": "", "timestamp": "2026-10-06T00:00:00.700Z" }
   ],
   "events": [
     { "name": "view_changed", "timestamp": "2026-10-06T00:00:01.000Z", "attributes": { "fromView": "unknown", "toView": "/", "secret": "secret-event-data" } },
