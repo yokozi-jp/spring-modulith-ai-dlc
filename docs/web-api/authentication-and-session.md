@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: APIの認証、セッション、権限
-description: ブラウザとシステム間連携のAPI認証、ログインの後のテナントの選択、ログアウト、セッションとCSRFのCookieの属性、ロールの管理場所を定める規約。APIの認証方式、セッション設定、CSRFのCookieを変更するとき、テナントを選ぶ前に呼ぶAPIを足すとき、対向システムへAPIを公開するとき、権限の判定を実装するときに読む。
+description: ブラウザとシステム間連携のAPI認証、ログインの後のテナントの選択、セッションの無操作と最長の期間、ログアウト、セッションとCSRFのCookieの属性、ロールの管理場所を定める規約。APIの認証方式、セッション設定、CSRFのCookieを変更するとき、テナントを選ぶ前に呼ぶAPIを足すとき、対向システムへAPIを公開するとき、権限の判定を実装するときに読む。
 tags: [convention, web-api, security, auth, future-arch-guidelines]
 ---
 
@@ -85,6 +85,19 @@ chainの`SecurityContextRepository`は`HttpSecurity`のbuildで作られ、`Tena
 今の`backend/src/main`には認可済みのクライアントを読むコードがないため、影響はない。
 ログアウトでトークンを失効させるなど、認可済みのクライアントを読む処理を足すときは、保存先をセッションかDBに移す。
 
+## セッションの期間
+
+セッションは、無操作の30分と、作成からの8時間のどちらか早いほうで切れる。
+理由は[ADR-135](../adr/ADR-135-add-absolute-session-lifetime-and-explicit-idle-timeout.md)にある。
+
+- 無操作の期間は、[application.yaml](../../backend/src/main/resources/application.yaml)の`server.servlet.session.timeout`（`30m`）に書く。Spring Bootは、この値をSpring Session JDBCの期間にも使う。`spring.session.timeout`は書かない。
+- 最長の期間は、`app.session.max-lifetime`（`8h`）に書く。
+- `SecurityConfig`は、`AbsoluteSessionTimeoutFilter`を`SecurityContextHolderFilter`の前に置く。このfilterは、セッションの作成時刻（`getCreationTime()`、`modulith.spring_session.creation_time`）に最長の期間を足した時刻を`Clock`の現在時刻と比べ、過ぎていればセッションを`invalidate()`する。
+- 期限を過ぎたセッションのリクエストは未認証になり、401になる（[ブラウザからの認証](#ブラウザからの認証)）。セッションの行は消えるので、次のログインのセッションは新しい作成時刻から数える。
+- 最長の期間は、ログインではなく、認可の開始でセッションを作った時刻から数える。ログインの時刻との差は数秒から数分である。
+- ログインとテナントの選択はセッションのIDを作り直すが、`creation_time`を変えないので、最長の期間は延びない。
+- IdPのSSOセッションが残っていれば、期限の後のログインで資格情報を求められない。資格情報なしで使い続けられる上限は、IdPのSSOセッションの最長の期間（Keycloakのrealm、Cognitoの設定）になる。
+
 ## ログアウト
 
 ログアウトでは、ADR-007に従ってアプリケーションのセッションを破棄し、IdPのSSOセッションを終了する。
@@ -108,7 +121,7 @@ Cookieは、セッションIDとADR-007のCSRFトークン以外の用途に使�
 設定は[application.yaml](../../backend/src/main/resources/application.yaml)にあり、そのほかの扱いは次のとおりにする。
 
 - セッションIDは、フレームワークが暗号論的に安全な乱数で生成した、十分に長く推測困難な値だけにする。
-- 有効期間は`Expires`ではなく`Max-Age`で指定し、合意したセッションの有効期間に合わせる。
+- `Max-Age`と`Expires`を付けず、ブラウザのセッションのCookieにする。期間はサーバーが切る（[セッションの期間](#セッションの期間)）。
 - ログインのたびにセッションIDを再生成し、ログイン前の値を引き継がない。
 - ログアウトでは、サーバーのセッションを破棄し、Cookieを`Max-Age=0`で削除する。
 
