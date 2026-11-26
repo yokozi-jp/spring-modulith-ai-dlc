@@ -221,6 +221,8 @@ H6は、`UnversionedOrderRepository`（集約ルートではなく識別子を�
 `featureCodeUsesOnlySlf4jFacade`は、違反フィクスチャの`LogbackOrderAuditor`（Logbackの`Level`を使う）で確かめる。
 `autowiredMethodsAreNotUsed`は、違反フィクスチャの`SetterInjectedOrderMailer`（`setSender`に`@Autowired`を付ける）で確かめる。
 `legacyDateTimeTypesAreNotUsed`は、違反フィクスチャの`LegacyOrderTimestamp`（`java.util.Date`を返す）で確かめる。
+`databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`は、違反フィクスチャの`application`の`JooqOrderCounter`（jOOQの`DSLContext`を使う）で確かめる。
+`repositoriesResideInPersistenceAdapters`は、違反フィクスチャの`application`の`OrderArchiveStore`（`@Repository`を付ける）で確かめる。
 規約どおりのフィクスチャの`CancelOrderCommandHandler`、`CancelExpiredOrderCommandHandler`、`ReserveStockCommandHandler`、`OrderController`は`NotFoundException`を、`Order`と`OrderLimitPolicy`は`BusinessRuleViolationException`を投げ、Domain、Application、Presentationから`shared.failure`を使っても規則が通ることを確かめる。
 `allowedUsagesAreNotDetected`の別の一行は、`IllegalStateException`、`IllegalArgumentException`、3つの業務上の失敗の例外の送出と`orElseThrow(Supplier)`を、`noSuchElementExceptionIsNotThrown`が誤検出しないことを確かめる。
 `httpTypesAreNotUsedByInnerLayers`は、違反フィクスチャの`shared.persistence`の`ChildRowWriter`と`application`の`HttpStatusCommandHandler`が`ResponseStatusException`を投げること、`infrastructure.persistence`の`HttpStatusOrderReader`が`HttpStatus`を使うことを検出する。
@@ -232,18 +234,36 @@ MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`
 `TestConventionsArchTest`の`sleepIsNotUsedInTests`は、`SleepRuleFixtureTest`が`archfixture.sleep`のクラスで確かめる。
 直接の呼び出しとメソッド参照が検出され、`Thread`と`TimeUnit`以外の`sleep`が検出されないことを固定する。
 
-規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
+規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`ConformingRules`の`rulesFor()`に規則を加える。
 この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。
 行の名前と`rulesFor()`のキーには、`@ArchTest`のフィールドの名前を使う。
 違反の種類ごとに行を分けるときは、`moduleCodeDoesNotUseJdbc: DataSource`のように名前の後に種類を足す。
-片方にだけ加えると、`everyRuleIsRegisteredOrExempted`が規則の名前を出して失敗する。
-次の規則は、違反の行と`rulesFor()`に載せず、`FixtureExemptions`に理由を付けて載せる。
+行の名前の`:`より前を規則の名前として読むのは、`ViolatingFixtures`の`FixtureRow`である。
+
+`everyRuleIsRegisteredOrExempted`は、`RuleRegistrationCheck`で次の誤りを探し、規則の名前を出して失敗する。
+`RuleRegistrationCheckTest`は、誤りの種類ごとに、規則の名前を出して報告することを確かめる。
+
+- 別のクラスに同じ名前の`@ArchTest`がある。
+- 除外していない規則が、違反の行か`rulesFor()`にない。
+- 除外した規則が、違反の行か`rulesFor()`にある。
+- 違反の行、`rulesFor()`、`FixtureExemptions`に、`@ArchTest`の規則のない名前がある。
+- `FixtureExemptions`の理由が空である。
+- 違反の行か`rulesFor()`で名前に対応づけた規則の最後のbecauseが、同じ名前の`@ArchTest`の規則の最後のbecauseと違う。
+
+名前に対応づけた規則は、最後のbecauseで照らす。
+ファクトリに別の基底パッケージを渡した規則は、説明がパッケージを含むため、インスタンスでも説明の全体でも比べられない。
+そのため、最後のbecauseが同じ別の規則を対応づけても検出しない。
+最後のbecauseが同じ規則の組は、除外した`disabledTestMethodsRequireReason`と`disabledTestClassesRequireReason`だけである。
+
+除外する規則は、違反の行と`rulesFor()`のどちらにも載せず、`FixtureExemptions`に理由を付けて載せる。
+次の規則を除外する。
 
 - テストコードを検査する規則
-- 別のテストが違反を確かめる規則
+- 違反フィクスチャの代わりに、別のテストが違反を確かめる規則
 - ArchUnitの`GeneralCodingRules`の定数に`.because(...)`を付けただけの規則（違反の検出はArchUnitのテストが確かめる）
 
-除外した規則に違反フィクスチャと行を足したら、`FixtureExemptions`から消す。
+別のテストが違反を確かめる規則でも、違反の行と`rulesFor()`に載せたら除外しない（`tableWritesGoThroughTableWriter`）。
+除外した規則に違反フィクスチャと行を足したら、`rulesFor()`にも足し、`FixtureExemptions`から消す。
 注釈の属性の値で判定する規則では、属性を省いて既定値のままにした注釈も違反フィクスチャに置く。
 たとえば値を省いた`@Order`は`Ordered.LOWEST_PRECEDENCE`になり、明示した値だけを見る規則を通ってしまう。
 
