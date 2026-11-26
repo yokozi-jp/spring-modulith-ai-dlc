@@ -29,7 +29,7 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 
 - `com.example.demo.<feature>.presentation.web` に置く。
 - 名前は集約の名前に `Controller` を付ける（`OrderController`）。
-- `@RequestMapping` のパスは `/api/` に集約の複数形を付ける（`/api/orders`）。
+- `@RequestMapping` のパスは `/api/v{version}/` に集約の複数形を付け（`/api/v{version}/orders`）、`version` に API のバージョンを書く（`version = "1"`）。`ApiVersionArchTest` が検査する（[APIの互換性と廃止](../../web-api/versioning.md)）。
   URL の形は[Web APIの方式とURLの設計](../../web-api/api-style.md)に従う。
 - ハンドラメソッドの名前は操作の動詞にする（`place`、`confirm`、`cancel`、`details`、`search`）。
 - ハンドラメソッドには `@Operation(operationId = "...")` で operationId を明示する（`placeOrder`、`confirmOrder`、`cancelOrder`、`findOrderById`、`listOrders`）。
@@ -37,19 +37,19 @@ Domain の型を Application の外へ出さず、HTTP API の形と Domain を�
 
 注文の Controller は、次の HTTP の形にする。
 
-- **`POST /api/orders`**：`PlaceOrderRequest` を受けて注文を受け付け、201 と作成した注文の URI の `Location` を返し、本文を返さない。
-- **`POST /api/orders/{orderId}/confirm`**：ロック番号を持つ `ConfirmOrderRequest` を受け、パス変数と合わせて `ConfirmOrderCommand` を作って確定し、204 を返す。
-- **`POST /api/orders/{orderId}/cancel`**：ロック番号を持つ `CancelOrderRequest` を受け、パス変数と合わせて `CancelOrderCommand` を作って取り消し、204 を返す。
-- **`GET /api/orders/{orderId}`**：`OrderQueries.findDetails` の結果を、ロック番号を含む `OrderDetailsResponse` にして 200 で返す。
+- **`POST /api/v1/orders`**：`PlaceOrderRequest` を受けて注文を受け付け、201 と作成した注文の URI の `Location` を返し、本文を返さない。
+- **`POST /api/v1/orders/{orderId}/confirm`**：ロック番号を持つ `ConfirmOrderRequest` を受け、パス変数と合わせて `ConfirmOrderCommand` を作って確定し、204 を返す。
+- **`POST /api/v1/orders/{orderId}/cancel`**：ロック番号を持つ `CancelOrderRequest` を受け、パス変数と合わせて `CancelOrderCommand` を作って取り消し、204 を返す。
+- **`GET /api/v1/orders/{orderId}`**：`OrderQueries.findDetails` の結果を、ロック番号を含む `OrderDetailsResponse` にして 200 で返す。
   注文がなければ `shared.failure` の `NotFoundException` を投げ、`ApiExceptionHandler` が 404 にする。
-- **`GET /api/orders?customerId=…`**：`OrderQueries.search` の結果を `OrderSummaryListResponse` の `items` に入れて 200 で返す。
+- **`GET /api/v1/orders?customerId=…`**：`OrderQueries.search` の結果を `OrderSummaryListResponse` の `items` に入れて 200 で返す。
 
 確定と取消は、[Web APIの方式とURLの設計](../../web-api/api-style.md)の「カスタムメソッド」の形にする。
 ロック番号の受け渡しは[更新の競合制御](../../web-api/optimistic-locking.md)に、作成の応答は[HTTPメソッドの使い分け](../../web-api/http-methods.md)の「作成」に、ステータスコードは[HTTPステータスコードの選択](../../web-api/status-codes.md)に、一覧の形は[レスポンスボディの形式](../../web-api/response-body.md)に従う。
 
 ## 必須の記述
 
-- `@RestController` と `@RequestMapping("/api/<resources>")` を付けた package-private の `class` にし、`final` を付けない。
+- `@RestController` と `@RequestMapping(path = "/api/v{version}/<resources>", version = "1")` を付けた package-private の `class` にし、`final` を付けない。
 - クラスに `@Tag(name = "<feature>", description = "...")` を付ける。
   tag の名前は業務機能のパッケージ名の kebab-case にする（[OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md)）。
 - 依存は package-private のコンストラクタで受け取る。
@@ -86,7 +86,7 @@ package com.example.demo.ordering.presentation.web;
 
 /** 注文の HTTP API。 */
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping(path = "/api/v{version}/orders", version = "1")
 @Tag(name = "ordering", description = "注文の API")
 class OrderController {
 
@@ -197,7 +197,7 @@ class OrderController {
 更新の操作には `with(user(...))` と `with(csrf())` を付ける。
 
 テストメソッドには `@ContractCase(method, path, status)` を付け、確かめる operation と status の組を宣言する。
-`path` は OpenAPI の path の形（`/api/orders/{orderId}`）で書き、宣言する status はそのテストが `andExpect(status()...)` で期待する値に限る。
+`path` は OpenAPI の path の形（`/api/v1/orders/{orderId}`）で書き、宣言する status はそのテストが `andExpect(status()...)` で期待する値に限る。
 `ApiContractCoverageTest` は、コミット済みの `openapi/openapi.yaml` の組のうち宣言のないものがあれば失敗する（[ADR-077](../../adr/ADR-077-check-contract-test-coverage-per-response-status.md)）。
 401 と更新の 403 は `ApiContractTest` が全 operation をまとめて確かめる。
 送る要求は宣言から作る（`@ArgumentsSource(ContractCaseArguments.class)`）ので、新しい operation を足したらその宣言だけを加える。
@@ -214,11 +214,11 @@ class OrderControllerTest {
 
   @Test
   @DisplayName("明細のない注文の受付は 400 の Problem Details を返す")
-  @ContractCase(method = RequestMethod.POST, path = "/api/orders", status = 400)
+  @ContractCase(method = RequestMethod.POST, path = "/api/v1/orders", status = 400)
   void placeWithoutLinesReturnsBadRequest() throws Exception {
     mockMvc
         .perform(
-            post("/api/orders")
+            post("/api/v1/orders")
                 .with(user("test-user"))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
@@ -239,7 +239,7 @@ class OrderControllerTest {
 - ルートの record（`OrderDetails`）をそのまま JSON で返す。
 - 一覧を JSON の配列のまま返す。
 - 作成の応答で 200 と本文を返し、`Location` を返さない。
-- 確定や取消を `PUT /api/orders/{orderId}` の状態の書き換えで表す。
+- 確定や取消を `PUT /api/v1/orders/{orderId}` の状態の書き換えで表す。
 - 確定や取消で、ロック番号を受けずにパス変数だけで Command を作る。
   画面が読んだ後に他の人が変えた注文を、気付かずに上書きする。
 - 画面ごとに Controller を作り、同じ集約の API を複数のクラスに分ける。
@@ -256,7 +256,7 @@ class OrderControllerTest {
 - [ ] ハンドラメソッドの Javadoc の 1 行目を summary にし、詳細を `<p>` の後に書く。［Spectral で検査：operation-description（説明の有無だけ。summary の切れ目は自分で点検）］
 - [ ] 404、409、422 は起きるハンドラメソッドにだけ `ref` で書き、成功応答の `@ApiResponse` も書く。［Spectral で検査：error-response-problem-detail、operation-success-response（付け忘れは自分で点検）］
 - [ ] [OpenAPIのアノテーションとJavadoc](../../web-api/openapi-annotations.md) のチェックリストを満たす。［自分で点検］
-- [ ] 集約ごとに一つ作り、`@RequestMapping("/api/<resources>")` を付けた package-private の class にする。［自分で点検］
+- [ ] 集約ごとに一つ作り、`@RequestMapping(path = "/api/v{version}/<resources>", version = "1")` を付けた package-private の class にする。［ArchUnit で検査：ApiVersionArchTest］
 - [ ] 状態を変える操作は `@Valid` の Request を `toCommand(...)` で Command にし、パス変数の値は引数で渡す。［自分で点検］
 - [ ] POST、PUT、PATCH、DELETE のハンドラメソッドは、パス変数の次の引数で `IdempotencyKey` を受ける。［ArchUnit で検査：IdempotencyArchTest.unsafeHandlersTakeIdempotencyKey］
 - [ ] 既存の集約を変える操作は、ロック番号を本文の Request で受ける。DELETE はクエリパラメータで受け、Request に渡す。［自分で点検］

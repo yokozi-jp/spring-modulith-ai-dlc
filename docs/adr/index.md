@@ -14,7 +14,7 @@
 - [ADR-010: プロジェクトのタスクランナーに Task を採用する](ADR-010-adopt-task-as-project-task-runner.md)（Proposed, 2026-09-13）
 - [ADR-011: モジュール所有のデータベーススキーマを使う](ADR-011-use-module-owned-database-schemas.md)（Proposed, 2026-09-14）
 - [ADR-012: プロパティベーステストとミューテーションテストを採用する](ADR-012-adopt-property-based-and-mutation-testing.md)（Proposed, 2026-09-14）
-- [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, Amended by ADR-117, Amended by ADR-126, 2026-09-14）
+- [ADR-013: HTTP API 契約を標準化する](ADR-013-standardize-http-api-contracts.md)（Accepted, Amended by ADR-117, Amended by ADR-126, Amended by ADR-138, 2026-09-14）
 - [ADR-014: SPA とバックエンドを同一オリジンで公開する](ADR-014-use-same-origin-spa-security-boundary.md)（Accepted, Amended by ADR-132, 2026-09-14）
 - [ADR-015: 可観測性データを構造化し保護する](ADR-015-structure-and-protect-observability-data.md)（Accepted, Amended by ADR-110, 2026-09-15）
 - [ADR-016: API と SPA のメッセージをローカライズする](ADR-016-localize-api-and-spa-messages.md)（Accepted, Amended by ADR-047, 2026-09-15）
@@ -136,3 +136,4 @@
 - [ADR-134: HTTP のアクセスログを出さず、要求の記録をトレースと指標で読む](ADR-134-read-http-requests-from-traces-and-metrics-without-access-log.md)（Proposed, 2026-11-26）
 - [ADR-135: セッションに 8 時間の最長の期間を足し、無操作の 30 分を明示する](ADR-135-add-absolute-session-lifetime-and-explicit-idle-timeout.md)（Proposed, 2026-11-26）
 - [ADR-136: 更新系の要求の Origin と Sec-Fetch-Site を CSRF のトークンの前に確かめる](ADR-136-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)（Proposed, 2026-11-26）
+- [ADR-138: 外部の利用者が現れる前に API を /api/v1 にし、バージョンの宣言を検査する](ADR-138-introduce-api-v1-with-spring-api-versioning.md)（Proposed, 2026-11-26）

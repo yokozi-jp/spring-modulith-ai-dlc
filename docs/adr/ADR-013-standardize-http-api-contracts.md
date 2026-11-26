@@ -13,6 +13,7 @@ Accepted
 
 Amended by [ADR-117](ADR-117-add-trace-id-and-omit-instance-in-problem-details.md)：span があるすべての Problem Details に `traceId` を付け、`instance` を設定しないこと。
 Amended by [ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)：冪等性に関する記述（「冪等性」の節、Alternative 3、保持期間を操作ごとに決める記述、冪等性ストアを今は持たない記述）を改め、GET と HEAD 以外のすべての業務の API に `Idempotency-Key` を必須にすること。
+Amended by [ADR-138](ADR-138-introduce-api-v1-with-spring-api-versioning.md)：「API バージョニング」の節の、SPA だけが利用する間は API バージョンを導入しないという記述を改め、外部の利用者が現れる前に `/api/v1/...` を導入すること。
 
 ## Date
 

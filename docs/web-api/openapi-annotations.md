@@ -98,7 +98,7 @@ FQNやcustom resolverで衝突を回避せず、Javaの型名自体を一意に�
 ```java
 /** 注文の HTTP API。 */
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping(path = "/api/v{version}/orders", version = "1")
 @Tag(name = "ordering", description = "注文の API")
 class OrderController {
 

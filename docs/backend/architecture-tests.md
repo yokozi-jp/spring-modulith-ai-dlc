@@ -16,6 +16,7 @@ ArchUnitとPMDの失敗メッセージは、理由、直し方、規約の文書
 
 ```text
 backend/src/test/java/com/example/demo/architecture/
+├── ApiVersionArchTest.java
 ├── ApplicationModuleArchitectureTest.java
 ├── ArchitectureRuleFixtureTest.java
 ├── ArchitectureRuleMessageTest.java
@@ -403,6 +404,12 @@ INSERTとUPDATEの共通カラムは`TableWriter`が書く。Repositoryは`Commo
   `@Operation`の拡張に`x-idempotency-key: none`を付けたメソッドは除く。
   `@RequestMapping(method = ...)`で書いたマッピングは検出しない。
 - `idempotentCommandHandlersExecuteThroughIdempotency`：`*CommandHandler`の、引数のCommandが`IdempotentCommand`である`handle`は、その中で`Idempotency.execute`を呼ぶ。
+
+`ApiVersionArchTest`は、`/api/`のControllerがAPIのバージョンを宣言することを検査する（[ADR-138](../adr/ADR-138-introduce-api-v1-with-spring-api-versioning.md)）。
+
+- `apiControllersDeclareVersion`：`presentation.web`の`@RestController`のうち、クラスの`@RequestMapping`のパスが`/api/`で始まるものは、パスを`/api/v{version}/`で始め、`version`を宣言する。
+  `version`を書かないmappingはどのバージョンにも一致し、パスに`v{version}`がないとバージョンを読む区間がずれる。
+  メソッドの`@RequestMapping`に書いた`/api/`のパスは検出しない。
 
 ## DB
 

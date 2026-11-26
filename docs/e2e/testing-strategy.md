@@ -29,7 +29,7 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 `telemetry.ts` と `pages.ts` は Playwright の中だけで使うため、相対の import に拡張子を付けない。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
-`frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/products`）で商品を作る `productFactory` を持つ。
+`frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/v1/products`）で商品を作る `productFactory` を持つ。
 `frontend/apps/web/e2e/api.ts` は、公開 API の応答の本文を読む `readJson` と、注文の決済記録を読む `listPayments` を持つ。
 `environment.ts`、`fixtures.ts`、`api.ts`、`payment-gateway.ts` と、画面のクラス（`order-create-page.ts`、`order-list-page.ts`、`order-detail-page.ts`）は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
 `task fe-check` が、この 7 つを Node で import できることを確かめる。
@@ -67,7 +67,7 @@ E2E は開発用のシーダー（`LocalDataSeeder`）の代表データを使�
 - 商品は、`fixtures.ts` の `productFactory` で作る。
   `productFactory({ onSale: false })` は販売終了の商品を作り、`unitPrice` で単価を決める。
   商品コードと商品名は呼ぶたびに一意になる。
-- `productFactory` は、テストの page（共有の `storageState` でログインし、テナントを選んだ状態）の Cookie で、商品を登録する API（`POST /api/products`）を呼ぶ。
+- `productFactory` は、テストの page（共有の `storageState` でログインし、テナントを選んだ状態）の Cookie で、商品を登録する API（`POST /api/v1/products`）を呼ぶ。
   CSRF の token（`__Host-XSRF-TOKEN` の値を `X-XSRF-TOKEN` に付ける）と `Idempotency-Key` は `productFactory` の中でだけ付ける。
   `page.request` は CSRF の token を自分では付けないので、spec が `page.request` で直接送る更新の要求は 403 になる（`order-payment.spec.ts` が確かめる）。
 - 他のテストと衝突しないよう、客先注文番号には `fixtures.ts` の `uniqueCode` で一意な値を含める。
