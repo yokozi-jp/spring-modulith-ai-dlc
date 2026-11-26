@@ -8,21 +8,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CapturedSpans;
+import com.example.demo.testkit.ReinstallLogAppenderExtension;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.SpanKind;
-import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import io.opentelemetry.sdk.trace.data.SpanData;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +50,7 @@ import tools.jackson.databind.json.JsonMapper;
  */
 @SuppressWarnings("PMD.TooManyMethods")
 @Slf4j
+@ExtendWith(ReinstallLogAppenderExtension.class)
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(SharedTestConfiguration.class)
@@ -79,20 +78,11 @@ class ObservabilityContractTest {
   /** OTLP へ送る直前の LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
 
-  /** このコンテキストの OpenTelemetry。 */
-  @Autowired private OpenTelemetry openTelemetry;
-
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;
 
   /** 終えた span。 */
   @Autowired private CapturedSpans capturedSpans;
-
-  @BeforeEach
-  void installAppender() {
-    // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
-    OpenTelemetryAppender.install(openTelemetry);
-  }
 
   @Test
   @DisplayName("span 内の JSON ログには trace ID と span ID が含まれる")

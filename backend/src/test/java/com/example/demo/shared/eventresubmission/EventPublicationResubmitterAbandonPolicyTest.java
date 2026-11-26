@@ -10,10 +10,8 @@ import com.example.demo.shared.eventresubmission.ResubmissionProbes.OnceProbe;
 import com.example.demo.shared.eventresubmission.ResubmissionProbes.OnceProbeListener;
 import com.example.demo.testkit.AsTenant;
 import com.example.demo.testkit.CapturedLogRecords;
-import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.logs.Severity;
-import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import java.time.Duration;
 import java.util.List;
@@ -61,13 +59,8 @@ class EventPublicationResubmitterAbandonPolicyTest {
   /** OTLP へ送る LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
 
-  /** この文脈の OpenTelemetry。 */
-  @Autowired private OpenTelemetry openTelemetry;
-
   @BeforeEach
   void setUp() {
-    // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
-    OpenTelemetryAppender.install(openTelemetry);
     clock.set(ResubmissionProbes.T0);
   }
 
