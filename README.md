@@ -65,7 +65,7 @@ clone したら、[スキルの取得元と更新](docs/agents/skill-sources.md)
 | Backend          | Java (Amazon Corretto)     | 25         |                                                |
 | Backend          | Spring Boot                | 4.2.0      | Web、Security（OIDC Client）、Session（JDBC）  |
 | Backend          | Spring Modulith            | 2.2.0      | モジュール境界の検証                           |
-| Backend          | jOOQ                       | 3.21.9     | スキーマから生成する型安全な SQL               |
+| Backend          | jOOQ                       | 3.21.10    | スキーマから生成する型安全な SQL               |
 | Backend          | Liquibase                  |            | DB マイグレーション                            |
 | Backend          | ArchUnit                   | 1.5.1      | アーキテクチャテスト                           |
 | Frontend         | React                      | 19.3.0     |                                                |
