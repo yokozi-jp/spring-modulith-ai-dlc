@@ -1,14 +1,14 @@
 ---
 type: Convention
 title: 処理ごとに記録するログ
-description: 起動時、HTTP アクセス、一括処理で記録するログの時点と項目、フロントエンドでログを出力しない規則を定める規約。起動処理、HTTP のログ出力、大量件数を扱う処理を実装するとき、ブラウザの例外の送り方を確かめるときに読む。
+description: 起動時と一括処理で記録するログの時点と項目、フロントエンドでログを出力しない規則を定める規約。起動処理、HTTP のログ出力、大量件数を扱う処理を実装するとき、ブラウザの例外の送り方を確かめるときに読む。
 tags: [convention, observability, logging, future-arch-guidelines]
 ---
 
 # 処理ごとに記録するログ
 
 起動時は、稼働しているビルドと起動の各段階を `INFO` で記録する。
-HTTP アクセスログは要求時と応答時に記録し、ヘルスチェックを除く。
+HTTP アクセスログは出力せず、トレースと指標で読む。
 一括処理は開始、終了、処理件数、進捗を記録し、1件ごとにはログを出さない。
 フロントエンドはブラウザの console へログを出力しない。
 
@@ -27,31 +27,22 @@ Spring Boot が出力する起動ログで足りる段階は、アプリケー�
 設定値をログへ出す場合は、allowlist で許可した値だけにする。
 秘密情報と接続文字列を出力しない。
 
-## HTTP アクセスログ
+## HTTP アクセス
 
-アクセスログは、要求の受信時と応答の送信時の両方で記録する。
-`/actuator/health` 配下へのアクセスは記録しない。
-ヘルスチェック以外は、HTTP メソッドで除外しない。
+アプリケーションは、HTTP アクセスログを出力しない。
+要求ごとの記録は、Micrometer の Observation が作るトレースと指標で読む。
 
-要求時と応答時の両方に、次の属性を記録する。
+- **トレース**：受信の span が `http.request.method`、`http.route`、`url.path`、`http.response.status_code`、処理時間を持つ。認証した要求の span は `user.id` も持つ（[可観測性データの規約](conventions.md#テナントと利用者)）。
+- **指標**：`http.server.requests` が、メソッド、route、status ごとの件数と処理時間を持つ。
 
-- **HTTP メソッド**：`http.request.method`
-- **route**：`http.route`
-- **URL パス**：`url.path`
-- **アプリの利用者の ID**：`user.id`（ログイン済みの場合だけ。「[テナントと利用者](conventions.md#テナントと利用者)」）
+アクセスログを出さない理由は次のとおり。
 
-応答時には、次の属性も記録する。
+- ログと同じ属性が、トレースと指標から読める。同じ要求を 3 つの信号に重ねて記録すると、ログの量と費用が増える（[ログの出力コストと量の抑制](log-performance-and-cost.md)）。
+- トレースの標本化率（`MANAGEMENT_TRACING_SAMPLING_PROBABILITY`）を 1 未満にすると、トレースには全要求が残らない。ただし件数と処理時間は、標本化の影響を受けない指標で読める。画面からの要求は、ブラウザが sampled flag を 1 にして送るので、標本化率にかかわらず残る（[ADR-068](../adr/ADR-068-collect-browser-telemetry-with-faro-via-collector.md)）。
+- 全要求の記録が要る運用（監査、攻撃の追跡）は、アプリケーションではなく、前段のロードバランサーなどのアクセスログで満たす。
 
-- **HTTP status**：`http.response.status_code`
-- **処理時間**：`http.server.request.duration`（秒）
-
-時刻、レベル、trace ID、span ID はフレームワークが付けるため、アクセスログの実装で追加しない。
-`url.path` には query string と URL fragment を含めない。
-送信元 IP アドレスと User-Agent は allowlist にないため記録しない。
-記録する場合は、allowlist の変更として扱う。
-
-アクセスログを追加する変更では、これらの属性を allowlist へ加える。
-禁止する値と allowlist は[可観測性データの規約](conventions.md)に従う。
+全要求をログだけで調べる要件が出たら、このアプリケーションのアクセスログを足す。
+そのときは、ADR を起こし、`http.request.method`、`http.route`、`url.path`、`http.response.status_code`、`http.server.request.duration` を Collector の allowlist へ加え（`user.id` は加えてある）、`/actuator/health` 配下を除く。
 
 ## 一括処理
 
