@@ -16,7 +16,7 @@
   "errorHeading": "Something went wrong",
   "errorDescription": "The page could not be displayed. Try again.",
   "retry": "Try again",
-  "forbiddenHeading": "No permission",
+  "forbiddenHeading": "Access denied",
   "forbiddenDescription": "You do not have permission to view this page.",
   "notFoundHeading": "Page not found",
   "notFoundDescription": "Check that the URL is correct.",

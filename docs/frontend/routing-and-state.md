@@ -97,7 +97,7 @@ layout routeにcomponentを持たせるなら、そのcomponentで `<Outlet />` 
 既定値は `src/router-defaults.ts` の `routerDefaults` にまとめ、`main.tsx` とrouteのテストが同じobjectを `createRouter` に渡す。
 
 errorの表示はcatalogの文言を使い、`error.message` を画面に出さない。
-権限不足の403（`isTenantNotSelected` でない403）は、`RouteError` が権限がないことを伝える画面とトップへのリンクを出し、再試行は出さない。
+`isTenantNotSelected` でない403は、`RouteError` が権限がないことを伝える画面とトップへのリンクを出し、再試行は出さない。
 再試行しても結果が変わらず、4xxは自動の再試行もしないためである。
 必要な役割は文言に書かない。役割の構成が変わっても文言を直さずに済むようにするためである。
 

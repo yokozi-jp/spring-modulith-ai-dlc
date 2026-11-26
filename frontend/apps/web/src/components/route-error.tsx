@@ -24,7 +24,8 @@ export function RouteError({ error }: ErrorComponentProps) {
     );
   }
 
-  // 権限不足の 403 は、再試行しても変わらない。役割の構成が変わりうるため、必要な役割は書かない。
+  // テナントを選ぶ前の 403 は上の分岐で扱うので、ここに残る 403 は再試行しても変わらない。
+  // 役割の構成が変わりうるため、必要な役割は書かない。
   if (error instanceof ApiProblemError && error.status === 403) {
     return (
       <section className="flex flex-col items-start gap-4 px-6 py-16 sm:px-10" role="alert">

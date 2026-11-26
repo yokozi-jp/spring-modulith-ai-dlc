@@ -48,7 +48,7 @@ feature の中のコードを components へ移す条件は[共有コード](../
   backend の `title` を出すときは、見出しの要素にそのまま出し、catalog の文言と連結しない（[分岐と文言](../update-conflicts.md#分岐と文言)）。
 - `RouteError` の再試行は、`useQueryErrorResetBoundary` の `reset()` を呼んでから `router.invalidate()` を呼ぶ。
   テナントを選ぶ前の 403 は `isTenantNotSelected` で判定し、再試行の代わりにテナントを選ぶ画面へのリンクを出す。
-  それ以外の 403 は権限不足として、再試行の代わりにトップへのリンクを出す。
+  ほかの 403 は、権限がないことを伝え、再試行の代わりにトップへのリンクを出す。
 - 状態の変化を読み上げる領域は `<output>` にする（[UIの書き方](../ui-and-style.md#uiの書き方)）。
   `ProblemNotice` は、通知がない間も `<output>` を描画しておき、中身だけを入れ替える。
 - button の見た目の link は `<Link className={buttonVariants(...)}>` で書く。
@@ -87,7 +87,7 @@ export function RoutePending() {
 ```
 
 典型的な例は、エラーの表示の `RouteError` である（`frontend/apps/web/src/components/route-error.tsx`）。
-`error.message` を出さず、テナントを選ぶ前の 403 はテナントを選ぶ画面へ案内し、権限不足の 403 は権限がないことを伝えてトップへのリンクを出す。
+`error.message` を出さず、テナントを選ぶ前の 403 はテナントを選ぶ画面へ案内し、ほかの 403 は権限がないことを伝えてトップへのリンクを出す。
 
 ```tsx
 import { ApiProblemError, isTenantNotSelected } from "@frontend/api/api-error";
@@ -116,7 +116,8 @@ export function RouteError({ error }: ErrorComponentProps) {
     );
   }
 
-  // 権限不足の 403 は、再試行しても変わらない。役割の構成が変わりうるため、必要な役割は書かない。
+  // テナントを選ぶ前の 403 は上の分岐で扱うので、ここに残る 403 は再試行しても変わらない。
+  // 役割の構成が変わりうるため、必要な役割は書かない。
   if (error instanceof ApiProblemError && error.status === 403) {
     return (
       <section className="flex flex-col items-start gap-4 px-6 py-16 sm:px-10" role="alert">
@@ -180,7 +181,7 @@ export function ProblemNotice({ notice }: { notice: Notice | undefined }) {
 jsdom の component test で、role と label から要素を探し、利用者から見える結果を確かめる（[フロントエンドのテストと検証](../testing.md)）。
 
 - router の既定の表示は、`frontend/apps/web/src/router-defaults.test.tsx` が `routerDefaults` で router を作って確かめる。
-  not found の見出しとリンク、loader の失敗で詳細を出さないことと再試行、読み込み中の `status` を見る。
+  not found の見出しとリンク、loader の失敗で詳細を出さないことと再試行、403 で再試行を出さずホームへのリンクを出すこと、読み込み中の `status` を見る。
 - アプリシェルは、`frontend/apps/web/src/components/app-shell.test.tsx` が `renderRoute("/")` で描画し、ログアウトの form の送信を確かめる。
 - `StatusScreen` は自身のテストファイルを持たず、使う route のテスト（`routes/-logged-out.test.tsx`、`routes/-login-failed.test.tsx`）が見出し、リンクの `href`、`<title>` を確かめる。
 - `ProblemNotice` は自身のテストファイルを持たず、使う画面のテスト（`features/orders/pages/order-new-page.test.tsx` など）が `getByRole("status")` で通知を読む。
