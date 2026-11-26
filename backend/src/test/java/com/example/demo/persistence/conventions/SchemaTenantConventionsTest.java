@@ -195,6 +195,9 @@ class SchemaTenantConventionsTest {
     /** 明細の表。 */
     private static final String T_ORDER_LINE = "t_order_line";
 
+    /** 明細から注文への外部キー。 */
+    private static final String FK_T_ORDER_LINE = "fk_t_order_line";
+
     /** ID連携の表。 */
     private static final String M_USER_IDENTITY = "m_user_identity";
 
@@ -221,7 +224,7 @@ class SchemaTenantConventionsTest {
               foreignKey(
                   ORDERING,
                   T_ORDER_LINE,
-                  "fk_t_order_line",
+                  FK_T_ORDER_LINE,
                   List.of(TENANT, ORDER_ID),
                   T_ORDER,
                   List.of(TENANT, ORDER_ID)),
@@ -261,7 +264,7 @@ class SchemaTenantConventionsTest {
               foreignKey(
                   ORDERING,
                   T_ORDER_LINE,
-                  "fk_t_order_line",
+                  FK_T_ORDER_LINE,
                   List.of(ORDER_ID),
                   T_ORDER,
                   List.of(ORDER_ID)),
@@ -289,7 +292,7 @@ class SchemaTenantConventionsTest {
               foreignKey(
                   ORDERING,
                   T_ORDER_LINE,
-                  "fk_t_order_line",
+                  FK_T_ORDER_LINE,
                   List.of(TENANT, ORDER_ID),
                   T_ORDER,
                   List.of(TENANT, ORDER_ID)));
@@ -306,7 +309,7 @@ class SchemaTenantConventionsTest {
               foreignKey(
                   ORDERING,
                   T_ORDER_LINE,
-                  "fk_t_order_line",
+                  FK_T_ORDER_LINE,
                   List.of(ORDER_ID, TENANT),
                   T_ORDER,
                   List.of(TENANT, ORDER_ID)));
@@ -334,7 +337,7 @@ class SchemaTenantConventionsTest {
               foreignKey(
                   ORDERING,
                   T_ORDER_LINE,
-                  "fk_t_order_line",
+                  FK_T_ORDER_LINE,
                   List.of(TENANT, ORDER_ID),
                   T_ORDER,
                   List.of(TENANT, ORDER_ID)));
