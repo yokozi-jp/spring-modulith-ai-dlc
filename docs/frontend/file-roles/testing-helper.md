@@ -8,7 +8,8 @@ tags: [convention, frontend, file-role]
 # ファイルの役割：テストの道具
 
 テストの道具は、複数のテストが同じ準備を同じ形で使うための関数と Vitest の setupFiles であり、`src/testing/` に置く。
-道具は、本番の関数を呼び、テストに要る差分だけを変える。画面を操作して要素を取る道具は、本番の関数を呼ばずに、描画された画面だけを使う。
+道具は、本番の関数を呼び、テストに要る差分だけを変える。
+画面を操作して要素を取る道具は、本番の関数を呼ばずに、描画された画面だけを使う。
 テストの書き方の正文は[フロントエンドのテストと検証](../testing.md)にあり、テスト基盤の判断理由は [ADR-027](../../adr/ADR-027-adopt-frontend-testing-stack.md) に示す。
 
 ## 定義
@@ -18,15 +19,14 @@ tags: [convention, frontend, file-role]
 道具は本番の設定を作り直さない。
 `createTestQueryClient` は `createQueryClient` を、`renderRoute` は `routerDefaults` と `routeTree` を使う。
 
-- `apps/web/src/testing/setup.ts`：`apps/web` の setupFiles。Temporal の polyfill、Testing Library の待つ上限、MSW の server の起動と後片付け、locale の初期化
-- `packages/api/src/testing/setup.ts`：`@frontend/api` の setupFiles。MSW の server の起動と後片付け
-- `apps/web/src/testing/render-route.tsx`：`renderRoute(path, { locale })`。`main.tsx` と同じ provider と router の既定値で、最初の loader を終えてから描画する
-- `apps/web/src/testing/query-client.ts`：`createTestQueryClient()`。本番の `createQueryClient()` から query の再試行だけを外す
-- `apps/web/src/testing/gate.ts`：`createGate()`。`release` を呼ぶまで解決しない promise を作る
-- `apps/web/src/testing/csrf-cookie.ts`：`stubCsrfCookie()`、`csrfCookieValue`。`document.cookie` が CSRF の Cookie を返すようにし、その値も export する
-- `apps/web/src/testing/order-detail-screen.ts`：注文の詳細の画面を操作し、要素を取る（`saveQuantity`、`getNotice`、`getFirstLineRow`）
-- `apps/web/src/testing/idempotency-keys.ts`：`recordKeysAndRespond(...responses)`。要求の Idempotency-Key を記録し、応答を順に返す MSW の resolver を作る
-- `apps/web/src/testing/catalog-i18n.ts`：Node のテストが使う `t`。`ja.json` だけを読んだ instance から取る
+道具は次の種類に分かれる。
+ファイルの全体は `src/testing/` を見る。この文書に全ファイルの一覧を持たないのは、道具を足したときに一覧へ書き漏らすからである。
+
+- **setupFiles**（`setup.ts`）：全テストに要る準備と後片付け。package ごとに一つ置き、`vite.config.ts` の `test.setupFiles` から指す
+- **本番の設定でテストの対象を組み立てる道具**（`render-route.tsx`、`query-client.ts`）：本番の関数を呼び、テストに要る差分だけを変える
+- **処理の流れを操る道具**（`gate.ts`、`idempotency-keys.ts`、`csrf-cookie.ts`）：promise を止める、要求の header を記録する、`document.cookie` を差し替える
+- **画面の操作と要素の取得**（`order-detail-screen.ts`）：描画された画面を操作し、要素を取る
+- **Node のテストの翻訳**（`catalog-i18n.ts`）：`ja.json` だけを読んだ instance から `t` を取る
 
 MSW の server（`src/testing/msw.ts`）と、業務機能ごとの fixture と handler（`src/testing/<feature>.ts`）は [MSW の handler と fixture](msw-handler.md) が扱う。
 E2E test の fixture（`apps/web/e2e/`）は、この役割に含めない（[E2Eテストの方針と書き方](../../e2e/testing-strategy.md)）。
