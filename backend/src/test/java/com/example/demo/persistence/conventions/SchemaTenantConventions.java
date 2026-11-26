@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -219,7 +220,21 @@ final class SchemaTenantConventions {
                         + "の外部キーを作る（"
                         + CONSTRAINTS_DOC
                         + "）。"));
-    return Stream.concat(misshaped, missing).toList();
+    final Stream<ConventionViolation> nullable =
+        columns.stream()
+            .filter(row -> !row.notNull())
+            .filter(row ->
+                foreignKeys.stream()
+                    .anyMatch(fk ->
+                        fk.schema().equals(row.schema())
+                            && fk.table().equals(row.table())
+                            && fk.columns().contains(row.column())))
+            .map(row ->
+                new ConventionViolation(
+                    "K1",
+                    row.schema() + "." + row.table() + "." + row.column(),
+                    "外部キーの列をNOT NULLにする。列の一つがNULLだと、外部キーは検査しない（" + CONSTRAINTS_DOC + "）。"));
+    return Stream.of(misshaped, missing, nullable).flatMap(Function.identity()).toList();
   }
 
   private static boolean hasExpectedShape(

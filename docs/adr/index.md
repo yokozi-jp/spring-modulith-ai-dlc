@@ -107,7 +107,7 @@
 - [ADR-105: 操作しているテナントを ScopedValue で束縛し、リクエストはセッションから、リスナーはイベントから取る](ADR-105-bind-tenant-to-request-and-event-context.md)（Proposed, 2026-11-19）
 - [ADR-106: jscpd は import 文を比べず、閾値を実測の 1.90% に合わせて 2.0% にする](ADR-106-ignore-import-statements-in-jscpd.md)（Proposed, 2026-11-21）
 - [ADR-107: 業務テーブルを RLS でテナントごとに分け、テナントをロールと同じ SQL でトランザクションごとに設定する](ADR-107-isolate-tenants-with-rls-set-per-transaction.md)（Proposed, 2026-11-21）
-- [ADR-108: 同じモジュールの表どうしの参照に、テナントを含む複合の外部キーを作る](ADR-108-add-tenant-composite-foreign-keys-within-modules.md)（Proposed, 2026-11-21）
+- [ADR-108: 同じモジュールの表どうしの参照に、テナントを含む複合の外部キーを作る](ADR-108-add-tenant-composite-foreign-keys-within-modules.md)（Accepted, 2026-11-21）
 - [ADR-109: バックエンドのテストを America/New_York の JVM で流す](ADR-109-run-backend-tests-in-new-york-jvm.md)（Proposed, 2026-11-22）
 - [ADR-110: ログとトレースに、テナントの public_id とアプリの利用者の ID を付ける](ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)（Proposed, 2026-11-22）
 - [ADR-111: ユーザー数が未知の間はセッションを PostgreSQL に保存し、Redis は負荷が出たときに戻す](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md)（Proposed, 2026-11-22）

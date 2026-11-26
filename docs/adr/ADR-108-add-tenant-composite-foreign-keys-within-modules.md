@@ -9,7 +9,7 @@ tags: [adr, database, postgresql, constraints, tenancy, rls]
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 
@@ -46,6 +46,14 @@ RLS の外に置く `tenancy` の表にも、同じモジュールの中の参�
 外部キーに `ON DELETE` と `ON UPDATE` の動作を付けないことも、同じ実装で Decision に足した。
 動作を付けないことで、上に挙げた理由の 4 つ目（動作の誤解による意図しない削除）を避ける。
 
+### Accepted にした理由
+
+[issue #611](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/611) で、複合の外部キーの索引のコストを減らせる案（選択肢4から6）を比べた。
+2026-11-26 に、手書きの SQL とマイグレーションの書き込みも DB で止める事故の範囲に含めると決めた。
+この範囲を止められるのは、複合の外部キーとトリガーだけである。
+トリガーは保守の対象が増えるので、Decision は変えず、Status を Accepted にした。
+外部キーの検査が RLS を迂回することは、[PostgreSQL の Row Security Policies](https://www.postgresql.org/docs/current/ddl-rowsecurity.html)に書かれている。
+
 ### 比較に使う実装の事実
 
 [issue #611](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/611) の比較（選択肢4から6と見積もり）は、次の二つに基づく。
@@ -59,6 +67,8 @@ RLS の外に置く `tenancy` の表にも、同じモジュールの中の参�
 
 - `tenant_public_id` を持つ表（RLS の表）どうしの参照は、`(tenant_public_id, 参照先の主キー)` の複合の外部キーにする。
   参照先には、同じ組のユニークインデックスを作る。
+  外部キーの列はすべて NOT NULL にする。
+  PostgreSQL の既定の照合は、列の一つが NULL だと検査しないためである。
   今の該当は、`ordering.t_order_line` から `ordering.t_order` への参照である。
 - `tenant_public_id` を持たない `tenancy` の表どうしの参照は、すべて単独の列の外部キーにする。
   今の該当は、`tenancy.m_user_identity.user_id` と `tenancy.m_membership.user_id` から `tenancy.m_user.user_id` への参照と、`tenancy.m_membership.tenant_id` から `tenancy.m_tenant.tenant_id` への参照である。
@@ -93,6 +103,9 @@ ADR-089 の Neutral に残していた「同じモジュールの中の外部キ
   動作を付けた changeset は、changeset の lint が止める。
 
 ### Neutral
+
+- 親の表が増えて、書き込みの遅延を計測して問題が出たときは、この判断を見直す。
+  計測する前に、ユニークインデックスの数だけを理由にして外部キーを単独の列へ戻さない。
 
 - 別のモジュールの行は、これまでどおり外部キーで参照の整合性を保てず、参照先が消えた行はアプリケーションで扱う（ADR-089）。
 - 新しいモジュールの表を足すときも、同じモジュールの中の参照には外部キーを作る。
@@ -156,12 +169,12 @@ ADR-089 の Neutral に残していた「同じモジュールの中の外部キ
 - 追加の索引は、親の INSERT のたびに一つの索引の行を足す。DELETE と、`tenant_public_id` か主キーを変える UPDATE も更新する。書き込みの遅さは測っていないので、増える割合は不明である。
 - 選択肢4と6は、この索引を作らない代わりに、トリガーの本体か経路のテストを N 個分書く。1本の索引と N 個のテストの大きさは比べていない。
 
-#### 今の判断
+#### 判断
 
-親の表が一つの今は、複合の外部キーの追加のコストは索引一つである。他の案の保守の負担は測っておらず、この比較は定性的である。
-Decision は変えない。
-Status を Accepted にするには、上の一覧の「手書きの SQL」と「マイグレーション」を、DB で止めたい事故に含めるかの合意が要る。
-含めないと決めた場合は、この ADR を選択肢6に書き直し、規則 K1（`SchemaTenantConventionsTest`）、`AggregateDeclarationConventionsTest`、[PostgreSQLの制約とインデックス](../database/postgresql-constraints-and-indexes.md)の外部キーの節も同じ変更で改める。
+親の表が一つの今は、複合の外部キーの追加のコストは索引一つである。
+他の案の保守の負担は測っておらず、この比較は定性的である。
+手書きの SQL とマイグレーションを DB で止める範囲に含めるので、Decision を変えない。
+選択肢6を採るなら、規則 K1（`SchemaTenantConventionsTest`）、`AggregateDeclarationConventionsTest`、[PostgreSQLの制約とインデックス](../database/postgresql-constraints-and-indexes.md)の外部キーの節も同じ変更で改める必要があった。
 
 ## References
 

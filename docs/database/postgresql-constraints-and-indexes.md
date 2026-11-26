@@ -40,12 +40,13 @@ Spring Modulithのイベント出版テーブルのように、フレームワ�
 外部キーは、changesetの`addForeignKeyConstraint`で作る。
 列の`constraints`には書かず、`onDelete`、`onUpdate`、`deleteCascade`を付けない。
 参照先の行を消したときと変えたときの動作は、既定の`NO ACTION`になる。
+外部キーの列はNOT NULLにする。列の一つがNULLだと、外部キーは参照先を検査しない。
 名前は[PostgreSQLの命名規約](postgresql-naming.md#外部キー名とポリシー名)に従う。
 
 外部キーは次の検査で確かめる。
 規則の記号の定義は[バックエンドのアーキテクチャテスト](../backend/architecture-tests.md)にある。
 
-- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、同じモジュールの表を指す列に外部キーがあることと、外部キーの列が業務テーブルなら複合、`tenancy`の表なら単独の形であることを確かめる（規則K1）。履歴の表（`h_`）は、削除した行を写して残すため、K1とP3の判定から外す（[ADR-131](../adr/ADR-131-archive-removed-child-rows-in-table-writer.md)）。
+- **カタログのテスト**：`SchemaConventionsTest`と`SchemaInspectionTest`が、同じモジュールの表を指す列に外部キーがあることと、外部キーの列が業務テーブルなら複合、`tenancy`の表なら単独の形であることと、外部キーの列がNOT NULLであることを確かめる（規則K1）。履歴の表（`h_`）は、削除した行を写して残すため、K1とP3の判定から外す（[ADR-131](../adr/ADR-131-archive-removed-child-rows-in-table-writer.md)）。
   規則P4は、別のスキーマのテーブルを参照する外部キーを拒否する。
 - **changesetのlint**：`ChangesetLintTest`が、外部キーを`addForeignKeyConstraint`で作ること、名前、参照先のスキーマと列、`onDelete`と`onUpdate`がないことを確かめる（規則K4）。
 

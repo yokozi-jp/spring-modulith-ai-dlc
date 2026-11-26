@@ -279,6 +279,43 @@ class SchemaTenantConventionsTest {
     }
 
     @Test
+    @DisplayName("K1：外部キーの列にNULLを許す表を拒否する")
+    void rejectsNullableForeignKeyColumns() {
+      final List<ColumnRow> nullable =
+          List.of(
+              new ColumnRow(ORDERING, T_ORDER_LINE, ORDER_ID, BIGINT, "b", "", "", null, false));
+      final List<ConstraintRow> constraints =
+          List.of(
+              foreignKey(
+                  ORDERING,
+                  T_ORDER_LINE,
+                  "fk_t_order_line",
+                  List.of(TENANT, ORDER_ID),
+                  T_ORDER,
+                  List.of(TENANT, ORDER_ID)));
+
+      assertThat(keys(SchemaTenantConventions.foreignKeys(relations, nullable, constraints)))
+          .containsExactly("K1 ordering.t_order_line.order_id");
+    }
+
+    @Test
+    @DisplayName("K1：列の順序を入れ替えた複合の外部キーを拒否する")
+    void rejectsSwappedColumnOrder() {
+      final List<ConstraintRow> constraints =
+          List.of(
+              foreignKey(
+                  ORDERING,
+                  T_ORDER_LINE,
+                  "fk_t_order_line",
+                  List.of(ORDER_ID, TENANT),
+                  T_ORDER,
+                  List.of(TENANT, ORDER_ID)));
+
+      assertThat(keys(SchemaTenantConventions.foreignKeys(relations, columns, constraints)))
+          .contains("K1 ordering.fk_t_order_line");
+    }
+
+    @Test
     @DisplayName("K1：別のスキーマの同じ名前の表の外部キーは、外部キーのない参照を隠さない")
     void foreignKeyOfSameNamedTableInAnotherSchemaDoesNotCoverReference() {
       final String archive = "archive";
