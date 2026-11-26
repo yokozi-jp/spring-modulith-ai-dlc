@@ -43,12 +43,15 @@ final class AbsoluteSessionTimeoutFilter extends OncePerRequestFilter {
       final FilterChain filterChain)
       throws ServletException, IOException {
     final @Nullable HttpSession session = request.getSession(false);
-    if (session != null
-        && !Instant.ofEpochMilli(session.getCreationTime())
-            .plus(maxLifetime)
-            .isAfter(Instant.now(clock))) {
+    if (session != null && isExpired(session)) {
       session.invalidate();
     }
     filterChain.doFilter(request, response);
+  }
+
+  /** 作成の時刻から最長の期間がたっていれば真。期限のちょうどの時刻は過ぎたとみなす。 */
+  private boolean isExpired(final HttpSession session) {
+    final Instant created = Instant.ofEpochMilli(session.getCreationTime());
+    return Duration.between(created, Instant.now(clock)).compareTo(maxLifetime) >= 0;
   }
 }
