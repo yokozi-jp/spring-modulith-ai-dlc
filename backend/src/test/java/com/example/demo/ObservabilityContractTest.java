@@ -1,7 +1,6 @@
 package com.example.demo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,8 +9,6 @@ import com.example.demo.testkit.AppUsers;
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.CapturedSpans;
 import com.example.demo.testkit.SharedTestConfiguration;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Tag;
 import io.micrometer.observation.Observation;
 import io.micrometer.observation.ObservationRegistry;
 import io.opentelemetry.api.OpenTelemetry;
@@ -48,9 +45,11 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * 構造化ログ、トレース相関、OTLP 属性、テナントと利用者の文脈の運用契約を検証する。
  *
+ * <p>HTTP の受信の指標は {@link HttpServerMetricsContractTest} が検証する。
+ *
  * <p>契約ごとに分けると、同じ Bean の注入と appender の準備を重ねるので、1 つの class にまとめる。
  */
-@SuppressWarnings({"PMD.TooManyStaticImports", "PMD.TooManyMethods"})
+@SuppressWarnings("PMD.TooManyMethods")
 @Slf4j
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -67,6 +66,9 @@ class ObservabilityContractTest {
   /** 注文の API のパスの前半。 */
   private static final String ORDERS_PATH = "/api/orders/";
 
+  /** HTTP の受信の span の、要求のパスの属性（OpenTelemetry の semantic conventions）。 */
+  private static final String URL_PATH = "url.path";
+
   /** HTTP などと同じ tracing handler が登録された observation registry。 */
   @Autowired private ObservationRegistry observationRegistry;
 
@@ -81,9 +83,6 @@ class ObservabilityContractTest {
 
   /** 終えた span。 */
   @Autowired private CapturedSpans capturedSpans;
-
-  /** HTTP の observation が記録するメトリクス。 */
-  @Autowired private MeterRegistry meterRegistry;
 
   @BeforeEach
   void installAppender() {
@@ -205,9 +204,8 @@ class ObservabilityContractTest {
   }
 
   @Test
-  @DisplayName(
-      "テナントを選んだ利用者の要求の受信の span は tenant.id と user.id を属性に持ち、http.server.requests の tag には持たない")
-  void serverSpanCarriesTenantAndUserButMetricsDoNot() throws Exception {
+  @DisplayName("テナントを選んだ利用者の要求の受信の span は tenant.id と user.id を属性に持つ")
+  void serverSpanCarriesTenantAndUser() throws Exception {
     final String orderId = UUID.randomUUID().toString();
 
     mockMvc
@@ -216,26 +214,34 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isNotFound());
 
     final List<SpanData> spans =
-        capturedSpans.withAttribute("http.url", ORDERS_PATH + orderId).stream()
+        capturedSpans.withAttribute(URL_PATH, ORDERS_PATH + orderId).stream()
             .filter(span -> span.getKind() == SpanKind.SERVER)
             .toList();
     assertEquals(1, spans.size(), () -> "orderId=" + orderId + " の受信の span: " + spans);
     final Attributes attributes = spans.getFirst().getAttributes();
     assertEquals(AppUsers.TENANT_ID, attributes.get(TENANT_ID), attributes::toString);
     assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
-    final List<String> tagKeys =
-        meterRegistry
-            .find("http.server.requests")
-            .tag("uri", "/api/orders/{orderId}")
-            .meters()
-            .stream()
-            .flatMap(meter -> meter.getId().getTags().stream())
-            .map(Tag::getKey)
-            .distinct()
-            .toList();
-    assertFalse(tagKeys.isEmpty(), "GET /api/orders/{orderId} の http.server.requests");
-    assertFalse(tagKeys.contains(TENANT_ID.getKey()), tagKeys::toString);
-    assertFalse(tagKeys.contains(USER_ID.getKey()), tagKeys::toString);
+  }
+
+  @Test
+  @DisplayName("ログとトレースの resource は、同じ service.instance.id を持つ")
+  void logsAndTracesShareServiceInstanceId() {
+    final String event = "observability instance contract";
+    final AttributeKey<String> instanceId = AttributeKey.stringKey("service.instance.id");
+
+    Observation.createNotStarted("observability.instance", observationRegistry)
+        .lowCardinalityKeyValue("contract", event)
+        .observe(() -> log.info(event));
+
+    final List<SpanData> spans = capturedSpans.withAttribute("contract", event);
+    assertEquals(1, spans.size(), () -> event + " の span: " + spans);
+    final String fromLog =
+        capturedLogRecords.withBody(event).getFirst().getResource().getAttribute(instanceId);
+    assertNotNull(fromLog, "LogRecord の resource の service.instance.id");
+    assertEquals(
+        fromLog,
+        spans.getFirst().getResource().getAttribute(instanceId),
+        "span の resource の service.instance.id");
   }
 
   @Test
@@ -305,7 +311,7 @@ class ObservabilityContractTest {
   /** {@code path} の要求の受信の span と同じ trace の、{@code ApiExceptionHandler} の 4xx のログの属性を返す。 */
   private Attributes clientErrorAttributes(final String path) {
     final List<String> traceIds =
-        capturedSpans.withAttribute("http.url", path).stream()
+        capturedSpans.withAttribute(URL_PATH, path).stream()
             .filter(span -> span.getKind() == SpanKind.SERVER)
             .map(SpanData::getTraceId)
             .toList();
@@ -318,6 +324,7 @@ class ObservabilityContractTest {
     return records.getFirst().getAttributes();
   }
 
+  /** {@code GET /api/orders/{orderId}} が 404 を返した要求の {@code http.server.request.duration}。 */
   private Attributes singleRecordAttributes(final String event) {
     final List<LogRecordData> records = capturedLogRecords.withBody(event);
     assertEquals(1, records.size(), () -> "body=" + event + " の LogRecord 件数");

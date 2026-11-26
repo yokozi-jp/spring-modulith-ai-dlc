@@ -1,8 +1,8 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ["backend/src/main/resources/logback-spring.xml", "docker/otel-collector/**", "frontend/apps/web/src/lib/telemetry.ts"]
+fileMatchPattern: ["backend/src/main/resources/logback-spring.xml", "backend/src/main/resources/application.yaml", "docker/otel-collector/**", "frontend/apps/web/src/lib/telemetry.ts"]
 name: observability
-description: Logback の設定、Collector の設定、ログの出力、OpenTelemetry へ送る可観測性データを追加や変更するときに使う。ログのレベル、メッセージ、出力箇所、量の規約の入口を示す。
+description: Logback の設定、Collector の設定、ログの出力、指標の名前と属性、OpenTelemetry へ送る可観測性データを追加や変更するときに使う。ログのレベル、メッセージ、出力箇所、量と、指標の規約の入口を示す。
 ---
 
 # 可観測性とログの入口
@@ -12,5 +12,6 @@ description: Logback の設定、Collector の設定、ログの出力、OpenTel
 ## 行動指針
 
 - ログに値を足す前に、`docs/observability/conventions.md` の allowlist を確認する。
+- `application.yaml` の `management.observations`、`management.metrics`、`management.otlp.metrics`、`management.opentelemetry.resource-attributes` を変える前に、`docs/observability/metrics.md` を読む。
 - Collector の設定を変えたら、`task otel-collector-check` を実行する。
 - Java のロギングの書き方は `docs/backend/java-coding.md` に従う。

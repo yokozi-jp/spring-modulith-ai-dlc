@@ -4,12 +4,14 @@ Hikari の接続の使用状況と、jOOQ のクエリの件数と時間が見�
 
 ## Sub-features
 
-- Hikari：`hikaricp_connections_active`、`_pending`、`_acquire_milliseconds_*`、`_timeout_total`
-- jOOQ：`jooq_query_milliseconds_*`（[ADR-070](../../../../docs/adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）
+- Hikari：接続の使用数、待ち数、取得の時間、タイムアウト
+- jOOQ：クエリの件数と時間（[ADR-070](../../../../docs/adr/ADR-070-record-sql-spans-with-jooq-execute-listener.md)）
+
+PromQL は `check.sh` の `metrics` 配列の「Hikari」と「jOOQ」の行が持つ。
 
 ## How to get to it (user POV)
 
-Explore の Prometheus で上の指標を実行する。
+Explore の Prometheus で `check.sh` の PromQL を実行する。
 同梱のダッシュボードには、これらのパネルが無い。
 
 ## Driving it with check.sh

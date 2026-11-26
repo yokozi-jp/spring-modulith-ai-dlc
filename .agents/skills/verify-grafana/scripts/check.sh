@@ -17,20 +17,21 @@ LOG="$OUT/check-$(date -u +%Y%m%dT%H%M%SZ).txt"
 exec > >(tee "$LOG") 2>&1
 fail=0
 
-# 名前|PromQL。NaN でない値の系列が 1 本以上あれば OK。
+# 名前|PromQL。NaN でない値の系列が 1 本以上あれば OK。名前と属性は OpenTelemetry の semantic conventions（ADR-133）。
+# RED Duration p95 は rate を使うので、直前の 5 分に request が要る。
 metrics=(
-  "RED Rate|sum(http_server_requests_milliseconds_count)"
-  "RED Errors (4xx/5xx)|sum(http_server_requests_milliseconds_count{status=~\"[45]..\"})"
-  "RED Duration p95|histogram_quantile(0.95,sum by (le)(rate(http_server_requests_milliseconds_bucket[5m])))"
-  "JVM heap|sum(jvm_memory_used_bytes{area=\"heap\"})"
-  "JVM metaspace|jvm_memory_used_bytes{id=\"Metaspace\"}"
-  "JVM GC pause count|sum(jvm_gc_pause_milliseconds_count)"
+  "RED Rate|sum(http_server_request_duration_seconds_count)"
+  "RED Errors (4xx/5xx)|sum(http_server_request_duration_seconds_count{http_response_status_code=~\"[45]..\"})"
+  "RED Duration p95|histogram_quantile(0.95,sum by (le)(rate(http_server_request_duration_seconds_bucket[5m])))"
+  "JVM heap|sum(jvm_memory_used_bytes{jvm_memory_type=\"heap\"})"
+  "JVM metaspace|jvm_memory_used_bytes{jvm_memory_pool_name=\"Metaspace\"}"
+  "JVM GC pause count|sum(jvm_gc_pause_seconds_count)"
   "JVM threads live|jvm_threads_live"
-  "Process CPU|process_cpu_usage"
+  "JVM CPU utilization|jvm_cpu_recent_utilization"
   "Hikari active|hikaricp_connections_active"
   "Hikari pending|hikaricp_connections_pending"
-  "Hikari acquire count|hikaricp_connections_acquire_milliseconds_count"
-  "jOOQ query count|sum(jooq_query_milliseconds_count)"
+  "Hikari acquire count|hikaricp_connections_acquire_seconds_count"
+  "jOOQ query count|sum(jooq_query_seconds_count)"
   "Logback events|sum(logback_events_total)"
 )
 
@@ -65,12 +66,23 @@ B, JOB = sys.argv[1], sys.argv[2]
 get = lambda u: json.load(urllib.request.urlopen(u, timeout=20))
 prom = B + "/api/datasources/proxy/uid/prometheus/api/v1/query?query="
 bad = 0
+# 値を出さないと決めたダッシュボード（理由は ADR-133）。走査しない。
+SKIP_DASHBOARDS = {
+    "RED Metrics (native histogram)": "explicit bucket の histogram を送るので、native histogram の系列が無い",
+}
+# 空のままにすると決めたパネル（ダッシュボード、パネル）。理由は ADR-133。
+KNOWN_EMPTY = {
+    ("JVM Overview (OpenTelemetry)", "Classes"): "Micrometer が jvm.class.count の単位を classes で送り、名前が jvm_class_count_classes になる",
+}
 def walk(ps):
     for p in ps:
         yield p
         yield from walk(p.get("panels", []))
 for d in get(B + "/api/search?type=dash-db"):
     dash = get(B + "/api/dashboards/uid/" + d["uid"])["dashboard"]
+    if dash["title"] in SKIP_DASHBOARDS:
+        print(f"SKIP {dash['title']}  {SKIP_DASHBOARDS[dash['title']]}")
+        continue
     for p in walk(dash.get("panels", [])):
         for t in p.get("targets", []):
             e = t.get("expr")
@@ -86,8 +98,17 @@ for d in get(B + "/api/search?type=dash-db"):
             except Exception as ex:
                 n = "ERR " + str(ex)[:40]
             ok = isinstance(n, int) and n > 0
+            why = KNOWN_EMPTY.get((dash["title"], p.get("title")))
+            label = f"{dash['title']} / {p.get('title')}  series={n}"
+            if why and not ok:
+                print(f"GAP  {label}  既知: {why}")
+                continue
+            if why:
+                print(f"FAIL {label}  既知の空が解消した。KNOWN_EMPTY から外す")
+                bad += 1
+                continue
             bad += not ok
-            print(("OK   " if ok else "FAIL ") + f"{dash['title']} / {p.get('title')}  series={n}")
+            print(("OK   " if ok else "FAIL ") + label)
 sys.exit(1 if bad else 0)
 PY
 }
