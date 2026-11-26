@@ -101,13 +101,24 @@ errorの表示はcatalogの文言を使い、`error.message` を画面に出さ�
 
 再試行は、`useQueryErrorResetBoundary` の `reset()` でqueryのerrorを戻してから `router.invalidate()` を呼ぶ。
 
-401は `QueryCache` と `MutationCache` の `onError` がログインへ遷移させる。
-遷移の前に、いまのpath、query、hashを戻り先としてsessionStorageに1つだけ保存する（`@frontend/api/login-return-to`）。
+401は `QueryCache` と `MutationCache` の `onError` がページ全体を遷移させる（`@frontend/api/unauthorized-redirect` の `createUnauthorizedRedirect()`）。
+同じ文書でqueryかmutationが1回でも成功した後の401は `/session-expired` へ移り、それ以外の401（ブックマークや最初の訪問）はログインへ移る。
+サーバーは有効期限切れと未認証を区別せず（業務の `type` を持つのは422と409だけである。[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）、区別できても次の訪問は同じ判定を受けるので、遷移先はその文書で成功を見たかを知るSPAが決める。
+成功は `QueryCache` と `MutationCache` の `onSuccess` が `QueryClient` ごとのclosureに記録し、記録は文書が続く間だけ残る。
+ログインへの遷移で文書を捨てるので、ログインの後の文書は成功の記録なしで始まる。
+`/session-expired` は `_authenticated` の外の画面でAPIを呼ばず、「もう一度ログイン」のリンクでログインへ移る。
+このため、成功の後の401は、バックグラウンドの再取得で受けたものも含めて、KeycloakのSSOセッションが残っていても、この画面で「もう一度ログイン」を1回押すまでログインし直さない。
+入力中だった値は残らない。
+どちらへ移るときも、遷移の前に、いまのpath、query、hashを戻り先としてsessionStorageに1つだけ保存する（`@frontend/api/login-return-to`）。
+`/session-expired` は戻り先を消さない。
 `/` のrouteの `beforeLoad` が戻り先を1回読んで消し、`new URL()` で解決した先が同一originのpathのときだけ、その画面へ移す。使えない値は `/` のまま表示する。
 ログインの後に着く `/` と `/tenants` は保存しない。
 戻り先はその tab の sessionStorage にあり、`/` を開くか `/logged-out` を開くまで残る。別のテナントを選んだときは、その画面が存在しないことがある。
 テナントを複数持つ利用者は、テナントを選んだ後に文書を `/` で読み直すので、選んだ後の `/` が戻り先を読む。
-30秒以内の2回目は遷移せず、戻り先も書き換えず、queryは `RouteError`、mutationは呼び出したcomponentのerror状態に任せる。
+ログインへの遷移は、30秒以内の2回目は遷移せず、戻り先も書き換えず、queryは `RouteError`、mutationは呼び出したcomponentのerror状態に任せる。
+`/session-expired` への遷移には30秒の抑止を掛けない。
+この画面はAPIを呼ばず、次の文書は成功の記録なしで始まるためである。
+同じ文書で401が続くと `location.assign` を重ねて呼ぶが、最後の遷移が残るだけで害はない。
 
 4xxの `ApiProblemError` は再試行しない。
 ただし、408と429は再試行してよい応答なので（RFC 9110 §15.5.9、RFC 6585 §4）、5xxと同じく再試行する。

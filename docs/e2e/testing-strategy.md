@@ -124,6 +124,10 @@ setup project は、`storageState` を持たない browser context で `/oauth2/
 
 ログインの失敗は、認可リクエストのないコールバックを直接開く `login-failed.spec.ts` が、配信点の proxy を通って `/login-failed` の画面に着くことで確かめる。
 
+操作の途中のセッション切れは、専用の browser context でログインして `/orders` を開き、`__Host-APP_SESSION` の Cookie を外してから一覧の絞り込みを操作する `session-expired.spec.ts` が確かめる。
+API が成功した後の 401 なので、`/session-expired` に着き、「もう一度ログイン」から絞り込んだ画面へ戻る。
+Cookie を外した要求は、DB のセッションを消した要求と同じく、サーバー側で未認証になり 401 を受ける。
+
 ## 書き方
 
 - 要素は role と accessible name で探す。

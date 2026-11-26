@@ -130,7 +130,7 @@ frontend/packages/ui/
 ```
 
 `main.tsx` はcomposition rootであり、`api/query-client.ts` の `createQueryClient()` で `QueryClient` を作り、TanStack Routerを生成してProviderを接続する。
-`createQueryClient()` は、`@frontend/api/api-error` の401の処理（`QueryCache` と `MutationCache` の `onError`）と再試行の判定（`defaultOptions.queries.retry` と `defaultOptions.mutations.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
+`createQueryClient()` は、`@frontend/api/unauthorized-redirect` の401の処理（`QueryCache` と `MutationCache` の `onSuccess` と `onError`）と、`@frontend/api/api-error` の再試行の判定（`defaultOptions.queries.retry` と `defaultOptions.mutations.retry`）を渡し、mutationの後に全queryを無効化する（[mutationの後のcache](routing-and-state.md#mutationの後のcache)）。
 本番とテスト（`testing/query-client.ts`）は同じ関数で `QueryClient` を作る。
 `main.tsx` は描画の前に `lib/telemetry.ts` の `initTelemetry()` を呼ぶが、SDKの読み込みを待たずに描画を始める。
 
@@ -200,7 +200,7 @@ frontend/apps/web/src/
 frontend/packages/api/
 ├── orval.config.ts
 └── src/
-    ├── api-error.ts           # ApiProblemErrorとエラーの判定、401の遷移、再試行の判定
+    ├── api-error.ts           # ApiProblemErrorとエラーの判定、再試行の判定
     ├── api-fetch.ts           # custom mutator
     ├── csrf.ts
     ├── generated/
@@ -294,7 +294,7 @@ shadcnのprimitiveと `cn` は、アプリの外の `packages/ui`（`@frontend/u
 許可する主要な依存方向は次のとおりである。
 
 ``` text
-main.tsx -> api/query-client.ts -> @frontend/api/api-error
+main.tsx -> api/query-client.ts -> @frontend/api/api-error、@frontend/api/unauthorized-redirect
          -> router-defaults.ts -> components
          -> lib/telemetry.ts -> @grafana/faro-web-sdk（動的import）
                              -> lib/telemetry-sanitize.ts
@@ -312,7 +312,7 @@ features -> @frontend/api
          -> i18n
 
 components -> @frontend/ui
-           -> @frontend/api/api-error、@frontend/api/csrf
+           -> @frontend/api/api-error、@frontend/api/csrf、@frontend/api/unauthorized-redirect
            -> lib
            -> i18n
 ```
@@ -325,7 +325,7 @@ components -> @frontend/ui
 
 `api`、`components`、`lib`、`i18n` からfeatureとrouteを参照しない。
 
-`components` が参照できる `@frontend/api` の入口は、`api-error` と `csrf` だけである。
+`components` が参照できる `@frontend/api` の入口は、`api-error`、`csrf`、`unauthorized-redirect` だけである。
 送信の `api-fetch` と、`endpoints`、`models`、`zod` は参照せず、データの取得はrouteとfeatureが行う。
 
 `lib` は最下層であり、`components` も参照しない。

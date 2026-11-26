@@ -333,13 +333,14 @@ describe("Vite の設定", { timeout: 60_000 }, () => {
       });
     });
 
-    // 予約した prefix は path の segment の境界で一致させ、/login-failed は SPA が返す（ADR-014）。
-    it("/login と /login/** はバックエンドへ送り、/login-failed は送らない", () => {
+    // 予約した prefix は path の segment の境界で一致させ、/login-failed と /session-expired は SPA が返す（ADR-014）。
+    it("/login と /login/** はバックエンドへ送り、/login-failed と /session-expired は送らない", () => {
       const backend = new RegExp(proxyPath, "u");
 
       expect("/login").toMatch(backend);
       expect("/login/oauth2/code/web").toMatch(backend);
       expect("/login-failed").not.toMatch(backend);
+      expect("/session-expired").not.toMatch(backend);
     });
 
     it("E2E_WEB_PORT は preview の port だけを変え、開発サーバーは 5173 のままにする", async () => {

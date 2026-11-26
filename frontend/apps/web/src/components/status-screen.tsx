@@ -1,4 +1,4 @@
-import { loginPath } from "@frontend/api/api-error";
+import { loginPath } from "@frontend/api/unauthorized-redirect";
 import { buttonVariants } from "@frontend/ui/button";
 import { useTranslation } from "react-i18next";
 

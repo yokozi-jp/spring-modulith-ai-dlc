@@ -21,7 +21,7 @@ tags: [convention, frontend, file-role]
 - **`app-shell.tsx`**：header、ログアウトの form、`<Outlet />` を持つアプリシェル。`routes/_authenticated/route.tsx` の component にする（[認証が要る画面とアプリシェル](../routing-and-state.md#認証が要る画面とアプリシェル)）。
 - **`route-pending.tsx`、`route-error.tsx`、`route-not-found.tsx`**：router の既定の Loading、Error、存在しない resource の表示。`router-defaults.ts` の `routerDefaults` に登録する（[状態表示の分担](../routing-and-state.md#状態表示の分担)）。
 - **`problem-notice.tsx`**：[lib](lib.md) の `notice.ts` が作った `Notice` を live region に出す通知。
-- **`status-screen.tsx`**：アプリシェルの外で、見出し、説明、もう一度ログインするリンクを出す画面。リンクはページ全体を遷移して `@frontend/api` の `loginPath` を開く。`/logged-out` と `/login-failed` の route の component が使う。
+- **`status-screen.tsx`**：アプリシェルの外で、見出し、説明、もう一度ログインするリンクを出す画面。リンクはページ全体を遷移して `@frontend/api/unauthorized-redirect` の `loginPath` を開く。`/logged-out`、`/login-failed`、`/session-expired` の route の component が使う。
 
 アプリの共有componentは [UI primitive](ui-primitive.md) ではない。
 UI primitive は catalog の文言、router、API の型を扱わず、`packages/ui` に置く。
@@ -65,9 +65,9 @@ feature の中のコードを components へ移す条件は[共有コード](../
 ファイルの範囲ごとの禁止の一覧は[ファイルの範囲ごとの制限](../lint-config.md#ファイルの範囲ごとの制限)にある。
 テストファイルと `src/testing/` では、テスト用部品と層の import の禁止が外れる。
 
-`components` が参照できる `@frontend/api` の入口は、`api-error` と `csrf` だけである（[依存方向](../architecture.md#依存方向)）。
+`components` が参照できる `@frontend/api` の入口は、`api-error`、`csrf`、`unauthorized-redirect` だけである（[依存方向](../architecture.md#依存方向)）。
 `api-fetch`、`endpoints`、`models`、`zod` は lint が止める。
-今の `app-shell.tsx` は `@frontend/api/csrf` を、`route-error.tsx` は `@frontend/api/api-error` を import している。
+今の `app-shell.tsx` は `@frontend/api/csrf` を、`route-error.tsx` は `@frontend/api/api-error` を、`status-screen.tsx` は `@frontend/api/unauthorized-redirect` を import している。
 
 ## 最小の例と典型的な例
 
@@ -168,7 +168,7 @@ jsdom の component test で、role と label から要素を探し、利用者�
 - router の既定の表示は、`frontend/apps/web/src/router-defaults.test.tsx` が `routerDefaults` で router を作って確かめる。
   not found の見出しとリンク、loader の失敗で詳細を出さないことと再試行、読み込み中の `status` を見る。
 - アプリシェルは、`frontend/apps/web/src/components/app-shell.test.tsx` が `renderRoute("/")` で描画し、ログアウトの form の送信を確かめる。
-- `StatusScreen` は自身のテストファイルを持たず、使う route のテスト（`routes/-logged-out.test.tsx`、`routes/-login-failed.test.tsx`）が見出し、リンクの `href`、`<title>` を確かめる。
+- `StatusScreen` は自身のテストファイルを持たず、使う route のテスト（`routes/-logged-out.test.tsx`、`routes/-login-failed.test.tsx`、`routes/-session-expired.test.tsx`）が見出し、リンクの `href`、`<title>` を確かめる。
 - `ProblemNotice` は自身のテストファイルを持たず、使う画面のテスト（`features/orders/pages/order-new-page.test.tsx` など）が `getByRole("status")` で通知を読む。
 
 次は `frontend/apps/web/src/router-defaults.test.tsx` の not found のテストである。
@@ -202,7 +202,7 @@ jsdom の component test で、role と label から要素を探し、利用者�
 - [ ] 1 ファイルに component を 1 つだけ置き、component 以外を export しない。［Oxlint で検査：react/no-multi-comp、react/only-export-components］
 - [ ] component を関数宣言で書く。［Oxlint で検査：func-style、react/prefer-function-component］
 - [ ] feature、route、route tree、Base UI、テスト用部品、テレメトリ SDK を import しない。［Oxlint で検査：no-restricted-imports］
-- [ ] `@frontend/api` は `api-error` と `csrf` だけを import し、`api-fetch`、`endpoints`、`models`、`zod` を import しない。［Oxlint で検査：no-restricted-imports］
+- [ ] `@frontend/api` は `api-error`、`csrf`、`unauthorized-redirect` だけを import し、`api-fetch`、`endpoints`、`models`、`zod` を import しない。［Oxlint で検査：no-restricted-imports］
 - [ ] `fetch` と `XMLHttpRequest` を使わない。［Oxlint で検査：no-restricted-globals、no-restricted-properties］
 - [ ] 文言を JSX に直接書かず、`t` で catalog から出す。［JSX の子は Oxlint で検査：react/jsx-no-literals。属性の文言は自分で点検］
 - [ ] `error.message` と `detail` を表示しない。［自分で点検］
