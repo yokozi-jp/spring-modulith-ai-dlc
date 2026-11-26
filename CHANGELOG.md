@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v1.0.0...v1.1.0) (2026-11-26)
+
+
+### Features
+
+* **auth:** ログインの失敗を英語の既定の画面ではなく SPA の画面で伝える ([#780](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/780)) ([762047b](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/762047b86616014ffed7234249baccee07fc093f)), closes [#643](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/643)
+* **backend:** リスナーの同時実行数の上限を外し、再投入の件数を pool の半分に絞る ([#794](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/794)) ([d87560f](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/d87560f5aa895f8aeb9e27cf2361e1cfb037bac0)), closes [#791](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/791)
+* **frontend:** 操作の途中でセッションが切れたことを、ログインの前に画面で伝える ([#798](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/798)) ([e139b08](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/e139b08ae9ae6e8414d3b7fa610883cf7c445817)), closes [#645](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/645)
+* **frontend:** 権限不足の 403 を、再試行を出さない画面で伝える ([#800](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/800)) ([8c16c5b](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/8c16c5ba123caaa88c63d8b6a46856eed85b514d)), closes [#646](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/646)
+* **observability:** 送信の span の URL からクエリを発生源と collector で落とす ([#790](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/790)) ([67c9c8e](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/67c9c8e279368297bc44449963798a1d586956db)), closes [#579](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/579)
+
 ## [1.0.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.17.0...v1.0.0) (2026-11-26)
 
 
