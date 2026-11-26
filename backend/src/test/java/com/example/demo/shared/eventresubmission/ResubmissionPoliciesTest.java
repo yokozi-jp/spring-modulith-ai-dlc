@@ -23,6 +23,7 @@ import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.modulith.events.AbandonPolicy.Decision;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.EventPublication;
+import org.springframework.modulith.events.core.PublicationTargetIdentifier;
 import org.springframework.modulith.events.core.TargetEventPublication;
 
 /**
@@ -200,8 +201,13 @@ class ResubmissionPoliciesTest {
 
   /** 最後の試行が {@link #T0} で、リスナーの ID を持つ FAILED の出版。 */
   private static EventPublication failed(final String listenerId, final int attempts) {
-    return ResubmissionTestSupport.stubTargetPublication(
-        listenerId, attempts, T0.minus(Duration.ofDays(1)), T0);
+    final TargetEventPublication publication =
+        Mockito.mock(TargetEventPublication.class, Mockito.CALLS_REAL_METHODS);
+    Mockito.doReturn(PublicationTargetIdentifier.of(listenerId))
+        .when(publication)
+        .getTargetIdentifier();
+    return ResubmissionTestSupport.stubPublication(
+        publication, UUID.randomUUID(), attempts, T0.minus(Duration.ofDays(1)), T0);
   }
 
   /** 方針を指定し、id を明示しないリスナー。 */

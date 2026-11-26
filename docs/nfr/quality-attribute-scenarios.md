@@ -114,12 +114,12 @@ T_out が和以上の出版は、上限の回数目の再投入で失敗して `
 | ------------------------ | ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 外部呼び出しの遅延       | [外部呼び出しの遅延のラッシュテスト計画](../performance-test/rush-test-external-call-latency.md)            | λ を C / L の前後で変え、Listener が持つ接続の数と要求の応答時間を測る。                                                                                              |
 | 外部呼び出しの遅延       | 結合テスト `DemoApplicationTest`                                                                            | C が P の半分以下であることと、L が `idle_in_transaction_session_timeout` より短いことを検査する。                                                                    |
-| 外部システムの停止と回復 | 単体テスト `ResubmissionDowntimeToleranceTest`                                                              | `application.yaml` の `multiplier`、`max-wait`、回数の上限と `wait-age`（1分）から、待ち時間が1、2、4、8、16分で、和が31分、6回目の再投入がないことを検査する。       |
 | 外部システムの停止と回復 | 結合テスト `EventPublicationResubmitterTest`                                                                | 待ち時間ちょうどでは再投入せず、1マイクロ秒過ぎると再投入して完了することを検査する。                                                                                 |
 | 外部システムの停止と回復 | 形式検証 [formal-verify-event-resubmission](../../.agents/skills/formal-verify-event-resubmission/SKILL.md) | 2台のインスタンスと停止を含めて、再投入が回数の上限を超えないことを検査する。                                                                                         |
 | 同じイベントの二重の配信 | 結合テスト `ListenerIdempotencyTest`                                                                        | すべての Listener に同じイベントを順に2回と同時に2回届け、2回目が行を変えないことを検査する（[非同期処理のテスト](../integration/async-testing.md#冪等性のテスト)）。 |
 
-利用先が再投入の方針を変えたら、`ResubmissionDowntimeToleranceTest` の待ち時間の一覧と、この文書の表を同じ変更で直す。
+再投入の方針（`wait-age`、`multiplier`、`max-wait`、`abandon-after-attempts`）を変えたら、「許容する停止の長さ」の表と和を同じ変更で直す。
+この表と和は、テストで検査していない。
 
 ## 限界
 

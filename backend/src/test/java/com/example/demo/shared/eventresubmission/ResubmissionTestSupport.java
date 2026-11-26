@@ -39,8 +39,6 @@ import org.mockito.Mockito;
 import org.springframework.context.annotation.Import;
 import org.springframework.modulith.events.EventPublication;
 import org.springframework.modulith.events.FailedEventPublications;
-import org.springframework.modulith.events.core.PublicationTargetIdentifier;
-import org.springframework.modulith.events.core.TargetEventPublication;
 import org.springframework.modulith.test.Scenario;
 import org.springframework.test.context.TestPropertySource;
 
@@ -297,21 +295,6 @@ final class ResubmissionTestSupport {
     Mockito.doReturn(publicationDate).when(publication).getPublicationDate();
     Mockito.doReturn(lastResubmissionDate).when(publication).getLastResubmissionDate();
     return publication;
-  }
-
-  /** {@link #stubPublication} と同じ値を返し、リスナーの ID を持つ出版。 */
-  /* package */ static TargetEventPublication stubTargetPublication(
-      final String listenerId,
-      final int completionAttempts,
-      final Instant publicationDate,
-      final Instant lastResubmissionDate) {
-    final TargetEventPublication publication =
-        Mockito.mock(TargetEventPublication.class, Mockito.CALLS_REAL_METHODS);
-    Mockito.doReturn(PublicationTargetIdentifier.of(listenerId))
-        .when(publication)
-        .getTargetIdentifier();
-    return stubPublication(
-        publication, UUID.randomUUID(), completionAttempts, publicationDate, lastResubmissionDate);
   }
 
   /** {@code publicationId} の出版についての、上限に達した出版の ERROR。 */
