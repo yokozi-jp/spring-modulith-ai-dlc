@@ -21,6 +21,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder;
 import com.github.tomakehurst.wiremock.client.WireMock;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
+import com.github.tomakehurst.wiremock.http.Fault;
 import com.github.tomakehurst.wiremock.stubbing.StubMapping;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
@@ -59,7 +60,7 @@ import org.springframework.web.client.HttpServerErrorException;
  * 件になることと、同じイベントの再配送で請求しないことを、本番の Client を通してここで確かめる（E2E は画面に見える状態だけを確かめる）。URL の設定の違いで {@link
  * OrderConfirmedListenerTest} とは別の Spring のコンテキストになる。
  */
-// 成功、拒否、契約に合わない応答、5xx、4xx、429、タイムアウト、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
+// 成功、拒否、契約に合わない応答、5xx、4xx、429、タイムアウト、接続の切断、遅延、circuit breaker を一つの WireMock の文脈で確かめるため、メソッドが多い。
 @SuppressWarnings("PMD.TooManyMethods")
 @ApplicationModuleTest(mode = BootstrapMode.ALL_DEPENDENCIES)
 @Import({SharedTestConfiguration.class, OrderConfirmedFixture.class})
@@ -193,6 +194,18 @@ class PaymentGatewayClientIntegrationTest {
   void timeoutLeavesPublicationFailed(final Scenario scenario) {
     final String orderId = fixture.draftedOrderId();
     stubCharge(orderId, succeeded(orderId).withFixedDelay(3000));
+
+    fixture.confirmAndAwait(
+        scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
+
+    assertFailedOnce(orderId);
+  }
+
+  @Test
+  @DisplayName("接続が切られれば、1 回だけ呼ばれ、決済記録を作らず、出版は FAILED、attempts 1 で残る")
+  void connectionResetLeavesPublicationFailed(final Scenario scenario) {
+    final String orderId = fixture.draftedOrderId();
+    stubCharge(orderId, WireMock.aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER));
 
     fixture.confirmAndAwait(
         scenario, orderId, FAILED_PUBLICATION, state -> FAILED.equals(state.status()));
