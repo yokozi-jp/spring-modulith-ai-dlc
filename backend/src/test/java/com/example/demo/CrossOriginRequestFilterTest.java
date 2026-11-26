@@ -62,6 +62,7 @@ class CrossOriginRequestFilterTest {
     "Origin, http://localhost:8080",
     "Origin, null",
     "Origin, http://localhost:abc",
+    "Origin, http://localhost:99999999999",
     "Sec-Fetch-Site, cross-site",
     "Sec-Fetch-Site, same-site",
     "Sec-Fetch-Site, ''",

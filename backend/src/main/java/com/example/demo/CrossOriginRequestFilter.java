@@ -14,7 +14,6 @@ import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.InvalidUrlException;
 
 /** 別のオリジンから来た更新系の要求を、CSRF のトークンを確かめる前に拒否する（ADR-134）。 */
 final class CrossOriginRequestFilter extends OncePerRequestFilter {
@@ -65,8 +64,8 @@ final class CrossOriginRequestFilter extends OncePerRequestFilter {
     }
     try {
       return CorsUtils.isCorsRequest(request);
-    } catch (InvalidUrlException malformed) {
-      // 解釈できない Origin は、同じオリジンだと示せないので拒否する。
+    } catch (IllegalArgumentException | IllegalStateException malformed) {
+      // 解釈できない Origin（InvalidUrlException、範囲外の port）は、同じオリジンだと示せないので拒否する。
       return true;
     }
   }
