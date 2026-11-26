@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：外部システムの Client
-description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、置き場所と命名、必須の記述（タイムアウト、名前付きの circuit breaker、再試行しないこと）、呼び出しの結果の分類、依存、例、テスト（LoopbackHttpServer と WireMock）、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るときに読む。
+description: infrastructure.client に置き、外部システムのインタフェースを HTTP で実装する Client の定義、再試行の層、置き場所と命名、必須の記述（タイムアウト、名前付きの circuit breaker）、呼び出しの結果の分類、依存、例、テスト（LoopbackHttpServer と WireMock）、アンチパターン、作成時のチェックリストを定める。外部システムの HTTP API を呼ぶ実装を作るときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -9,18 +9,22 @@ tags: [convention, backend, class-role]
 
 `<ExternalSystem>Client` は、`domain.model` の外部システムのインタフェースを HTTP で実装するクラスであり、`infrastructure.client` に package-private で置いて `@Component` を付ける。
 接続先の URL は設定から受け取り、タイムアウトを設定し、Boot の自動構成の `RestClient.Builder` から作った `RestClient` で呼ぶ。
-名前付きの Resilience4j の circuit breaker を、この層のメソッドにだけ付ける。
-Client は再試行せず、失敗した呼び出しはイベント出版の再投入が呼び直す。
+名前付きの Resilience4j の circuit breaker を、この層のクラスかメソッドにだけ付ける。
 呼び出しの結果は四つに分け、再投入で回復できる失敗だけを例外で投げる。
 本番のコードに外部システムの偽物を置かず、ローカルとテストでは WireMock が外部システムを偽る。
 役割の決定理由は [ADR-050](../../adr/ADR-050-define-backend-class-roles-and-naming.md) に、偽物と結果の分類の決定理由は [ADR-072](../../adr/ADR-072-fake-external-systems-with-wiremock.md) に示す。
+
+外部の呼び出しを再試行する層は、イベント出版の再投入だけにする。
+Client、外部システムを呼ぶ CommandHandler、Listener は再試行しない。
+Resilience4j の retry と TimeLimiter、Spring の `@Retryable` と `RetryTemplate` を使わず、SDK を使う Client は SDK の再試行を止める。
+一時障害は例外で投げてイベント出版を `FAILED` に残し、再投入が呼び直す。
+理由と、同期の要求から外部を呼ぶ経路を足すときに即時の再試行を決め直す条件は [ADR-019](../../adr/ADR-019-define-resilience-and-capacity-guardrails.md) にある。
 
 ## 定義
 
 Listener から呼ばれる CommandHandler は、決済のような外部システムを[外部システムのインタフェース](external-system-interface.md)で呼び、HTTP の詳細を知らない。
 **外部システムの Client**（`<ExternalSystem>Client`）は、そのインタフェースを、外部システムの HTTP API の呼び出しで実装するクラスである。
 URL、JSON の形、タイムアウト、サーキットブレーカーは、Client だけが扱う。
-外部の呼び出しを再試行する層は、イベント出版の再投入だけである（[ADR-019](../../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
 
 Client は業務規則を持たない。
 外部システムの応答を Domain の型に変換して返すだけにする。
@@ -54,13 +58,8 @@ Client はユースケースの進行役でもない。
   これが `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS`（[ADR-055](../../adr/ADR-055-set-db-time-limits-per-connection.md)）以上だと、待つ間に PostgreSQL が接続を切り、結果を記録できない。
   今の値は 1 秒 + 2 秒 = 3 秒で、ローカルとテストの 10 秒より短い。
   `DemoApplicationTest` が束縛した設定からこれを確かめる。
-- 実装するメソッドに `@CircuitBreaker(name = "payment-gateway")` を付ける。
+- クラスか実装するメソッドに `@CircuitBreaker(name = "payment-gateway")` を付ける。
   circuit breaker の instance の設定は、`application.yaml` の `resilience4j.circuitbreaker.instances` に、`default` を継承して書く。
-- Client は即時の再試行をしない。
-  Resilience4j の `@Retry` と `@TimeLimiter`、Spring の `@Retryable` を付けず、`application.yaml` に `resilience4j.retry` と `resilience4j.timelimiter` を書かない。
-  SDK を使う Client は、SDK の再試行を止める。
-  一時障害は例外で投げ、イベント出版の再投入が呼び直す。
-  失敗した請求の再投入で同じ注文をもう一度請求しても、冪等性キーで二重の請求を防ぐ。
 - 冪等性キーを受け取る操作は、キーを外部システムの API が定めるヘッダー（決済システムの例では `Idempotency-Key`）で送る。
 - 外部システムの応答は、Domain の型（`ChargeOutcome`、`GatewayPaymentCode`）に変換して返す。
 - 応答は `toEntity` で状態のコードと本文を受け取り、契約に合うことを確かめてから変換する。
@@ -70,7 +69,7 @@ Client はユースケースの進行役でもない。
 - クラス、定数、フィールド、コンストラクタ、実装するメソッドに Javadoc を書く。
 - `infrastructure.client` のパッケージに `@NullMarked` を宣言する `package-info.java` を置く。
 
-タイムアウトとサーキットブレーカーの値と、同期の要求から外部を呼ぶ経路を足すときに即時の再試行を決め直す条件は、[ADR-019](../../adr/ADR-019-define-resilience-and-capacity-guardrails.md) に従う。
+タイムアウトとサーキットブレーカーの値は、[ADR-019](../../adr/ADR-019-define-resilience-and-capacity-guardrails.md) に従う。
 
 ```yaml
 payment-gateway:
@@ -311,9 +310,7 @@ circuit breaker、イベント出版の状態、外部システムが受けた�
   Gradle の `test` タスクは `docker/wiremock` を入力（`inputs.dir`）に宣言しているため、スタブを変えるとテストがやり直される。
 - 失敗と拒否は、冪等性キーに一致する注文ごとのスタブを `atPriority(1)` で共有のスタブより優先して足す。
   `@BeforeEach` で `resetToDefaultMappings()` と `resetRequests()` を呼び、circuit breaker を `reset()` する。
-- 四つの分類ごとに、公開の境界（注文の確定から始まるイベント）から出版の状態（`COMPLETED` か `FAILED`）、決済記録、circuit breaker の失敗の件数を確かめる。
-- 接続のリセット（WireMock の `Fault.CONNECTION_RESET_BY_PEER`）では、WireMock が受けた請求が 1 回だけで、出版が `FAILED`、`completion_attempts` が 1 で残ることを確かめる。
-  Client や HTTP クライアントが再試行すると、受けた請求が 2 回以上になる。
+- 四つの分類ごとに、公開の境界（注文の確定から始まるイベント）から出版の状態（`COMPLETED` か `FAILED`）、決済記録、circuit breaker の失敗の件数を確かめ、接続のリセット（`Fault.CONNECTION_RESET_BY_PEER`）では WireMock が受けた請求が 1 回だけであることも確かめる。
 - テストの依存の jar の版は、compose の WireMock のイメージのタグと同じにする。
 
 ## アンチパターン
@@ -321,8 +318,6 @@ circuit breaker、イベント出版の状態、外部システムが受けた�
 - CommandHandler や Domain Service で `RestClient` を直接使う。
 - HTTP クライアントにタイムアウトを設定せず、TimeLimiter に中断を任せる。
   TimeLimiter は `CompletionStage` を返すメソッドにしか効かない。
-- Client、外部システムを呼ぶ CommandHandler、Listener に `@Retry` や `@Retryable` を付ける、または SDK の再試行を残す。
-  再投入の回数に掛け算で試行が増え、冪等性キーを渡さない更新は二重に実行されうる。
 - `@CircuitBreaker` を CommandHandler や Listener に付ける。
   依存先の不調と、業務の処理の失敗が同じ instance に混ざる。
 - 冪等性キーを外部システムへ送らない。
@@ -352,11 +347,11 @@ circuit breaker、イベント出版の状態、外部システムが受けた�
 - [ ] 呼び出しに Boot の計測が付く（SDK を使う Client は対象外）。［結合テストで検査：DemoApplicationTest.paymentGatewayCallIsObserved］
 - [ ] 接続 1 秒、呼び出し 2 秒のタイムアウトを `application.yaml` に書き、コンストラクタで受け取る。［自分で点検］
 - [ ] トランザクションの中で呼ぶなら、最悪の時間を `DB_IDLE_IN_TRANSACTION_TIMEOUT_MS` より短くする。［結合テストで検査：DemoApplicationTest.externalClientWorstCaseFitsIdleInTransactionTimeout］
-- [ ] 名前付きの instance の `@CircuitBreaker` をメソッドに付け、`application.yaml` に設定を書く。［自分で点検］
-- [ ] `@CircuitBreaker` を `infrastructure.client` の `*Client` にだけ付ける。［ArchUnit で検査：ClassRoleArchTest.circuitBreakerIsUsedOnlyOnClients］
-- [ ] Resilience4j の retry と TimeLimiter を使わない。［ArchUnit で検査：ClassRoleArchTest.resilience4jRetryAndTimeLimiterAreNotUsed］
-- [ ] Client、外部システムを呼ぶ CommandHandler、Listener に Spring の `@Retryable` を付けない。［ArchUnit で検査：ClassRoleArchTest.retryableIsNotUsedOnExternalSystemPath］
-- [ ] SDK を使う Client は、SDK の再試行を止める。［自分で点検］
+- [ ] 名前付きの instance の `@CircuitBreaker` をクラスかメソッドに付け、`application.yaml` に設定を書く。［自分で点検］
+- [ ] `@CircuitBreaker` を `infrastructure.client` の `*Client` にだけ付ける。［ArchUnit で検査：ResilienceRulesArchTest.circuitBreakerIsUsedOnlyOnClients］
+- [ ] Resilience4j の retry と TimeLimiter を使わない。［ArchUnit で検査：ResilienceRulesArchTest.resilience4jRetryAndTimeLimiterAreNotUsed］
+- [ ] Client、外部システムを呼ぶ CommandHandler、Listener で、Spring の `@Retryable` と `RetryTemplate` などの `org.springframework.core.retry` を使わない。［ArchUnit で検査：ResilienceRulesArchTest.springRetryIsNotUsedOnExternalSystemPath］
+- [ ] SDK を使う Client は、SDK の再試行を止める。［自分で点検（メールの Client は `MailSenderClientTest` が確かめる）］
 - [ ] circuit breaker の instance に、429 以外の 4xx を無視する `ignore-exception-predicate` を指定する。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 業務上の拒否と契約の不備を結果で返し、一時障害と資格情報の不備を例外で投げる。［結合テストで検査：PaymentGatewayClientIntegrationTest］
 - [ ] 外部システムの応答を Domain の型に変換して返す。［自分で点検］

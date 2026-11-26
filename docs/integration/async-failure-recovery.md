@@ -22,10 +22,8 @@ DLQ に当たるのは Spring Modulith の `ABANDONED` の出版で、アプリ�
 
 回復可能なエラーは、回数と間隔を決めて再試行する。
 
-- 外部呼び出しを再試行する層は、イベント出版の再投入だけにする（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。client adapter は即時の再試行をせず、コンシューマーで client adapter を囲む再試行のループも書かない。
+- 外部呼び出しを再試行する層は、イベント出版の再投入だけにする（[外部システムの Client](../backend/class-roles/external-client.md)）。
 - メッセージの再配信の間隔は、基盤が指数バックオフをサポートしていれば使う。指数バックオフに独自の実装が必要な場合は、実装費用に見合う効果がある場合だけ採用する。
-
-リスナーでその場の再試行に任せる案を取らない理由は、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) の選択肢 9 にある。
 
 回復不能なエラーは、資源の浪費と他の処理への影響を避けるため、次の三つに分けて扱う。
 

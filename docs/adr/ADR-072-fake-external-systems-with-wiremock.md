@@ -11,7 +11,7 @@ tags: [adr, backend, testing, external-system, wiremock]
 
 Accepted
 
-Amended by [ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md)：Client は即時の再試行をしないこと。retry の `payment-gateway` の instance と `idempotent` の再試行の対象の項、WireMock の結合テストで確かめるもののうちリトライを改める。
+Amended by [ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md)：ADR-072 の Decision の次の 3 点を改める。（1）`payment-gateway` の retry の instance の継承（67 行付近）、（2）`idempotent` の再試行の対象（68 行付近）、（3）WireMock の結合テストで確かめる対象からリトライを外す（43 行付近）。
 
 ## Date
 

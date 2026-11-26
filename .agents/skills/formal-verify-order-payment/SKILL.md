@@ -86,7 +86,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 どれも、範囲と前提の「テナントは一つ」の項目に結びつく。
 `application.yaml` は `spring.modulith.events`（`completion-mode`、`staleness`）、`event-publication.resubmission` の節だけ、`build.gradle` は `springModulithVersion` だけが関わる。
 モデルは 1 回の配信で決済代行に 1 回だけ請求する。
-`PaymentGatewayClient` は再試行せず、`ClassRoleArchTest` の `resilience4jRetryAndTimeLimiterAreNotUsed` と `retryableIsNotUsedOnExternalSystemPath` が再試行の注釈を止めるためである（ADR-019）。
+`PaymentGatewayClient` は再試行せず、`ResilienceRulesArchTest` の `resilience4jRetryAndTimeLimiterAreNotUsed` と `springRetryIsNotUsedOnExternalSystemPath` が再試行を止めるためである（ADR-019）。
 再試行を足したら、1 回の配信が同じ冪等性キーで重ねて請求する経路をモデルに足す。
 
 changeset は `includeAll` で読み込まれるため、新しい changeset は上の差分に出ない。

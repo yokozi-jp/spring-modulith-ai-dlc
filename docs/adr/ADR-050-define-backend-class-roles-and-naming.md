@@ -37,7 +37,7 @@ Proposed
 [ADR-115](ADR-115-build-business-batches-with-spring-batch.md) は、機能モジュールに業務のバッチの層 `batch` を足し、`shared` に `shared.batch` を置いた。
 そこで、Context の層の数を書き直し、`shared` を使う層の決定に `shared.batch` を書き足した。
 
-[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が Client の即時の再試行を外したため（[#573](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/573)）、`charge` の再試行の決定を、Resilience4j の `retry` の試行の回数から、Client が再試行しないことへ書き直した。
+Proposed の間に、[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が Client の再試行をなくしたため、`charge` の再試行の決定を書き直した。
 
 ## Decision
 

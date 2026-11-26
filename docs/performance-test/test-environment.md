@@ -65,7 +65,7 @@ tags: [convention, performance-test, testing, environment, future-arch-guideline
 - 工数や環境の制約で独立したプロセスにできず、対象機能への影響が小さい場合に限り、プログラム内でスタブのオブジェクトへ差し替えてよい。
 - どちらの方式でも、設定可能な遅延を含む正常応答を、十分なスループットで返せるようにする。
 
-外部連携の timeout と retry は、スタブに置き換えても[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)の値のまま動かす。
+外部連携の timeout と circuit breaker は、スタブに置き換えても[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)の値のまま動かす。
 
 ## メトリクスの収集
 

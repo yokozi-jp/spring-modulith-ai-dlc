@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-019: 外部連携の耐障害性と容量制御を標準化する'
-description: 外部の呼び出しを再試行する層をイベント出版の再投入の 1 つだけにし、Client は即時の再試行をせず、タイムアウトを HTTP クライアントに、circuit breaker を Client に持ち、DB の接続数を接続の予算から決める、外部連携の耐障害性と容量制御の決定。
+description: 外部の呼び出しを再試行する層をイベント出版の再投入だけにし、タイムアウト、circuit breaker、DB の接続数を決める、外部連携の耐障害性と容量制御の決定。
 tags: [adr, resilience, backend, reliability]
 ---
 
@@ -37,58 +37,37 @@ JDK 25 では JEP 491 により、通常の `synchronized` メソッドとブロ
 [ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間にstarter が管理する通信から Redis を除いた。
 
 Proposed の間に、外部の呼び出しを再試行する層を、Client の即時の再試行からイベント出版の再投入（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）の 1 つへ書き直した（[#573](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/573)）。
-理由は次のとおりである。
+理由は次の 3 点である。
 
-- 外部システムのインタフェースは CommandHandler と Client からだけ使え、その CommandHandler は Listener からだけ呼べる。
-  ArchUnit の `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients` と `externalSystemCommandHandlersAreDependedOnlyByListeners` がこれを守る（[#545](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/545)）。
-  外部の呼び出しはすべて Listener の経路にあり、外側に再投入がある。
-- 決済代行の `payment-gateway` とメールの `mail-sender` の retry は、試行 1 回の `default` を継承し、何もしていなかった。
-  GET などのための `idempotent`（最大 3 回）を継承する instance はなく、継承できる経路もなかった。
-- `@Retry` の名前に合う instance がないと、Resilience4j は `configs.default` を使う。
-  `default` の `max-attempts: 1` を消すと、Resilience4j の既定（`RetryConfig.DEFAULT_MAX_ATTEMPTS` の 3 回、待ち 500 ミリ秒）で再試行する。
-  使わない仕組みが残ると、設定の 1 行を消すだけで、再投入の内側に再試行の層が黙って増える。
-- Spring Framework 7 の `@Retryable` は、`@EnableResilientMethods` がないと黙って無視され、有効にすると再投入と重なる（[Resilience Features](https://docs.spring.io/spring-framework/reference/core/resilience.html)）。
-- Resilience4j の TimeLimiter の既定（2 秒）は、`CompletionStage` を返すメソッドにしか効かず、使う箇所がなかった。
-  タイムアウトは HTTP クライアントにある。
+- 即時の再試行を使う経路がなかった。
+  `payment-gateway` と `mail-sender` の retry は試行 1 回の `default` を継承し、`idempotent`（最大 3 回）を継承する instance はなかった。
+  外部の呼び出しはすべて Listener の経路にあり（[#545](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/545)）、リスナーの方針が `abandon-after-attempts: 1` で 1 回目に諦めない限り、再投入が呼び直す。
+- `default` の `max-attempts: 1` の 1 行を消すと、Resilience4j の既定（`RetryConfig.DEFAULT_MAX_ATTEMPTS` の 3 回）で黙って再試行する。
+- Spring Framework 7 の `@Retryable` は、`@EnableResilientMethods` で有効にすると再投入と重なる（[Resilience Features](https://docs.spring.io/spring-framework/reference/core/resilience.html)）。
 
-この方針は、姉妹リポジトリ（`yokozi-jp/agent-software-factory`）の [ADR 0023](https://github.com/yokozi-jp/agent-software-factory/blob/main/docs/adr/0023-ky-for-external-http-and-sdk-retries-for-aws.md) の芯である「1 つの呼び出しで再試行する層は 1 つ」と同じである。
-[#319](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/319) の調査で、ADR 0023 の一部を取り込むと決めた。
-ADR 0023 は、即時の再試行に、冪等な GET だけ、ジッター、`Retry-After`、全体のタイムアウトを求める。
-AWS の Builders' Library も、再試行を stack の 1 か所に絞り、待ちにジッターを足すことを勧める（[Timeouts, retries, and backoff with jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/)）。
-
-circuit breaker は外さない。
-ADR 0023 は Builders' Library に従って circuit breaker を入れないが、事情が違う。
-こちらでは、全モジュールのリスナーが 2 枠の executor（`spring.task.execution.simple.concurrency-limit: 2`）を共有する。
-半死の決済代行は、1 回の呼び出しで枠を最大 3 秒（接続 1 秒と呼び出し 2 秒）持つ。
-circuit breaker が open の間は、外部を呼ばずに失敗するので、ほかのリスナーの枠が空く。
-[#557](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/557) は、外部システムを呼ぶリスナーに専用の executor を持たせると結論し、作業は [#685](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/685) にある。
-
-この書き直しは、Accepted の [ADR-072](ADR-072-fake-external-systems-with-wiremock.md) の Decision のうち、retry の `payment-gateway` の instance と `idempotent` の再試行の対象の項と、WireMock の結合テストで確かめるもののうちリトライを改める。
+この書き直しで、Accepted の [ADR-072](ADR-072-fake-external-systems-with-wiremock.md) の Decision の次の 3 点を改める。
+（1）`payment-gateway` の retry の instance の継承（67 行付近）、（2）`idempotent` の再試行の対象（68 行付近）、（3）WireMock の結合テストで確かめる対象からリトライを外す（43 行付近）。
 
 ## Decision
 
 外部の呼び出しを再試行する層は、イベント出版の再投入（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）の 1 つだけにする。
 
 - Client は即時の再試行をしない。
-  Resilience4j の `@Retry` と `resilience4j.retry` の設定を置かない。
-  Spring Framework の `@Retryable` を、Client、外部システムを呼ぶ CommandHandler、Listener に付けない。
-- SDK が自分で再試行する外部連携は、SDK の再試行を止める。
-  メールの SES v2 の Client は `AwsRetryStrategy.doNotRetry()` で試行を 1 回にする（[ADR-125](ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
-- 一時障害（接続の失敗、タイムアウト、HTTP 429、HTTP 5xx）では、Client が例外を投げ、イベント出版を `FAILED` に残す。
-  再投入が、分から時間の間隔で、回数の上限まで呼び直す。
+  Resilience4j の retry と、Spring Framework の `@Retryable` と `RetryTemplate` を使わない。
+- SDK が自分で再試行する外部連携は、SDK の再試行を止める（メールは [ADR-125](ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
+- 一時障害（接続の失敗、タイムアウト、HTTP 429、HTTP 5xx）では、Client が例外を投げてイベント出版を `FAILED` に残し、再投入が回数の上限まで呼び直す。
   呼び出しの結果の分け方は [ADR-072](ADR-072-fake-external-systems-with-wiremock.md) に従う。
-- ArchUnit が、main のコードの Resilience4j の retry と TimeLimiter と、Client、外部システムを呼ぶ CommandHandler、Listener の `@Retryable` を止める。
+- 守らせる規則と検査は[外部システムの Client](../backend/class-roles/external-client.md) に置く。
 
 即時の再試行は、同期の要求から外部システムを呼ぶ経路を足すときに決め直す。
-その経路を足す変更は、ArchUnit の `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients` と `externalSystemCommandHandlersAreDependedOnlyByListeners` を緩める。
-決め直すときは、即時の再試行に次の条件を付ける（姉妹リポジトリの ADR 0023 と AWS の Builders' Library）。
+その変更は、ArchUnit の `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients` と `externalSystemCommandHandlersAreDependedOnlyByListeners` を緩める。
+決め直すときは、即時の再試行に次の条件を付ける（姉妹リポジトリの [ADR 0023](https://github.com/yokozi-jp/agent-software-factory/blob/main/docs/adr/0023-ky-for-external-http-and-sdk-retries-for-aws.md)、AWS の Builders' Library の [Timeouts, retries, and backoff with jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/)）。
 
-- 冪等な操作だけを再試行する。
-  冪等な操作は、GET などの安全な操作と、相手が冪等性キーで重複を防ぐ操作である。
+- 冪等な操作（GET などの安全な操作と、相手が冪等性キーで重複を防ぐ操作）だけを再試行する。
 - 待ちは、ジッター付きの指数的な待ちにする。
-- `Retry-After` の待ちが、呼び出し元の時間の予算に収まらないときは、再試行しない。
+- `Retry-After` の待ちが呼び出し元の時間の予算に収まらないときは、再試行しない。
 - 試行の回数と、待ちを含む合計の時間に上限を置く。
-- その経路でも再試行の層は 1 つにし、HTTP クライアント、SDK、再投入の再試行と重ねない。
+- 再試行の層は 1 つにし、HTTP クライアント、SDK、再投入の再試行と重ねない。
 
 外部 HTTP client のタイムアウトは、HTTP クライアントの接続と呼び出しの 2 つに持つ。
 開始値は次のとおりとする。
@@ -97,10 +76,9 @@ circuit breaker が open の間は、外部を呼ばずに失敗するので、�
 - 一回の呼び出し全体のタイムアウトは 2 秒とする。
 - Resilience4j の TimeLimiter は使わない。
 
-外部連携ごとに名前付きの Resilience4j の circuit breaker の instance を定義し、`infrastructure.client` の Client のメソッドにだけ付ける。
-ArchUnit が、`infrastructure.client` の `*Client` の外の `@CircuitBreaker` を止める。
+外部連携ごとに名前付きの Resilience4j の circuit breaker の instance を定義し、`infrastructure.client` の Client のクラスかメソッドに付ける。
 circuit breaker の既定値を、count based window 20 回、評価開始 10 回、failure rate 50 パーセント、open 30 秒、half-open 5 回とする。
-外部システムを呼ぶリスナーが専用の executor で動き（#685）、ほかのリスナーと枠を共有しなくなったら、circuit breaker の要否を見直す。
+外部システムを呼ぶリスナーが専用の executor で動き（[#685](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/685)）、ほかのリスナーと枠を共有しなくなったら、circuit breaker の要否を見直す。
 
 Spring の starter が持つ通信は、Resilience4j で包まない。
 今の対象は JDBC と HikariCP、Spring Security の OAuth2 Client で、Redis を戻すときの Lettuce も同じに扱う。
@@ -143,7 +121,6 @@ maximum-pool-size × 最大アプリケーションタスク数
 
 - 非冪等処理の意図しない再実行を既定で防げる。
 - 1 回の呼び出しの試行は 1 回なので、1 件の出版が外部を呼ぶ回数は再投入の回数の上限で決まる。
-- 使わない再試行の設定がなくなり、設定を消しただけで Resilience4j の既定の再試行が黙って効くことがない。
 - retry storm と長時間の連鎖待ちを抑え、障害を呼び出し元へ返す時間を予測しやすくなる。
 - DB 接続数を仮想スレッド数から切り離し、PostgreSQL の容量から逆算できる。
 - Java 25 で解消済みの monitor pinning を理由に、不要な lock の書き換えを行わずに済む。
@@ -158,7 +135,6 @@ maximum-pool-size × 最大アプリケーションタスク数
 
 ### Neutral
 
-- circuit breaker の要否は、#685 で外部システムを呼ぶリスナーの executor が分かれた後に見直す。
 - bulkhead と rate limiter は依存先の同時実行上限が判明した時点で、名前付き instance へ追加する。
 - JFR の pinning 検証は常時有効化せず、負荷スモークと障害調査で実行する。
 
@@ -172,32 +148,27 @@ maximum-pool-size × 最大アプリケーションタスク数
 
 ### Client に即時の再試行の設定を残し、同期の経路ができたら使う
 
-- **Description**：`idempotent`（最大 3 回、200 ミリ秒から倍率 2 の待ち）の retry の設定と、試行 1 回の `default` を残す。
+- **Description**：`idempotent`（最大 3 回、200 ミリ秒から倍率 2 の待ち）と、試行 1 回の `default` の retry の設定を残す。
 - **Pros**：同期の経路を足したときに、設定を継承するだけで再試行できる。
-- **Cons**：継承する instance も経路もなく、誰も確かめない設定になる。
-  `default` を消すと Resilience4j の既定の 3 回が黙って効く。
-  `idempotent` にはジッターがなく、429 でも `Retry-After` を見ずに再試行するため、決め直すときの条件を満たさない。
-  このため採用しない。
+- **Cons**：使う経路がなく、ジッターも `Retry-After` の扱いもないため、決め直すときの条件を満たさず採用しない。
 
 ### circuit breaker も外す
 
 - **Description**：姉妹リポジトリの ADR 0023 と AWS の Builders' Library に従い、circuit breaker を入れない。
 - **Pros**：試験しにくい状態の切り替えがなくなり、回復が遅れることもない。
-- **Cons**：全モジュールのリスナーが 2 枠の executor を共有するため、半死の決済代行が呼び出しごとに枠を最大 3 秒持ち、ほかのリスナーを待たせる。
-  #685 で枠が分かれるまでは採用しない。
+- **Cons**：全モジュールのリスナーが 2 枠の executor（`spring.task.execution.simple.concurrency-limit: 2`）を共有し、半死の決済代行が呼び出しごとに枠を最大 3 秒持つため、#685 で枠が分かれるまで採用しない。
 
 ### Spring Framework 7 の `@Retryable` で即時の再試行を持つ
 
 - **Description**：Resilience4j の `@Retry` の代わりに、Spring Framework の `@Retryable` を Client に付ける。
 - **Pros**：Resilience4j の retry の module が要らない。
-- **Cons**：`@EnableResilientMethods` がないと黙って無視され、有効にすると再投入と重なるため採用しない。
+- **Cons**：再投入と重なり、`@EnableResilientMethods` がないと黙って無視されるため採用しない。
 
 ### TimeLimiter で呼び出し全体を切る
 
 - **Description**：Resilience4j の TimeLimiter に、呼び出し全体の上限を持たせる。
 - **Pros**：HTTP クライアントの種類によらず、同じ設定で上限を置ける。
-- **Cons**：`CompletionStage` を返すメソッドにしか効かず、同期の Client には効かない。
-  HTTP クライアントのタイムアウトと上限が 2 か所になるため採用しない。
+- **Cons**：`CompletionStage` を返すメソッドにしか効かず、上限が HTTP クライアントと 2 か所になるため採用しない。
 
 ### Resilience4j のライブラリ既定値だけを使う
 

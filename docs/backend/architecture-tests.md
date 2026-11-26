@@ -30,6 +30,7 @@ backend/src/test/java/com/example/demo/architecture/
 ├── PackageByFeatureOnionArchitectureTest.java
 ├── ProxyRulesArchTest.java
 ├── PublicIdArchTest.java
+├── ResilienceRulesArchTest.java
 ├── TableWriterArchTest.java
 ├── TestConventionsArchTest.java
 └── ViolatingFixtures.java
@@ -109,11 +110,6 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   守らせる規約は[CommandHandler](class-roles/command-handler.md)のアンチパターンに示し、理由は[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)に示す。
 - `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`：外部システムのインタフェースに依存してよいのは、`application`の`*CommandHandler`と、それを実装する`infrastructure.client`のクラスだけである。
   集約、Domain Service、QueryService、補助のクラスを通して外部システムを呼ぶ経路をなくすため、前の規則は`*CommandHandler`の直接の依存だけを見れば足りる。
-- `resilience4jRetryAndTimeLimiterAreNotUsed`：どのクラスも、Resilience4jのretryとTimeLimiterのパッケージ（`io.github.resilience4j.retry..`、`io.github.resilience4j.timelimiter..`）に依存しない。
-  外部の呼び出しを再試行する層はイベント出版の再投入だけにし、タイムアウトはHTTPクライアントに持つ（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
-- `retryableIsNotUsedOnExternalSystemPath`：`infrastructure.client`のクラス、外部システムのインタフェースに依存する`*CommandHandler`、`application`の`*Listener`は、クラスにもメソッドにもSpringの`@Retryable`を付けない。
-- `circuitBreakerIsUsedOnlyOnClients`：Resilience4jの`@CircuitBreaker`は、`infrastructure.client`の`*Client`のクラスとメソッドにだけ付ける。
-  守らせる規約は[外部システムのClient](class-roles/external-client.md)に示す。
 - `commandHandlersAndListenersDoNotImplementInterfaces`：`application`の`*CommandHandler`と`*Listener`は、Java標準の型以外のinterfaceを実装しない。
   実装を認めると、呼び出し側がinterfaceだけに依存して`externalSystemCommandHandlersAreDependedOnlyByListeners`と`listenersAreNotCalled`を迂回できる。
 - `listenersAreNotCalled`：`application`の`*Listener`に、ほかのクラスは依存しない。
@@ -158,6 +154,17 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
   書き込みと既存のオブジェクトへの対応づけは、`Record`の`into(Object)`と`from(Object)`、`DSLContext.newRecord(Table, Object)`を検出する。
   `convertFrom`、`Records.mapping`、`into(Table)`、`fetch(RecordMapper)`と、列の型を変換する`intoArray(Field, Class)`、`intoSet(Field, Class)`、`fetch(Field, Class)`は呼んでよい。
 
+## 耐障害性
+
+`ResilienceRulesArchTest`は、外部の呼び出しの再試行とcircuit breakerの置き場所を検査する。
+
+- `resilience4jRetryAndTimeLimiterAreNotUsed`：どのクラスも、Resilience4jのretryとTimeLimiterのパッケージ（`io.github.resilience4j.retry..`、`io.github.resilience4j.timelimiter..`）に依存しない。
+- `springRetryIsNotUsedOnExternalSystemPath`：`infrastructure.client`のクラス、外部システムのインタフェースに依存する`*CommandHandler`、`application`の`*Listener`は、Springの`@Retryable`（メタアノテーションを含む）をクラスにもメソッドにも付けず、`RetryTemplate`などの`org.springframework.core.retry..`に依存しない。
+- `circuitBreakerIsUsedOnlyOnClients`：Resilience4jの`@CircuitBreaker`は、`infrastructure.client`の`*Client`のクラスかメソッドにだけ付ける。
+
+守らせる規約は[外部システムのClient](class-roles/external-client.md)に、理由は[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)に示す。
+SDKが自分で行う再試行（SESのClientなど）は、どの規則も検出しない。
+
 ## 許可する外部ライブラリの型を足す
 
 `domain.model`と`application`が使える外部ライブラリの型と、`domain.model`と`domain.service`が使える標準型は、`PackageByFeatureOnionArchitectureTest`の`DOMAIN_JAVA_PACKAGES`と`allowedInDomain`（`domain.model`と`domain.service`）、`applicationDependsOnlyOnAllowedTypesRule`の`resideInAnyPackage`（`application`）が持つ。
@@ -188,10 +195,6 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `presentation.web`に置いた名前だけの`ChargeOrderListener`が呼ぶ場合も検出する。
 `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients`は、違反フィクスチャの`PaymentChargePolicy`（Domain Service）、`PaymentCharger`（`domain.model`）、`PaymentChargerConfig`（`infrastructure.client`に置いた、interfaceを実装しない設定クラス）、`OrderPaymentCharger`（補助のクラス）が`PaymentGateway`に依存することを検出する。
 規約どおりのフィクスチャでは、`PaymentGateway`に依存する`CapturePaymentCommandHandler`を`OrderPlacedPaymentListener`だけが呼び、`PaymentGatewayClient`が`PaymentGateway`を実装しても、二つの規則が通ることを確かめる。
-
-`resilience4jRetryAndTimeLimiterAreNotUsed`は、違反フィクスチャの`RetryingPaymentClient`（`@Retry`と`@TimeLimiter`）を検出する。
-`retryableIsNotUsedOnExternalSystemPath`は、違反フィクスチャの`RetryablePaymentClient`（Clientのメソッド）、`RetryableChargeOrderCommandHandler`（外部システムを呼ぶCommandHandlerのクラス）、`OrderRefundedListener`（Listenerの`on`）の`@Retryable`を検出する。
-`circuitBreakerIsUsedOnlyOnClients`は、違反フィクスチャの`GuardedChargeOrderCommandHandler`（CommandHandlerのメソッド）と`PaymentGatewayBreaker`（`infrastructure.client`の`*Client`でないクラス）の`@CircuitBreaker`を検出する。
 
 `commandHandlersAndListenersDoNotImplementInterfaces`は、違反フィクスチャの`ShelveOrderCommandHandler`が`ShelveOrderUseCase`を、`ChargeTriggerListener`が`ChargeTrigger`を実装することを検出する。
 `listenersAreNotCalled`は、違反フィクスチャの`OrderPaidController`が`OrderPaidListener`の`on`を呼ぶことを検出する。

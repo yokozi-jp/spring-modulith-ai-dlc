@@ -27,7 +27,7 @@ Actuator の `loggers` endpoint と JMX からレベルを動的に変更しな�
 
 リトライで回復する一時的な失敗は `INFO` にする。
 リトライを使い切って処理が失敗した時点で `ERROR` にする。
-リトライを行う条件は [ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md) に従う。
+リトライの回数と間隔は[イベント出版の再投入の全体像](../integration/event-publication-resubmission.md)に従う。
 
 `TRACE` はアプリケーションコードで使わない。
 SLF4J に `FATAL` はないため、プロセスの停止は起動処理を担当する logger の severity と終了結果で区別する。

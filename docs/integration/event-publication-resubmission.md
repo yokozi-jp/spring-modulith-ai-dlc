@@ -36,10 +36,8 @@ tags: [architecture, integration, async, spring-modulith, resilience]
 
 ## Resilience4j との関係
 
-外部の呼び出しを再試行する層は、再投入の 1 つだけである。
-Resilience4j は Client の circuit breaker だけを担い、Client は即時の再試行をしない。
-再試行の層と circuit breaker を残す理由は [ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md) に、リスナーでその場の再試行に任せる案の却下は [ADR-079 の選択肢 9](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) にある。
-circuit breaker が open の間に回数を消費する限界は、ADR-079 の Consequences にある。
+外部の呼び出しを再試行する層は再投入だけで、Resilience4j は Client の circuit breaker だけを担う（[外部システムの Client](../backend/class-roles/external-client.md)）。
+circuit breaker が open の間に回数を消費する限界は、[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) の Consequences にある。
 
 ## どの文書を読むか
 

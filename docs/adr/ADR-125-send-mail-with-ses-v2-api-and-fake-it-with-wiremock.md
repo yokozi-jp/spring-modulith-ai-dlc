@@ -40,8 +40,7 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
 [#323](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/323) のコメントは、本番を SES の API、ローカルとテストを Mailpit への SMTP にし、設定で実装を選ぶ形を一度決め、その後この ADR の形へ改めた。
 前の形では、本番のコードが環境で実装を選び、本番の実装がローカルとテストの経路を通らなかったためである。
 
-Proposed の間に、Resilience4j の `mail-sender` の retry を外した。
-[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が、外部の呼び出しを再試行する層をイベント出版の再投入だけにし、Client の即時の再試行をなくしたためである（[#573](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/573)）。
+Proposed の間に、[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が Client の再試行をなくしたため、Resilience4j の `mail-sender` の retry を外した。
 
 ## Decision
 

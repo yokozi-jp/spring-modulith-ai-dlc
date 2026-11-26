@@ -40,10 +40,7 @@ DB 共有と、上流から下流へデータを送るプッシュ型の Web API
   大量データや全件データを毎回取得する連携はファイル連携にする。
 - **メッセージング連携**：「メッセージングの使い方」節に従い、通知に限って使う。
 
-プル型の Web API を呼ぶ client は `infrastructure.client` に置き（[バックエンドの層の責務](../backend/layers.md)）、timeout と circuit breaker は [ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md) に従う。
-client は即時の再試行をしない。
-今の外部の呼び出しはすべて Listener の経路にあり、失敗した呼び出しはイベント出版の再投入が呼び直す。
-同期の要求から外部を呼ぶ経路を足すときは、ADR-019 の条件で即時の再試行を決め直す。
+プル型の Web API を呼ぶ client は `infrastructure.client` に置き（[バックエンドの層の責務](../backend/layers.md)）、timeout、再試行、circuit breaker は[外部システムの Client](../backend/class-roles/external-client.md)に従う。
 
 ## 受信テーブル共有の例外
 

@@ -30,7 +30,7 @@ PostgreSQL の文書は、`statement_timeout` と `lock_timeout` を `postgresql
 `connectionInitSql` は接続を pool に加える前に実行され、失敗すると接続の失敗として扱われる（[HikariCP, Configuration](https://github.com/brettwooldridge/HikariCP#infrequently-used)）。
 
 `docs/nfr/` に DB に固有の時間の目標はない。
-決める材料は、ADR-019 の値（接続取得 5 秒、外部呼び出しの接続 1 秒と全体 2 秒、`retry` 1 回）、[性能テストの目標値](../performance-test/performance-targets.md)の更新系の目標値（コア 500 ミリ秒、標準と管理 800 ミリ秒）、[非機能要件の適用範囲と合意相手](../nfr/scope-and-stakeholders.md)の自システム内の処理を 2 秒以内にする例、`application.yaml` の `timeout-per-shutdown-phase: 30s` である。
+決める材料は、ADR-019 の値（接続取得 5 秒、外部呼び出しの接続 1 秒と全体 2 秒、Client の再試行なし）、[性能テストの目標値](../performance-test/performance-targets.md)の更新系の目標値（コア 500 ミリ秒、標準と管理 800 ミリ秒）、[非機能要件の適用範囲と合意相手](../nfr/scope-and-stakeholders.md)の自システム内の処理を 2 秒以内にする例、`application.yaml` の `timeout-per-shutdown-phase: 30s` である。
 
 ## Decision
 

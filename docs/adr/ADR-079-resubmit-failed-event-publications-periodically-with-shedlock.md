@@ -90,9 +90,7 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、`markStalePub
 Proposed の間に、`@Scheduled` を `EventPublicationResubmitter` から、`enabled` が真のときだけ作る構成へ移した（[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)）。
 期限を過ぎた冪等性キーの掃除のジョブ（[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）も `@EnableScheduling` を足し、`@EnableScheduling` はアプリのすべての `@Scheduled` を動かすので、ジョブのクラスに置いたままでは `enabled` を偽にしても再投入が動くためである。
 
-Proposed の間に、Client の即時の再試行を外し、外部の呼び出しを再試行する層を再投入の 1 つだけにした（[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md)、[#573](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/573)）。
-Client の retry は試行 1 回の `default` で何もしておらず、`idempotent` を継承する経路もなかったためである。
-これに合わせて、Neutral の外部の呼び出しの回数と、選択肢9 の Resilience4j の役割を書き直した。
+Proposed の間に、[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が Client の再試行をなくしたため、Neutral の外部の呼び出しの回数と選択肢9 の Resilience4j の役割を書き直した。
 
 ## Decision
 
@@ -344,10 +342,8 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   `modulith.shedlock` の `lock_until` は `timestamptz` の列であり、書くときと読むときに同じセッションの TimeZone で変換されるため、接続の TimeZone によらず正しく動く（PostgreSQL 17 で実測）。
   列を `timestamp` にすると壊れるため、変えない。
   `ShedLockSessionTimeZoneTest` がこれを守る。
-- 外部の呼び出しを再試行する層は、この再投入の 1 つだけである（ADR-019）。
-  Client は即時の再試行をしないので、1 件の出版あたりの外部の呼び出しは最大 6 回（最初の 1 回と再投入 5 回）である。
+- Client は再試行しないので（ADR-019）、1 件の出版あたりの外部の呼び出しは最大 6 回（最初の 1 回と再投入 5 回）である。
   回数の上限は `spring.modulith.events.resubmission.abandon-after-attempts`（`application.yaml`）にある。
-  同期の要求から外部を呼ぶ経路を足して即時の再試行を決め直すときも、その経路の再試行と再投入を重ねない（ADR-019）。
 
 ## Alternatives Considered
 
