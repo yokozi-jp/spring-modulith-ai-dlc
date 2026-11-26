@@ -130,6 +130,10 @@ final class ClassRoleFixtureRows {
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
             "ordering.application.LegacyOrderFinder.firstOrFail("),
         row(
+            "featureCodeUsesOnlySlf4jFacade",
+            GeneralCodingRulesArchTest.featureCodeUsesOnlySlf4jFacade,
+            "ordering.application.LogbackOrderAuditor"),
+        row(
             "moduleApiDoesNotExposeInternalTypes",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),

@@ -695,6 +695,9 @@ class ArchitectureRuleFixtureTest {
             "noSuchElementExceptionIsNotThrown",
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown),
         entry(
+            "featureCodeUsesOnlySlf4jFacade",
+            GeneralCodingRulesArchTest.featureCodeUsesOnlySlf4jFacade),
+        entry(
             "domainModelDependsOnlyOnAllowedTypes",
             PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
                 basePackage)),
