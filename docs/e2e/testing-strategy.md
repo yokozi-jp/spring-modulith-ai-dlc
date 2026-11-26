@@ -26,11 +26,11 @@ E2E テストは、複数画面にまたがる主要な利用者の流れだけ�
 `frontend/apps/web/e2e/environment.ts` は、ログイン情報をルートの `.env.test` から読み、`storageState` のパスを決める。
 web の origin（`webOrigin`）と IdP の origin（`idpOrigin`）は、slot が渡す `E2E_WEB_PORT` と `OIDC_ISSUER_URI` から決め、無ければ slot 0 の値を使う。
 Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち、setup、ログアウトの spec、未認証の spec が共有する。
-`frontend/apps/web/e2e/pages.ts` は、ログアウトのボタンとトップページの見出しの locator、ログアウト後の画面と認証済みのトップページの確認、未認証で開いたときのログインの入力画面の確認を持つ。
+`frontend/apps/web/e2e/pages.ts` は、ログアウトのボタンと、注文の画面以外で 2 つ以上の spec が待つ見出しの locator、ログアウト後の画面と認証済みのトップページの確認、未認証で開いたときのログインの入力画面の確認を持つ。
 `telemetry.ts` と `pages.ts` は Playwright の中だけで使うため、相対の import に拡張子を付けない。
 `frontend/apps/web/e2e/payment-gateway.ts` は、決済代行の WireMock の管理 API を呼ぶ補助を持つ。
 注文ごとの失敗のスタブ（`failChargesFor`）と、注文 ID を冪等性キーにした請求の回数（`chargeRequestCount`）である。
-`frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/v1/products`）で商品を作る `productFactory` と、axe で画面を検査する `makeAxeBuilder` と `expectNoA11yViolations` を持つ（[アクセシビリティの検査](#アクセシビリティの検査)）。
+`frontend/apps/web/e2e/fixtures.ts` は、商品を登録する API（`POST /api/v1/products`）で商品を作る `productFactory`、画面で注文を作る `createOrder` と、axe で画面を検査する `makeAxeBuilder` と `expectNoA11yViolations` を持つ（[アクセシビリティの検査](#アクセシビリティの検査)）。
 `frontend/apps/web/e2e/api.ts` は、公開 API の応答の本文を読む `readJson` と、注文の決済記録を読む `listPayments` を持つ。
 `environment.ts`、`fixtures.ts`、`api.ts`、`payment-gateway.ts` と、画面のクラス（`order-create-page.ts`、`order-list-page.ts`、`order-detail-page.ts`）は、Playwright の外から Node が直接 import できるよう、相対の import に拡張子 `.ts` を付ける。
 `task fe-check` が、この 7 つを Node で import できることを確かめる。
@@ -67,7 +67,7 @@ Keycloak の画面でログインする手順（`signInOnKeycloak`）も持ち�
 E2E は開発用のシーダー（`LocalDataSeeder`）の代表データを使わない（[ADR-130](../adr/ADR-130-create-e2e-data-per-test-with-product-registration-api.md)）。
 各テストは、自分専用のデータを画面か公開 API で作る。
 
-- 注文は、画面か公開 API で作る。決済代行の拒否、5xx、遅延は `failChargesFor` で作る（[外部システムの偽物](#外部システムの偽物)）。
+- 注文は、画面か公開 API で作る。画面で作り、下書き、確定済み、取消済みを選ぶときは `createOrder` を使う。決済代行の拒否、5xx、遅延は `failChargesFor` で作る（[外部システムの偽物](#外部システムの偽物)）。
 - 商品は、`fixtures.ts` の `productFactory` で作る。
   `productFactory({ onSale: false })` は販売終了の商品を作り、`unitPrice` で単価を決める。
   商品コードと商品名は呼ぶたびに一意になる。
@@ -143,18 +143,12 @@ Cookie を外した要求は、DB のセッションを消した要求と同じ�
 `a11y.spec.ts` は、画面ごとに axe（`@axe-core/playwright`）を流し、違反が 1 件でもあれば失敗にする（[ADR-142](../adr/ADR-142-check-accessibility-with-axe-in-playwright-e2e.md)）。
 
 - 規則は、タグ `wcag2a`、`wcag2aa`、`wcag21a`、`wcag21aa`、`wcag22aa`、`best-practice` で選ぶ。`fixtures.ts` の `makeAxeBuilder` がこのタグの `AxeBuilder` を返す。
-- 画面は、トップ、注文の一覧、注文の作成（空のまま送信した検証エラーの状態を含む）、下書きと確定済みの注文の詳細、メンバー、テナントの選択、404、ログアウト後の画面である。
-  メンバーの画面は、`test-user` が管理者でないため、管理者だけが使えることを示す表示を検査する。所属の一覧の表は検査しない。
-  注文は、[テストデータ](#テストデータ)のとおり各テストが画面で作る。
-  ログアウト後の画面とログアウトした後の 404 は、専用の browser context でログインしてから確かめる。
-- 配色は、ライトとダーク（Playwright の `colorScheme`。画面は `prefers-color-scheme` に従う）の両方で流す。
-  配色や幅の組を足すときは、`a11y.spec.ts` の `variants` に 1 行足す。
+- テストは、`a11y.spec.ts` の画面の表 `screens` と配色の表 `variants`（Playwright の `colorScheme`）の組ごとにできる。
+  画面を足すときは、`screens` に、`app` の fixture を受けて画面を開き見出しを待つ `open` を 1 行足す。配色や幅の組を足すときは、`variants` に 1 行足す。
 - Keycloak のログインの画面は、この repo の画面ではないので含めない。
-- 流れの中でしか届かない状態（競合の選択肢、決済の欄の決済済み、再投入待ち、拒否、対象外）は、その流れの spec が `expectNoA11yViolations` を呼んで確かめる。
-- `expectNoA11yViolations` は、画面の screenshot と、axe の結果の全体（`incomplete` を含む JSON）を HTML report に添付する。
-  違反は、規則の id、対象の selector、`helpUrl` を失敗の文言に出す。
+- 流れの中でしか届かない状態は、その流れの spec が `expectNoA11yViolations` を呼ぶ。[#647](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/647) が既存の spec の中での検査を求めたので、axe の違反はその流れのテストを失敗にする。
+- `expectNoA11yViolations` は、マウスを左上へ動かしてから流し、screenshot と `incomplete` を含む結果の JSON を HTML report に添付する。違反は、規則の id、対象の selector、`helpUrl` を失敗の文言に出す。
 - `incomplete`（axe が自動で決められなかった項目）は失敗にしない。report の JSON を読んで、人が確かめる。
-- 1 つの spec だけが開く画面（メンバー、テナントの選択、404）は、画面のクラスを作らず、`a11y.spec.ts` の中で開いて見出しを待つ。
 
 ## ページオブジェクト
 

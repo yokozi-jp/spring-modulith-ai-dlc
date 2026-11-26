@@ -34,16 +34,20 @@ jsdom は layout と描画の色を計算しないためである。
 比較の相手（`yokozi-jp/agent-software-factory`）は、Storybook の a11y addon で部品の story に axe を流す。
 この repo は Storybook を入れていない（[#284](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/284)）。
 
+Proposed の間に、Decision から規則のタグの一覧と、流れの中でしか届かない状態の扱いを外した。どちらも書き方なので、規約の 1 か所に置く。
+
 ## Decision
 
-`@axe-core/playwright` を `frontend/apps/web` の devDependency に入れ、Playwright の E2E だけで axe を流す。
+`@axe-core/playwright` 4.14.0 を `frontend/apps/web` の devDependency に入れ、Playwright の E2E だけで axe を流す。
+その依存の axe-core は `~4.14.0` の指定で、lockfile は 4.14.1 に解決する。
 jsdom の component test と Storybook には入れない。
 
-- 検査の規則は、タグ `wcag2a`、`wcag2aa`、`wcag21a`、`wcag21aa`、`wcag22aa`、`best-practice` で選ぶ。
+- WCAG 2.2 の AA と best-practice の規則で検査する。
 - 画面ごとに、ライトとダークの配色（`prefers-color-scheme`）で流す。
 - 違反が 1 件でもあればテストを失敗にし、`incomplete` を含む結果の全体を HTML report に添付する。
 - 対象はこの repo の画面に限り、Keycloak のログインの画面を含めない。
-- 流れの中でしか届かない状態（競合の選択肢、決済の欄の状態）は、その流れを確かめる spec の中で同じ補助を呼ぶ。
+
+規則のタグ、対象の画面、補助の使い方は [E2E テストの方針と書き方](../e2e/testing-strategy.md#アクセシビリティの検査)に従う。
 
 これは ADR-027 の Consequences の Neutral にある「axe は利用する要件が生じるまで追加しない」を改める。
 ADR-027 の jest-dom、Playwright、fast-check についての記述は変えない。
