@@ -33,6 +33,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors;
@@ -62,6 +63,9 @@ class ObservabilityContractTest {
 
   /** ログとトレースの、アプリの利用者の ID の項目。 */
   private static final AttributeKey<String> USER_ID = AttributeKey.stringKey("user.id");
+
+  /** 403 のログの、応答の problem type の項目。 */
+  private static final AttributeKey<String> PROBLEM_TYPE = AttributeKey.stringKey("problem.type");
 
   /** 注文の API のパスの前半。 */
   private static final String ORDERS_PATH = "/api/orders/";
@@ -245,7 +249,8 @@ class ObservabilityContractTest {
   }
 
   @Test
-  @DisplayName("認可が拒否した 403 のログは、user.id を持ち、拒否がテナントの束縛の外で記録されるので tenant.id を持たない")
+  @DisplayName(
+      "認可が拒否した 403 のログは、about:blank の problem.type と user.id を持ち、拒否がテナントの束縛の外で記録されるので tenant.id を持たない")
   void authorizationDenialLogCarriesUserWithoutTenant() throws Exception {
     final String path = "/api/current-tenant/members/" + UUID.randomUUID();
 
@@ -253,11 +258,11 @@ class ObservabilityContractTest {
         .perform(MockMvcRequestBuilders.get(path).with(AppUsers.oidcLogin()))
         .andExpect(MockMvcResultMatchers.status().isForbidden());
 
-    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
+    assertDenialLogCarriesTypeAndUserAndLeavesNoMdc(path, "about:blank");
   }
 
   @Test
-  @DisplayName("テナントを選ぶ前の利用者の拒否のログは、user.id を持ち、tenant.id を持たない")
+  @DisplayName("テナントを選ぶ前の利用者の拒否のログは、その problem.type と user.id を持ち、tenant.id を持たない")
   void tenantNotSelectedLogCarriesUserWithoutTenant() throws Exception {
     final String path = ORDERS_PATH + UUID.randomUUID();
     final OidcUser user = AppUsers.oidcUser();
@@ -271,11 +276,11 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/tenant-not-selected"));
 
-    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
+    assertDenialLogCarriesTypeAndUserAndLeavesNoMdc(path, "/problems/tenant-not-selected");
   }
 
   @Test
-  @DisplayName("CSRF の検証の失敗のログは、user.id を持ち、tenant.id を持たない")
+  @DisplayName("CSRF の検証の失敗のログは、その problem.type と user.id を持ち、tenant.id を持たない")
   void csrfFailureLogCarriesUserWithoutTenant() throws Exception {
     final String path = ORDERS_PATH + UUID.randomUUID();
 
@@ -284,7 +289,27 @@ class ObservabilityContractTest {
         .andExpect(MockMvcResultMatchers.status().isForbidden())
         .andExpect(MockMvcResultMatchers.jsonPath("$.type").value("/problems/csrf-token-invalid"));
 
-    assertDenialLogCarriesOnlyUserAndLeavesNoMdc(path);
+    assertDenialLogCarriesTypeAndUserAndLeavesNoMdc(path, "/problems/csrf-token-invalid");
+  }
+
+  @Test
+  @DisplayName("別のオリジンからの更新の拒否のログは、その problem.type と user.id を持ち、tenant.id を持たない")
+  void crossOriginRejectionLogCarriesUserWithoutTenant() throws Exception {
+    final String path = ORDERS_PATH + UUID.randomUUID();
+
+    mockMvc
+        .perform(
+            MockMvcRequestBuilders.post(path)
+                .with(AppUsers.oidcLogin())
+                .with(SecurityMockMvcRequestPostProcessors.csrf())
+                .header(HttpHeaders.ORIGIN, "https://evil.localhost"))
+        .andExpect(MockMvcResultMatchers.status().isForbidden())
+        .andExpect(
+            MockMvcResultMatchers.jsonPath("$.type")
+                .value("/problems/cross-origin-request-rejected"));
+
+    assertDenialLogCarriesTypeAndUserAndLeavesNoMdc(
+        path, "/problems/cross-origin-request-rejected");
   }
 
   @Test
@@ -301,8 +326,11 @@ class ObservabilityContractTest {
     assertNull(attributes.get(TENANT_ID), attributes::toString);
   }
 
-  private void assertDenialLogCarriesOnlyUserAndLeavesNoMdc(final String path) {
+  /** 拒否のログが、応答と同じ type と user.id を持ち、tenant.id を持たず、MDC を残さないことを確かめる。 */
+  private void assertDenialLogCarriesTypeAndUserAndLeavesNoMdc(
+      final String path, final String problemType) {
     final Attributes attributes = clientErrorAttributes(path);
+    assertEquals(problemType, attributes.get(PROBLEM_TYPE), attributes::toString);
     assertEquals(AppUsers.USER_ID, attributes.get(USER_ID), attributes::toString);
     assertNull(attributes.get(TENANT_ID), attributes::toString);
     assertNull(MDC.get(USER_ID.getKey()), "要求の後の MDC の user.id");

@@ -21,6 +21,8 @@ enum CommonProblem {
   IDEMPOTENCY_KEY_PAYLOAD_MISMATCH(HttpStatus.BAD_REQUEST),
   /** CSRF トークンの検証失敗。 */
   CSRF_TOKEN_INVALID(HttpStatus.FORBIDDEN),
+  /** 別のオリジンから来た更新系の要求を、CSRF トークンを確かめる前に拒否した（ADR-136）。 */
+  CROSS_ORIGIN_REQUEST_REJECTED(HttpStatus.FORBIDDEN),
   /** テナントを選ぶ前に業務の API を呼んだ。 */
   TENANT_NOT_SELECTED(HttpStatus.FORBIDDEN),
   /** 版の不一致。別の要求が先に行を更新した。 */

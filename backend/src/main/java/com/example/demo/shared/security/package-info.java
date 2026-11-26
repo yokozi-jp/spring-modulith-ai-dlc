@@ -1,10 +1,12 @@
 /**
  * 認証の語彙を置く。共通カラムの {@code *_by} に登録するアプリの利用者を表す {@link
  * com.example.demo.shared.security.AppUserPrincipal}（ADR-096）と、テナントを選ぶ前の拒否を表す {@link
- * com.example.demo.shared.security.TenantNotSelectedException} である。
+ * com.example.demo.shared.security.TenantNotSelectedException} と、別のオリジンからの更新の拒否を表す {@link
+ * com.example.demo.shared.security.CrossOriginRequestRejectedException} である。
  *
  * <p>Domain、Application、Presentation、Infrastructure のどの層からも使ってよい。業務の概念を置かない。{@code
- * TenantNotSelectedException} はテナントの ID も役割も持たず、ログインの状態だけを表す。
+ * TenantNotSelectedException} はテナントの ID も役割も持たず、ログインの状態だけを表す。{@code
+ * CrossOriginRequestRejectedException} は要求の送り元だけを表す。
  */
 @NamedInterface("security")
 @NullMarked
