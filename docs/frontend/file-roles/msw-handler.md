@@ -22,8 +22,6 @@ API を使う component test は、HTTP の境界を MSW で置き換え、Orval
 - `apps/web/src/testing/orders.ts`：注文の画面のテストが共有する固定の値、応答、handler を足す関数
 - `apps/web/src/testing/tenancy.ts`：テナントの画面のテストが共有する固定の値と、テナントを選ぶ前の 403 の応答
 
-今の `orders.ts` は、注文の画面のテストが共有する操作と要素の取得（`saveQuantity`、`notice`、`firstLineRow`、`errorMessageOf`）と、CSRF の Cookie の差し替え（`stubCsrfCookie`）も持つ。
-
 server の起動、handler の初期化、停止は `setup.ts` が行う（[テストの道具](testing-helper.md)）。
 `setup.ts` の `afterEach` が `server.resetHandlers()` を呼ぶので、テストが `server.use()` で足した handler はそのテストの中だけで効く。
 
@@ -64,7 +62,6 @@ Orval が生成する MSW handler（`packages/api/src/generated/mocks/<tag>/<tag
 ## 依存してよいもの、してはいけないもの
 
 - **依存してよいもの**：`msw` の `http` と `HttpResponse`、`msw/node` の `setupServer`（`msw.ts` だけ）、`@frontend/api/mocks/**`、`@frontend/api/models` の型、同じ `src/testing/` のファイル。
-  今の `orders.ts` は、画面の操作のために Testing Library、user-event の型、`vi` も使う。
 - **依存してはいけないもの**：Base UI、テレメトリ SDK、global の `fetch`、`vi.mock` と `vi.doMock` による module の差し替え。
 
 production source は `msw`、`@frontend/api/mocks/**`、`@/testing/**` を import できない（[ファイルの範囲ごとの制限](../lint-config.md#ファイルの範囲ごとの制限)）。

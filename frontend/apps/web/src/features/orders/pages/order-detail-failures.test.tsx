@@ -6,22 +6,20 @@ import { screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
+import { stubCsrfCookie } from "@/testing/csrf-cookie";
 import { recordKeysAndRespond } from "@/testing/idempotency-keys";
 import { server } from "@/testing/msw";
+import { getFirstLineRow, getNotice, saveQuantity } from "@/testing/order-detail-screen";
 import {
   draftOrder,
-  firstLineRow,
   noContent,
-  notice,
   orderId,
   penId,
   problemResponse,
   products,
-  saveQuantity,
   serveDetail,
   serveDetailFailingRefetch,
   serveUpdate,
-  stubCsrfCookie,
 } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";
 
@@ -51,7 +49,7 @@ async function submitConflictingChange() {
   const bodies = conflictOnce(serveDetail(draftOrder()));
   const { user } = await renderRoute(detailPath);
   await saveQuantity(user, "3");
-  await expect(within(notice()).findByText(conflictTitle)).resolves.toBeTruthy();
+  await expect(within(getNotice()).findByText(conflictTitle)).resolves.toBeTruthy();
   return { user, bodies };
 }
 
@@ -74,10 +72,10 @@ describe("注文の詳細の画面の失敗", () => {
   it("明細の変更の 409 は入力を残して最新を表示し、通知を出し、選択肢を live region の外に出す", async () => {
     await submitConflictingChange();
 
-    expect(notice().textContent).toContain("ほかの操作で注文が更新されました。");
-    expect(within(notice()).queryByRole("button")).toBeNull();
+    expect(getNotice().textContent).toContain("ほかの操作で注文が更新されました。");
+    expect(within(getNotice()).queryByRole("button")).toBeNull();
     expect(screen.getByRole("button", { name: "変更を捨てて最新を表示する" })).toBeTruthy();
-    expect(firstLineRow()?.textContent).toContain("5");
+    expect(getFirstLineRow()?.textContent).toContain("5");
     expect(screen.getByLabelText("数量")).toHaveProperty("value", "3");
   });
 
@@ -87,7 +85,7 @@ describe("注文の詳細の画面の失敗", () => {
     await user.click(screen.getByRole("button", { name: "変更を捨てて最新を表示する" }));
 
     expect(screen.getByLabelText("数量")).toHaveProperty("value", "5");
-    expect(notice().textContent).toBe("");
+    expect(getNotice().textContent).toBe("");
     expect(screen.queryByRole("button", { name: "最新の版に変更を適用し直す" })).toBeNull();
   });
 
@@ -99,7 +97,7 @@ describe("注文の詳細の画面の失敗", () => {
     expect(screen.getByRole("button", { name: "最新の版に変更を適用し直す" })).toHaveFocus();
     await user.keyboard("{Enter}");
 
-    await expect(within(notice()).findByText("明細を変更しました。")).resolves.toBeTruthy();
+    await expect(within(getNotice()).findByText("明細を変更しました。")).resolves.toBeTruthy();
     expect(bodies).toStrictEqual([
       { lines: [{ productId: penId, quantity: 3 }], lockNo: 1 },
       { lines: [{ productId: penId, quantity: 3 }], lockNo: 2 },
@@ -113,8 +111,8 @@ describe("注文の詳細の画面の失敗", () => {
 
     await saveQuantity(user, "3");
 
-    await expect(within(notice()).findByText(conflictTitle)).resolves.toBeTruthy();
-    expect(notice().textContent).toContain("最新の内容を読み込めませんでした。");
+    await expect(within(getNotice()).findByText(conflictTitle)).resolves.toBeTruthy();
+    expect(getNotice().textContent).toContain("最新の内容を読み込めませんでした。");
     expect(screen.queryByRole("button", { name: "最新の版に変更を適用し直す" })).toBeNull();
     expect(screen.getByLabelText("数量")).toHaveProperty("value", "3");
   });
@@ -130,7 +128,7 @@ describe("注文の詳細の画面の失敗", () => {
     await saveQuantity(user, "3");
 
     await expect(
-      within(notice()).findByText("注文が確定または取り消されたため、変更できません。"),
+      within(getNotice()).findByText("注文が確定または取り消されたため、変更できません。"),
     ).resolves.toBeTruthy();
     expect(screen.queryByLabelText("数量")).toBeNull();
   });
@@ -145,8 +143,8 @@ describe("注文の詳細の画面の失敗", () => {
 
     await user.click(await screen.findByRole("button", { name: "確定する" }));
 
-    await expect(within(notice()).findByText(conflictTitle)).resolves.toBeTruthy();
-    expect(notice().textContent).toContain("最新の内容を表示しています。");
+    await expect(within(getNotice()).findByText(conflictTitle)).resolves.toBeTruthy();
+    expect(getNotice().textContent).toContain("最新の内容を表示しています。");
     expect(screen.getByText("取消済み")).toBeTruthy();
   });
 
@@ -161,8 +159,8 @@ describe("注文の詳細の画面の失敗", () => {
 
     await saveQuantity(user, "3");
 
-    await expect(within(notice()).findByText("販売を終了した商品です")).resolves.toBeTruthy();
-    expect(notice().textContent).toContain("販売中の商品かを確かめてください。");
+    await expect(within(getNotice()).findByText("販売を終了した商品です")).resolves.toBeTruthy();
+    expect(getNotice().textContent).toContain("販売中の商品かを確かめてください。");
     expect(screen.getByLabelText("数量")).toHaveProperty("value", "3");
   });
 
@@ -173,8 +171,10 @@ describe("注文の詳細の画面の失敗", () => {
 
     await user.click(await screen.findByRole("button", { name: "確定する" }));
 
-    await expect(within(notice()).findByText("操作を完了できませんでした")).resolves.toBeTruthy();
-    expect(notice().textContent).toContain("最新の内容を表示しています。");
+    await expect(
+      within(getNotice()).findByText("操作を完了できませんでした"),
+    ).resolves.toBeTruthy();
+    expect(getNotice().textContent).toContain("最新の内容を表示しています。");
   });
 
   it.each([
@@ -200,7 +200,7 @@ describe("注文の詳細の画面の失敗", () => {
     await user.click(await screen.findByRole("button", { name }));
 
     await waitFor(() => {
-      expect(notice().textContent).toContain(text);
+      expect(getNotice().textContent).toContain(text);
     });
   });
 });
@@ -223,7 +223,7 @@ describe("注文の詳細の画面の Idempotency-Key の再試行", () => {
 
     await user.click(await screen.findByRole("button", { name: "確定する" }));
 
-    await expect(within(notice()).findByText("注文を確定しました。")).resolves.toBeTruthy();
+    await expect(within(getNotice()).findByText("注文を確定しました。")).resolves.toBeTruthy();
     expect(keys).toHaveLength(2);
     expect(keys[1]).toBe(keys[0]);
   });
@@ -239,11 +239,11 @@ describe("注文の詳細の画面の Idempotency-Key の再試行", () => {
     );
     const { user } = await renderRoute(detailPath);
     await user.click(await screen.findByRole("button", { name: "確定する" }));
-    await expect(within(notice()).findByText("下書きではない注文です")).resolves.toBeTruthy();
+    await expect(within(getNotice()).findByText("下書きではない注文です")).resolves.toBeTruthy();
 
     await user.click(screen.getByRole("button", { name: "確定する" }));
 
-    await expect(within(notice()).findByText("注文を確定しました。")).resolves.toBeTruthy();
+    await expect(within(getNotice()).findByText("注文を確定しました。")).resolves.toBeTruthy();
     expect(keys).toHaveLength(2);
     expect(keys[1]).not.toBe(keys[0]);
   });
@@ -257,8 +257,8 @@ describe("注文の詳細の画面の Idempotency-Key の再試行", () => {
 
     await saveQuantity(user, "3");
 
-    await expect(within(notice()).findByText(inProgressTitle)).resolves.toBeTruthy();
-    expect(notice().textContent).toContain("前の操作をまだ処理しています。");
+    await expect(within(getNotice()).findByText(inProgressTitle)).resolves.toBeTruthy();
+    expect(getNotice().textContent).toContain("前の操作をまだ処理しています。");
     expect(screen.queryByRole("button", { name: "変更を捨てて最新を表示する" })).toBeNull();
     expect(screen.getByLabelText("数量")).toHaveProperty("value", "3");
     expect(keys).toStrictEqual([keys[0], keys[0], keys[0], keys[0]]);
@@ -285,7 +285,7 @@ describe("注文の詳細の画面の決済の失敗", () => {
     });
     expect(within(region).getByRole("button", { name: "決済の状態を読み直す" })).toBeTruthy();
     expect(screen.getByRole("heading", { level: 1, name: "注文 C-001" })).toBeTruthy();
-    expect(firstLineRow()?.textContent).toContain("ボールペン");
+    expect(getFirstLineRow()?.textContent).toContain("ボールペン");
     expect(screen.getByRole("button", { name: "確定する" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "取り消す" })).toBeTruthy();
   });

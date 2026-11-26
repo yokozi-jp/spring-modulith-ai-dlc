@@ -5,10 +5,7 @@ import type {
   OrderSummaryResponse,
   ProductSummaryListResponse,
 } from "@frontend/api/models";
-import { screen, within } from "@testing-library/react";
-import type { UserEvent } from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
-import { vi } from "vite-plus/test";
 
 import { server } from "./msw";
 
@@ -17,7 +14,6 @@ export const penId = "11111111-1111-4111-8111-111111111111";
 export const notebookId = "22222222-2222-4222-8222-222222222222";
 export const eraserId = "33333333-3333-4333-8333-333333333333";
 export const orderId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-export const csrfCookieValue = "4f0e1c2a-5b6d-4e7f-8a9b-0c1d2e3f4a5b";
 
 export const products: ProductSummaryListResponse = {
   items: [
@@ -82,18 +78,6 @@ export function problemResponse(
   );
 }
 
-export function stubCsrfCookie(): void {
-  vi.spyOn(document, "cookie", "get").mockReturnValue(`__Host-XSRF-TOKEN=${csrfCookieValue}`);
-}
-
-/** aria-errormessage が指す要素の文言。誤りがなければ undefined。 */
-export function errorMessageOf(element: HTMLElement): string | undefined {
-  const id = element.getAttribute("aria-errormessage");
-  return id === null
-    ? undefined
-    : (document.querySelector(`[id="${id}"]`)?.textContent ?? undefined);
-}
-
 /** 詳細の GET が返す注文を、テストの途中で差し替えられるようにする。決済の参照は既定で 0 件を返す。 */
 export function serveDetail(initial: OrderDetailsResponse) {
   const state = { order: initial };
@@ -120,23 +104,6 @@ export function noContent() {
   return new HttpResponse(undefined, { status: 204 });
 }
 
-async function changeQuantity(user: UserEvent, value: string) {
-  const quantity = await screen.findByLabelText("数量");
-  await user.clear(quantity);
-  await user.type(quantity, value);
-}
-
-/** 決済の欄の外の status（ProblemNotice の output）。 */
-export function notice() {
-  const payment = screen.queryByRole("region", { name: "決済" });
-  const inPayment = payment === null ? [] : within(payment).queryAllByRole("status");
-  const element = screen.getAllByRole("status").find((el) => !inPayment.includes(el));
-  if (element === undefined) {
-    throw new Error("ProblemNotice の status がない");
-  }
-  return element;
-}
-
 /** 最初の詳細の GET だけ成功させ、mutation の後の再取得を 500 にする。決済の参照は既定で 0 件を返す。 */
 export function serveDetailFailingRefetch(order: OrderDetailsResponse): void {
   let requests = 0;
@@ -149,16 +116,4 @@ export function serveDetailFailingRefetch(order: OrderDetailsResponse): void {
     }),
     getListPaymentsMockHandler({ items: [] }),
   );
-}
-
-/** 数量を value にして明細の変更を送る。 */
-export async function saveQuantity(user: UserEvent, value: string): Promise<void> {
-  await changeQuantity(user, value);
-  await user.click(screen.getByRole("button", { name: "明細を保存する" }));
-}
-
-/** 詳細の明細の表の最初の行（見出しの行の次）。 */
-export function firstLineRow(): HTMLElement | undefined {
-  const [table] = screen.getAllByRole("table");
-  return table === undefined ? undefined : within(table).getAllByRole("row")[1];
 }

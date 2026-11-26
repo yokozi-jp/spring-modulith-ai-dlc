@@ -1,14 +1,14 @@
 ---
 type: Convention
 title: ファイルの役割：テストの道具
-description: src/testing に置く、MSW の handler と fixture を除くテストの道具（Vitest の setupFiles、route の描画、テスト用の QueryClient、処理を止める gate、Node のテストの翻訳）の定義、置き場所と命名、必須の記述、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。複数のテストが使う準備のコードを足すとき、setupFiles の後片付けを変えるとき、route を描画するテストを書くときに読む。
+description: src/testing に置く、MSW の handler と fixture を除くテストの道具（Vitest の setupFiles、route の描画、テスト用の QueryClient、処理を止める gate、CSRF の Cookie の差し替え、注文の詳細の画面の操作、Idempotency-Key の記録、Node のテストの翻訳）の定義、置き場所と命名、必須の記述、依存、例、テスト、アンチパターン、作成時のチェックリストを定める。複数のテストが使う準備のコードを足すとき、setupFiles の後片付けを変えるとき、route を描画するテストを書くときに読む。
 tags: [convention, frontend, file-role]
 ---
 
 # ファイルの役割：テストの道具
 
 テストの道具は、複数のテストが同じ準備を同じ形で使うための関数と Vitest の setupFiles であり、`src/testing/` に置く。
-道具は本番の関数を呼び、テストに要る差分だけを変える。
+道具は、本番の関数を呼び、テストに要る差分だけを変える。画面を操作して要素を取る道具は、本番の関数を呼ばずに、描画された画面だけを使う。
 テストの書き方の正文は[フロントエンドのテストと検証](../testing.md)にあり、テスト基盤の判断理由は [ADR-027](../../adr/ADR-027-adopt-frontend-testing-stack.md) に示す。
 
 ## 定義
@@ -23,6 +23,9 @@ tags: [convention, frontend, file-role]
 - `apps/web/src/testing/render-route.tsx`：`renderRoute(path, { locale })`。`main.tsx` と同じ provider と router の既定値で、最初の loader を終えてから描画する
 - `apps/web/src/testing/query-client.ts`：`createTestQueryClient()`。本番の `createQueryClient()` から query の再試行だけを外す
 - `apps/web/src/testing/gate.ts`：`createGate()`。`release` を呼ぶまで解決しない promise を作る
+- `apps/web/src/testing/csrf-cookie.ts`：`stubCsrfCookie()`、`csrfCookieValue`。`document.cookie` が CSRF の Cookie を返すようにし、その値も export する
+- `apps/web/src/testing/order-detail-screen.ts`：注文の詳細の画面を操作し、要素を取る（`saveQuantity`、`getNotice`、`getFirstLineRow`）
+- `apps/web/src/testing/idempotency-keys.ts`：`recordKeysAndRespond(...responses)`。要求の Idempotency-Key を記録し、応答を順に返す MSW の resolver を作る
 - `apps/web/src/testing/catalog-i18n.ts`：Node のテストが使う `t`。`ja.json` だけを読んだ instance から取る
 
 MSW の server（`src/testing/msw.ts`）と、業務機能ごとの fixture と handler（`src/testing/<feature>.ts`）は [MSW の handler と fixture](msw-handler.md) が扱う。

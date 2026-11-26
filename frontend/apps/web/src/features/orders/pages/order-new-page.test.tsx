@@ -12,18 +12,16 @@ import type { UserEvent } from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
+import { csrfCookieValue, stubCsrfCookie } from "@/testing/csrf-cookie";
 import { createGate } from "@/testing/gate";
 import { server } from "@/testing/msw";
 import {
-  csrfCookieValue,
   draftOrder,
-  errorMessageOf,
   notebookId,
   orderId,
   penId,
   problemResponse,
   products,
-  stubCsrfCookie,
 } from "@/testing/orders";
 import { renderRoute } from "@/testing/render-route";
 
@@ -74,6 +72,14 @@ async function submitFilledForm() {
 
 function notice() {
   return screen.getByRole("status");
+}
+
+/** aria-errormessage が指す要素の文言。誤りがなければ undefined。 */
+function errorMessageOf(element: HTMLElement): string | undefined {
+  const id = element.getAttribute("aria-errormessage");
+  return id === null
+    ? undefined
+    : (document.querySelector(`[id="${id}"]`)?.textContent ?? undefined);
 }
 
 // oxlint-disable-next-line max-statements -- 注文の作成の画面のテストを 1 つの describe に置き、準備を共有する。
