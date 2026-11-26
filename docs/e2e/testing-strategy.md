@@ -208,7 +208,7 @@ slot 0 の port は次のとおりである。
 - slot 0 の 5173 と 8080 は、開発用の Vite と Keycloak と同じ port である。
   slot を取るときに、port が `127.0.0.1` で応答する slot は飛ばす。
   slot を取った後も、`task e2e-up` が web と backend の port を確かめ、使用中なら止めるよう示して失敗する。
-- 前提の道具は、[開発環境構築](../local-env-setup/setup.md)の手順 7（`mise install --locked` と `task setup`）で入れたものと同じである。
+- 前提の道具は、[開発環境構築](../local-env-setup/setup.md)のブロック2（`mise install --locked` と `task setup`）で入れたものと同じである。
   Chromium は `task e2e` が導入する。
   OS の依存ライブラリは、初回に `frontend/apps/web` で、`sudo` を付けた `vp exec playwright install-deps chromium` を実行して入れる。
 

@@ -158,7 +158,7 @@ tasks:
       - |
         # migration とシーダーはホストの Gradle で動く。JAVA_HOME があればそれを、なければ PATH の java を使う。
         if ! command -v "${JAVA_HOME:+$JAVA_HOME/bin/}java" >/dev/null 2>&1; then
-          echo "Java が見つかりません（JAVA_HOME か PATH）。docs/local-env-setup/setup.md の手順で Corretto 25 を入れてください。" >&2
+          echo "Java が見つかりません（JAVA_HOME か PATH）。mise install --locked を実行してください（docs/local-env-setup/setup.md）。" >&2
           exit 1
         fi
         # compose の backend と Playwright が .env.test を固定で読むため、TEST_ENV_FILE の上書きには対応しない。

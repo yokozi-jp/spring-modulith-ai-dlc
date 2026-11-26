@@ -11,7 +11,7 @@ java = "corretto-25.0.5.0.10"
 task = "3.54.0"
 # zizmor.yml の zizmor-action の version も同じ版にする（ADR-090）。
 zizmor = "1.32.0"
-# Kiro CLI の Java の LSP（.kiro/settings/lsp.json）。registry と aqua に無いので Eclipse の配布物を取り、版は手で上げる。
+# Kiro CLI の Java の LSP（.kiro/settings/lsp.json）。registry と aqua に無いので Eclipse の配布物を取り、版は手で上げる。jdtls と下の Lombok は Renovate が追わない（#389）。
 "http:jdtls" = { version = "1.63.0", url = "https://download.eclipse.org/jdtls/milestones/1.63.0/jdt-language-server-1.63.0-202610191322.tar.gz", bin_path = "bin" }
 # jdtls に @Slf4j を解釈させる javaagent。Spring Boot が管理する版に揃える（backend/ の
 # `./gradlew -q dependencyInsight --dependency org.projectlombok:lombok --configuration compileClasspath` で確かめる）。

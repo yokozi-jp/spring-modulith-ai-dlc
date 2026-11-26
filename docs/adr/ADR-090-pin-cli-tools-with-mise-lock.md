@@ -104,10 +104,10 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 
 - `mise.toml` が trust を要するので、clone と新しい worktree のたびに `mise trust` を実行する。忘れると shims が `Config files in … are not trusted` で止まり、`task` を呼ぶ Git フックも止まる。mise のエラーが直し方を示す。CI の `jdx/mise-action` は trust を自動で済ませる。
 - CI は `tools` で名指しした道具だけを入れるので、Kiro CLI（3.5.0 の zip は 139,487,134 byte）を入れない。Kiro CLI を動かす job を足すときは、`tools` に `http:kiro-cli` を書く。
-- 公式のインストーラーが `~/.local/bin` に入れた `kiro-cli` が残ると、`~/.profile` に shims の行が無い環境のログインシェルでは、shims より先に使われる。`setup.md` の手順で消す。
+- 公式のインストーラーが `~/.local/bin` に入れた `kiro-cli` が残ると、`~/.profile` に shims の行が無い環境のログインシェルでは、shims より先に使われる。`~/.local/bin/kiro-cli` を手で消す。
 - Kiro CLI は起動時に自己更新を確かめる（設定 `app.disableAutoupdates` が `kiro-cli settings list` に出る）。自己更新が mise の install 先の `kiro-cli` を書き換えるかは確かめていない。書き換えると、`mise install --locked` は checksum を見直さず、固定が崩れる。`setup.md` に自己更新を止める設定を書いたが、これで止まるかは未確認である。
 - 開発者は mise を入れ、shims を PATH に通す必要がある。shims が PATH にないと `task` が見つからない。
-- `~/.bashrc` に apt の Corretto の `JAVA_HOME` が残る環境では、Gradle が mise の Java でなく apt の Java を使う。これを見つける検査はなく、`docs/local-env-setup/setup.md` の手順で消す。
+- `~/.bashrc` に apt の Corretto の `JAVA_HOME` が残る環境では、Gradle が mise の Java でなく apt の Java を使う。これを見つける検査はなく、`~/.bashrc` のその行を手で消す。
 - shims は `mise.toml` のあるチェックアウトの中でだけ道具を選べる。
   `task` も `java` も、リポジトリの外では動かない。
   この変更より前に切ったブランチや worktree では、古い `task` や apt の Java を消すと、Git フックや Gradle が動かなくなる。
