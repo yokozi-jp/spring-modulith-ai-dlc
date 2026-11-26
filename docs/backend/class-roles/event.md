@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: クラスの役割：イベント
-description: 他モジュールへ状態の変化を通知するモジュールルートの record（イベント）の定義、置き場所と命名、必須の記述、依存、発行と受信の例、テスト、アンチパターン、作成時のチェックリストを定める。イベントを作るとき、イベントの発行と受信の場所を確かめるときに読む。
+description: 他モジュールへ状態の変化を通知するモジュールルートの record（イベント）の定義、置き場所と命名、必須の記述、依存、発行と受信の例、テスト、アンチパターン、作成時のチェックリストと、保存した出版を読めなくしない変更の規則を定める。イベントを作るとき、イベントの component や名前を変えるとき、イベントの発行と受信の場所を確かめるときに読む。
 tags: [convention, backend, class-role]
 ---
 
@@ -49,6 +49,13 @@ tags: [convention, backend, class-role]
 - 受信は `<Event>Listener` の `@ApplicationModuleListener` を付けた `on` メソッドで行う。
 - record に Javadoc を書く。
 - ルートのパッケージの `package-info.java` は[参照のインタフェース](feature-queries.md)と共有する。
+- イベントを変えるときは、`@Nullable` の component を足すことだけをする。
+  足す component をプリミティブにしない。
+  受信側は、足した component が `null` の出版も処理する（足す前に保存した出版は `null` で読める）。
+- component の削除、名前の変更、型の変更と、record の名前とパッケージの変更はしない。
+  そうしたいときは、新しい型のイベントを足す。
+  古い型の出版が DB に残る間は、古い型と、それを受けるリスナーと fixture を残す。
+  変更の規則の理由は [ADR-137](../../adr/ADR-137-guard-event-json-compatibility-with-versioned-fixtures.md) に示す。
 
 ## 依存してよい型、してはいけない型
 
@@ -114,7 +121,16 @@ public void on(final OrderPlaced event) {
 
 ## 対応するテスト
 
-専用のテストは作らない。
+`@ApplicationModuleListener` で受けるイベントは、過去の各版の JSON を fixture に置き、`EventContractTest` が今の型で読めることを確かめる。
+fixture は `backend/src/test/resources/events/<型の完全な名前>.v<n>.json` に置く。
+`n` は 1 から始め、先頭に 0 を付けない。
+fixture の中身は、その版の値を `application.yaml` の `spring.jackson` の設定で JSON にしたもので、Spring Modulith が出版に保存する形と同じである。
+イベントを足すか変えるときは、同じ変更で次の版の fixture を足し、今の型のすべての component に値を入れる。
+過去の fixture は書き換えも削除もしない。
+
+`EventContractTest` が失敗したときは、失敗のメッセージが fixture の名前と直し方を示す。
+検査が違反を見つけることは、`EventContractViolationTest` がわざと違反する型と fixture で確かめる。
+fixture のテストのほかに、イベントの専用のテストは作らない。
 ArchUnit が形を検査し、この record を使う側のテストが中身を確かめる。
 
 イベントの発行は、発行する CommandHandler の `@ApplicationModuleTest` で `AssertablePublishedEvents` を使って確かめる。
@@ -146,5 +162,12 @@ ArchUnit が形を検査し、この record を使う側のテストが中身を
 - [ ] `infrastructure` の下には `persistence` と `client` 以外のパッケージを作らない。［ArchUnit で検査：PackageByFeatureOnionArchitectureTest.dependenciesPointInward］
 - [ ] 受信側は `application` の `<Event>Listener` の `on` に `@ApplicationModuleListener` を付けて受ける。［ArchUnit で検査：ClassRoleArchTest.moduleListenersAreApplicationListeners］
 - [ ] 受信側の `on` は、自モジュールの CommandHandler をちょうど一つ呼ぶ。［ArchUnit で検査：ClassRoleArchTest.listenersExposeOnlyOnAndCallOneCommandHandler］
+- [ ] イベントを変えるときは `@Nullable` の component を足すことだけをし、プリミティブを足さない。［テストで検査：EventContractTest］
+- [ ] component の削除、名前の変更、型の変更をしない。［テストで検査：EventContractTest］
+- [ ] record の名前とパッケージを変えない。変えたいときは新しい型のイベントを足す。［テストで検査：EventContractTest］
+- [ ] `@ApplicationModuleListener` で受けるイベントに、`v1` から版の欠けない fixture を `<型の完全な名前>.v<n>.json` の名前で置く。［テストで検査：EventContractTest］
+- [ ] イベントを足すか変える変更で、今の型のすべての component に値を入れた次の版の fixture を足す。［テストで検査：EventContractTest］
+- [ ] 過去の fixture を書き換えも削除もしない。［自分で点検］
+- [ ] 受信側は、足した component が `null` の出版も処理する。［自分で点検］
 - [ ] record に Javadoc を書く。［自分で点検］
 - [ ] ルートのパッケージに `@NullMarked` の `package-info.java` がある。［Error Prone で検査：RequireExplicitNullMarking］
