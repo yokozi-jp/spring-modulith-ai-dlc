@@ -79,7 +79,7 @@ const screens: { name: string; open: (app: App) => Promise<void> }[] = [
     },
   },
   {
-    // test-user はどちらのテナントでも管理者でないので、管理者だけが使えることを示す画面になる。
+    // test-user はどちらのテナントでも管理者でないので、権限がないことを示す画面になる。
     name: "メンバー",
     open: async ({ page }) => {
       await page.goto("/members");

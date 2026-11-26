@@ -20,7 +20,7 @@ export function tenantsHeading(page: Page): Locator {
 }
 
 export function membersForbiddenHeading(page: Page): Locator {
-  return page.getByRole("heading", { level: 1, name: "管理者だけが使える画面です" });
+  return page.getByRole("heading", { level: 1, name: "権限がありません" });
 }
 
 export function loginFailedHeading(page: Page): Locator {
