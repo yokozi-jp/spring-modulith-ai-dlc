@@ -8,15 +8,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.example.demo.testkit.CapturedLogRecords;
 import com.example.demo.testkit.SharedTestConfiguration;
+import io.opentelemetry.api.OpenTelemetry;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.logs.Severity;
+import io.opentelemetry.instrumentation.logback.appender.v1_0.OpenTelemetryAppender;
 import io.opentelemetry.sdk.logs.data.LogRecordData;
 import jakarta.servlet.http.Cookie;
 import java.util.Base64;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +63,15 @@ class LoginFailureContractTest {
 
   /** OTLP へ送る直前の LogRecord。 */
   @Autowired private CapturedLogRecords capturedLogRecords;
+
+  /** このコンテキストの OpenTelemetry。 */
+  @Autowired private OpenTelemetry openTelemetry;
+
+  @BeforeEach
+  void installAppender() {
+    // 別のコンテキストが appender の送り先を差し替えていても、このコンテキストの記録を読む。
+    OpenTelemetryAppender.install(openTelemetry);
+  }
 
   @Test
   @DisplayName("IdP のエラーのコールバックは /login-failed へ移り、error code だけを INFO に残し、error_description を残さない")
