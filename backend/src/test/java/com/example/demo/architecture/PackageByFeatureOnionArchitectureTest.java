@@ -174,23 +174,7 @@ class PackageByFeatureOnionArchitectureTest {
   /** DB 技術 API を各機能の Persistence Adapter に閉じ込める。 */
   @ArchTest
   /* package */ static final ArchRule databaseTechnologyApisAreOnlyUsedByPersistenceAdapters =
-      noClasses()
-          .that()
-          .resideOutsideOfPackages(persistenceAdapterPackages(BASE_PACKAGE))
-          .should()
-          .dependOnClassesThat()
-          .resideInAnyPackage(
-              "org.jooq..",
-              "com.example.demo.jooq..",
-              "java.sql..",
-              "javax.sql..",
-              "org.springframework.jdbc..")
-          .because(
-              "Domain と Application を DB の技術詳細から独立させるため。"
-                  + "直し方：jOOQ、JDBC、生成型を使う処理は Jooq<Aggregate>Repository へ移し、"
-                  + "Persistence Adapter の中で Domain の型へ変換する。"
-                  + "規約：docs/backend/class-roles/jooq-repository.md、"
-                  + ADR_002);
+      databaseTechnologyApisAreOnlyUsedByPersistenceAdaptersRule(BASE_PACKAGE);
 
   /** Domain Model の依存先を許可した型だけに限る。 */
   @ArchTest
@@ -392,6 +376,28 @@ class PackageByFeatureOnionArchitectureTest {
               TRANSACTION_BOUNDARY
                   + "直し方：@Transactional と @ApplicationModuleListener は Application の public メソッドへ移す。"
                   + TRANSACTION_DOCS);
+
+  /** 基底パッケージの Persistence Adapter の外から、DB 技術の API と jOOQ の生成型への依存を禁止する規則を組み立てる。 */
+  /* package */ static ArchRule databaseTechnologyApisAreOnlyUsedByPersistenceAdaptersRule(
+      final String basePackage) {
+    return noClasses()
+        .that()
+        .resideOutsideOfPackages(persistenceAdapterPackages(basePackage))
+        .should()
+        .dependOnClassesThat()
+        .resideInAnyPackage(
+            "org.jooq..",
+            "com.example.demo.jooq..",
+            "java.sql..",
+            "javax.sql..",
+            "org.springframework.jdbc..")
+        .because(
+            "Domain と Application を DB の技術詳細から独立させるため。"
+                + "直し方：jOOQ、JDBC、生成型を使う処理は Jooq<Aggregate>Repository へ移し、"
+                + "Persistence Adapter の中で Domain の型へ変換する。"
+                + "規約：docs/backend/class-roles/jooq-repository.md、"
+                + ADR_002);
+  }
 
   /** 基底パッケージ配下の各機能モジュールに、外側から内側へ向かう依存を強制する規則を組み立てる。 */
   /* package */ static ArchRule dependenciesPointInwardRule(final String basePackage) {

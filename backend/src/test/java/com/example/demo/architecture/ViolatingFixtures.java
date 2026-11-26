@@ -26,9 +26,30 @@ final class ViolatingFixtures {
 
   private ViolatingFixtures() {}
 
-  /** 規則の名前、規則、違反フィクスチャのクラス名（基底パッケージより下）から、検出を確かめる行を作る。 */
-  /* package */ static Arguments row(
-      final String ruleName, final ArchRule rule, final String violatingClass) {
-    return Arguments.of(ruleName, rule, VIOLATING_PREFIX + violatingClass);
+  /** 行の名前、規則、違反フィクスチャのクラス名（基底パッケージより下）から、検出を確かめる行を作る。 */
+  /* package */ static FixtureRow row(
+      final String name, final ArchRule rule, final String violatingClass) {
+    return new FixtureRow(name, rule, VIOLATING_PREFIX + violatingClass);
+  }
+
+  /**
+   * 規則が違反フィクスチャのクラスを検出することを確かめる行。JUnit には名前、規則、クラス名の順の引数として渡す。
+   *
+   * @param name 行の名前。{@code @ArchTest} のフィールドの名前か、その後に {@code ": "} と違反の種類を足したもの
+   * @param rule 確かめる規則
+   * @param violatingClass 失敗のメッセージに含まれる、違反フィクスチャのクラスの完全修飾名
+   */
+  /* package */ record FixtureRow(String name, ArchRule rule, String violatingClass)
+      implements Arguments {
+
+    /** 行の名前から違反の種類を除いた、{@code @ArchTest} のフィールドの名前を返す。 */
+    /* package */ String ruleName() {
+      return name.split(":", 2)[0];
+    }
+
+    @Override
+    public Object[] get() {
+      return new Object[] {name, rule, violatingClass};
+    }
   }
 }

@@ -3,8 +3,8 @@ package com.example.demo.architecture;
 import static com.example.demo.architecture.ViolatingFixtures.VIOLATING;
 import static com.example.demo.architecture.ViolatingFixtures.row;
 
+import com.example.demo.architecture.ViolatingFixtures.FixtureRow;
 import java.util.stream.Stream;
-import org.junit.jupiter.params.provider.Arguments;
 
 /** {@link ArchitectureRuleFixtureTest} が使う、クラスの役割と配置の規則と、それを検出する違反フィクスチャの対応の行。 */
 final class ClassRoleFixtureRows {
@@ -24,7 +24,7 @@ final class ClassRoleFixtureRows {
       ERROR_ADVICE + ".handle(java.lang.IllegalStateException)>";
 
   /** クラスの役割と配置の規則が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
-  /* package */ static Stream<Arguments> rows() {
+  /* package */ static Stream<FixtureRow> rows() {
     return Stream.of(
         row(
             "dependenciesPointInward",
@@ -35,6 +35,11 @@ final class ClassRoleFixtureRows {
             PackageByFeatureOnionArchitectureTest.infrastructureDependsOnlyOnDomainModelRule(
                 VIOLATING),
             "ordering.infrastructure.persistence.ExpiredOrderSweeper"),
+        row(
+            "databaseTechnologyApisAreOnlyUsedByPersistenceAdapters",
+            PackageByFeatureOnionArchitectureTest
+                .databaseTechnologyApisAreOnlyUsedByPersistenceAdaptersRule(VIOLATING),
+            "ordering.application.JooqOrderCounter"),
         row(
             "sharedModuleIsUsedOnlyByPersistenceAdapters",
             PackageByFeatureOnionArchitectureTest.sharedModuleIsUsedOnlyByPersistenceAdaptersRule(
@@ -125,6 +130,18 @@ final class ClassRoleFixtureRows {
             GeneralCodingRulesArchTest.noSuchElementExceptionIsNotThrown,
             "ordering.application.LegacyOrderFinder.firstOrFail("),
         row(
+            "featureCodeUsesOnlySlf4jFacade",
+            GeneralCodingRulesArchTest.featureCodeUsesOnlySlf4jFacade,
+            "ordering.application.LogbackOrderAuditor"),
+        row(
+            "autowiredMethodsAreNotUsed",
+            GeneralCodingRulesArchTest.autowiredMethodsAreNotUsed,
+            "ordering.application.SetterInjectedOrderMailer.setSender("),
+        row(
+            "legacyDateTimeTypesAreNotUsed",
+            DateTimeConventionsArchTest.legacyDateTimeTypesAreNotUsed,
+            "ordering.application.LegacyOrderTimestamp"),
+        row(
             "moduleApiDoesNotExposeInternalTypes",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),
@@ -185,6 +202,10 @@ final class ClassRoleFixtureRows {
             "controllersResideInPresentationWeb",
             PackageByFeatureOnionArchitectureTest.controllersResideInPresentationWeb,
             "ordering.presentation.OrderResource"),
+        row(
+            "repositoriesResideInPersistenceAdapters",
+            PackageByFeatureOnionArchitectureTest.repositoriesResideInPersistenceAdapters,
+            "ordering.application.OrderArchiveStore"),
         row(
             "presentationDoesNotDependOnDomain",
             PackageByFeatureOnionArchitectureTest.presentationDoesNotDependOnDomain,
@@ -390,7 +411,7 @@ final class ClassRoleFixtureRows {
   }
 
   /** {@code jooqReflectionMappingIsNotUsed} が、違反フィクスチャの同名のメソッドの呼び出しを検出することを確かめる行を作る。 */
-  private static Arguments reflectionRow(final String method) {
+  private static FixtureRow reflectionRow(final String method) {
     return row(
         "jooqReflectionMappingIsNotUsed: " + method,
         ClassRoleArchTest.jooqReflectionMappingIsNotUsed,
@@ -398,7 +419,7 @@ final class ClassRoleFixtureRows {
   }
 
   /** {@code httpErrorsAreMappedOnlyInErrorPresentationWeb} が、型か注釈への依存を 1 つ検出することを確かめる行を作る。 */
-  private static Arguments httpErrorRow(final String type, final String violation) {
+  private static FixtureRow httpErrorRow(final String type, final String violation) {
     return row(
         "httpErrorsAreMappedOnlyInErrorPresentationWeb: " + type,
         PackageByFeatureOnionArchitectureTest.httpErrorsAreMappedOnlyInErrorPresentationWebRule(
