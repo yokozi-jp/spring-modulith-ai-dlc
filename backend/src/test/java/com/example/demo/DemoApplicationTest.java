@@ -329,6 +329,17 @@ class DemoApplicationTest {
   }
 
   @Test
+  @DisplayName("セッションの無操作の期間は 30 分で、Spring Boot の既定に頼らず書いてある")
+  void sessionIdleTimeoutIsExplicitlyThirtyMinutes() {
+    assertEquals(
+        Duration.ofMinutes(30),
+        applicationContext
+            .getEnvironment()
+            .getProperty("server.servlet.session.timeout", Duration.class),
+        "server.servlet.session.timeout が書いてあり 30 分であること（未設定だと null で落ちる）");
+  }
+
+  @Test
   @DisplayName("セッションの最長の期間は 8 時間である")
   void sessionMaxLifetimeIsEightHours() {
     assertEquals(
