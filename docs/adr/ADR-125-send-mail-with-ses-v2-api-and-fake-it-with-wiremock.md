@@ -40,6 +40,9 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
 [#323](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/323) のコメントは、本番を SES の API、ローカルとテストを Mailpit への SMTP にし、設定で実装を選ぶ形を一度決め、その後この ADR の形へ改めた。
 前の形では、本番のコードが環境で実装を選び、本番の実装がローカルとテストの経路を通らなかったためである。
 
+Proposed の間に、Resilience4j の `mail-sender` の retry を外した。
+[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が、外部の呼び出しを再試行する層をイベント出版の再投入だけにし、Client の即時の再試行をなくしたためである（[#573](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/573)）。
+
 ## Decision
 
 メールは、本番、ローカル、テストのどれも、AWS SDK for Java v2 の `SesV2Client` で SES v2 の `SendEmail` を呼ぶ同じ Client で送る。
@@ -71,7 +74,7 @@ SDK は OS の環境変数と JVM のシステムプロパティだけを読み�
   HTTP の Client の接続を 1 秒、読み取りを 2 秒、SDK の `apiCallTimeout`（呼び出し全体）を 2 秒にする。
   HTTP の Client は、JDK の `HttpURLConnection` を使う `url-connection-client` にし、SDK が既定で入れる Apache と Netty の Client を依存から外す。
 - SES の `SendEmail` には冪等キーがないので、SDK の再試行を止めて試行を 1 回にする。
-  Resilience4j の `mail-sender` の retry も `default`（試行 1 回）を継承する。
+  Resilience4j の retry も使わず、`mail-sender` には circuit breaker だけを掛ける（ADR-019）。
   再投入で同じメールを 2 回送らない扱いは、Client を呼ぶ Listener が決める。
 - 呼び出しの結果は、ADR-072 の分け方に合わせる。
   同じ要求を再投入しても受け付けられない拒否（`MessageRejected`、`BadRequestException`）と、送り直すと 2 通目が出うる `MessageId` のない応答は、拒否の結果で返す。

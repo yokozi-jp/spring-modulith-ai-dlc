@@ -1,7 +1,7 @@
 ---
 type: ADR
 title: 'ADR-019: 外部連携の耐障害性と容量制御を標準化する'
-description: retry の乗算による障害増幅を避けるため、外部連携の耐障害性と容量制御を標準化する決定。
+description: 外部の呼び出しを再試行する層をイベント出版の再投入の 1 つだけにし、Client は即時の再試行をせず、タイムアウトを HTTP クライアントに、circuit breaker を Client に持ち、DB の接続数を接続の予算から決める、外部連携の耐障害性と容量制御の決定。
 tags: [adr, resilience, backend, reliability]
 ---
 
@@ -36,24 +36,75 @@ JDK 25 では JEP 491 により、通常の `synchronized` メソッドとブロ
 
 [ADR-111](ADR-111-store-sessions-in-postgresql-until-user-growth-needs-redis.md) で Redis を外したため、Proposed の間にstarter が管理する通信から Redis を除いた。
 
+Proposed の間に、外部の呼び出しを再試行する層を、Client の即時の再試行からイベント出版の再投入（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）の 1 つへ書き直した（[#573](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/573)）。
+理由は次のとおりである。
+
+- 外部システムのインタフェースは CommandHandler と Client からだけ使え、その CommandHandler は Listener からだけ呼べる。
+  ArchUnit の `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients` と `externalSystemCommandHandlersAreDependedOnlyByListeners` がこれを守る（[#545](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/545)）。
+  外部の呼び出しはすべて Listener の経路にあり、外側に再投入がある。
+- 決済代行の `payment-gateway` とメールの `mail-sender` の retry は、試行 1 回の `default` を継承し、何もしていなかった。
+  GET などのための `idempotent`（最大 3 回）を継承する instance はなく、継承できる経路もなかった。
+- `@Retry` の名前に合う instance がないと、Resilience4j は `configs.default` を使う。
+  `default` の `max-attempts: 1` を消すと、Resilience4j の既定（`RetryConfig.DEFAULT_MAX_ATTEMPTS` の 3 回、待ち 500 ミリ秒）で再試行する。
+  使わない仕組みが残ると、設定の 1 行を消すだけで、再投入の内側に再試行の層が黙って増える。
+- Spring Framework 7 の `@Retryable` は、`@EnableResilientMethods` がないと黙って無視され、有効にすると再投入と重なる（[Resilience Features](https://docs.spring.io/spring-framework/reference/core/resilience.html)）。
+- Resilience4j の TimeLimiter の既定（2 秒）は、`CompletionStage` を返すメソッドにしか効かず、使う箇所がなかった。
+  タイムアウトは HTTP クライアントにある。
+
+この方針は、姉妹リポジトリ（`yokozi-jp/agent-software-factory`）の [ADR 0023](https://github.com/yokozi-jp/agent-software-factory/blob/main/docs/adr/0023-ky-for-external-http-and-sdk-retries-for-aws.md) の芯である「1 つの呼び出しで再試行する層は 1 つ」と同じである。
+[#319](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/319) の調査で、ADR 0023 の一部を取り込むと決めた。
+ADR 0023 は、即時の再試行に、冪等な GET だけ、ジッター、`Retry-After`、全体のタイムアウトを求める。
+AWS の Builders' Library も、再試行を stack の 1 か所に絞り、待ちにジッターを足すことを勧める（[Timeouts, retries, and backoff with jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/)）。
+
+circuit breaker は外さない。
+ADR 0023 は Builders' Library に従って circuit breaker を入れないが、事情が違う。
+こちらでは、全モジュールのリスナーが 2 枠の executor（`spring.task.execution.simple.concurrency-limit: 2`）を共有する。
+半死の決済代行は、1 回の呼び出しで枠を最大 3 秒（接続 1 秒と呼び出し 2 秒）持つ。
+circuit breaker が open の間は、外部を呼ばずに失敗するので、ほかのリスナーの枠が空く。
+[#557](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/557) は、外部システムを呼ぶリスナーに専用の executor を持たせると結論し、作業は [#685](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/685) にある。
+
+この書き直しは、Accepted の [ADR-072](ADR-072-fake-external-systems-with-wiremock.md) の Decision のうち、retry の `payment-gateway` の instance と `idempotent` の再試行の対象の項と、WireMock の結合テストで確かめるもののうちリトライを改める。
+
 ## Decision
 
-外部連携ごとに名前付きの Resilience4j instance を定義し、client adapter の境界で適用する。
+外部の呼び出しを再試行する層は、イベント出版の再投入（[ADR-079](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）の 1 つだけにする。
 
-外部 HTTP client の開始値を次のように定める。
+- Client は即時の再試行をしない。
+  Resilience4j の `@Retry` と `resilience4j.retry` の設定を置かない。
+  Spring Framework の `@Retryable` を、Client、外部システムを呼ぶ CommandHandler、Listener に付けない。
+- SDK が自分で再試行する外部連携は、SDK の再試行を止める。
+  メールの SES v2 の Client は `AwsRetryStrategy.doNotRetry()` で試行を 1 回にする（[ADR-125](ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)）。
+- 一時障害（接続の失敗、タイムアウト、HTTP 429、HTTP 5xx）では、Client が例外を投げ、イベント出版を `FAILED` に残す。
+  再投入が、分から時間の間隔で、回数の上限まで呼び直す。
+  呼び出しの結果の分け方は [ADR-072](ADR-072-fake-external-systems-with-wiremock.md) に従う。
+- ArchUnit が、main のコードの Resilience4j の retry と TimeLimiter と、Client、外部システムを呼ぶ CommandHandler、Listener の `@Retryable` を止める。
 
-- connect timeout は 1 秒とする。
-- 一回の呼び出し全体の timeout は 2 秒とする。
-- client 自身の connect timeout と response timeout を設定し、TimeLimiter だけに中断を委ねない。
-- retry の既定は一回だけとし、自動 retry を行わない。
-- GET などの冪等な操作、または冪等性キーで重複を防げる操作だけ、`idempotent` 設定を継承して最大三回試行する。
-- `idempotent` retry は 200 ミリ秒から倍率 2 の exponential backoff を使う。
-- retry 対象は接続失敗、timeout、HTTP 429、HTTP 502、HTTP 503、HTTP 504 のような一時障害へ限定し、入力エラー、認証失敗、その他の HTTP 4xx は除外する。
-- retry は client adapter の一層だけで行い、HTTP client や呼び出し元の retry と重ねない。
+即時の再試行は、同期の要求から外部システムを呼ぶ経路を足すときに決め直す。
+その経路を足す変更は、ArchUnit の `externalSystemInterfacesAreUsedOnlyByCommandHandlersAndClients` と `externalSystemCommandHandlersAreDependedOnlyByListeners` を緩める。
+決め直すときは、即時の再試行に次の条件を付ける（姉妹リポジトリの ADR 0023 と AWS の Builders' Library）。
 
+- 冪等な操作だけを再試行する。
+  冪等な操作は、GET などの安全な操作と、相手が冪等性キーで重複を防ぐ操作である。
+- 待ちは、ジッター付きの指数的な待ちにする。
+- `Retry-After` の待ちが、呼び出し元の時間の予算に収まらないときは、再試行しない。
+- 試行の回数と、待ちを含む合計の時間に上限を置く。
+- その経路でも再試行の層は 1 つにし、HTTP クライアント、SDK、再投入の再試行と重ねない。
+
+外部 HTTP client のタイムアウトは、HTTP クライアントの接続と呼び出しの 2 つに持つ。
+開始値は次のとおりとする。
+
+- 接続のタイムアウトは 1 秒とする。
+- 一回の呼び出し全体のタイムアウトは 2 秒とする。
+- Resilience4j の TimeLimiter は使わない。
+
+外部連携ごとに名前付きの Resilience4j の circuit breaker の instance を定義し、`infrastructure.client` の Client のメソッドにだけ付ける。
+ArchUnit が、`infrastructure.client` の `*Client` の外の `@CircuitBreaker` を止める。
 circuit breaker の既定値を、count based window 20 回、評価開始 10 回、failure rate 50 パーセント、open 30 秒、half-open 5 回とする。
+外部システムを呼ぶリスナーが専用の executor で動き（#685）、ほかのリスナーと枠を共有しなくなったら、circuit breaker の要否を見直す。
 
-starter が管理する通信のタイムアウトは、呼び出しごとに次の値と置き場所で持つ。
+Spring の starter が持つ通信は、Resilience4j で包まない。
+今の対象は JDBC と HikariCP、Spring Security の OAuth2 Client で、Redis を戻すときの Lettuce も同じに扱う。
+starter が持つ通信のタイムアウトは、呼び出しごとに次の値と置き場所で持つ。
 
 - 認可コードをトークンに替える（ログインのコールバック）：接続 1 秒、応答 5 秒。`spring.http.clients.*` に置き、`OidcTokenClientConfig` が Boot の `RestClient.Builder` から作った `RestClient` を `RestClientAuthorizationCodeTokenResponseClient` に渡す。
 - UserInfo：呼び出さない。`SignInOidcUserService` が使うのは ID トークンの `iss` と `sub` だけなので、`OidcUserService.setRetrieveUserInfo` で止める。UserInfo の HTTP クライアントは `new RestTemplate()` で、タイムアウトを足すには request factory を持つ `RestTemplate` が別に要る。
@@ -64,7 +115,7 @@ starter が管理する通信のタイムアウトは、呼び出しごとに次
 トークンの取得の応答を、外部 HTTP client の開始値の 2 秒より長い 5 秒にする。ログインは利用者が画面で待つが、トランザクションの外にあり、IdP の一時的な遅延でログインを落とさないよう余裕を持たせる。
 `spring.http.clients.*` は自分の値を持たない Boot の `RestClient` の既定なので、新しい client を足すときは自分の値で上書きする。決済代行は `payment-gateway.*` で上書きする。メールは AWS SDK の HTTP クライアントで、`spring.http.clients.*` を使わず `mail-sender.*` を使う。
 
-外部連携を追加するときは、依存先の SLO と上位処理の時間予算から値を見直し、名前付き instance の設定と境界テストを同じ変更に含める。
+外部連携を追加するときは、依存先の SLO と上位処理の時間予算から値を見直し、名前付きの circuit breaker の instance の設定と境界テストを同じ変更に含める。
 既定値をそのまま採用した場合も、その根拠を client adapter の文書へ残す。
 
 HikariCP の `maximum-pool-size` は、PostgreSQL がアプリケーションへ割り当てた接続数から算出して環境変数で注入する。
@@ -91,19 +142,23 @@ maximum-pool-size × 最大アプリケーションタスク数
 ### Positive
 
 - 非冪等処理の意図しない再実行を既定で防げる。
+- 1 回の呼び出しの試行は 1 回なので、1 件の出版が外部を呼ぶ回数は再投入の回数の上限で決まる。
+- 使わない再試行の設定がなくなり、設定を消しただけで Resilience4j の既定の再試行が黙って効くことがない。
 - retry storm と長時間の連鎖待ちを抑え、障害を呼び出し元へ返す時間を予測しやすくなる。
 - DB 接続数を仮想スレッド数から切り離し、PostgreSQL の容量から逆算できる。
 - Java 25 で解消済みの monitor pinning を理由に、不要な lock の書き換えを行わずに済む。
 
 ### Negative
 
+- 一瞬の接続の失敗も、再投入の最初の待ち（`wait-age`）が過ぎるまで回復しない。
+- 同期の要求から外部を呼ぶ経路を足すときに、即時の再試行を決め直す作業が要る。
 - 外部連携ごとに例外分類、冪等性、時間予算を決める作業が必要になる。
 - 小さすぎる timeout は正常だが遅い依存先を失敗扱いにし、大きすぎる pool は PostgreSQL を過負荷にする。
 - circuit breaker の初期値は実トラフィックを測定した後に調整が必要になる。
 
 ### Neutral
 
-- 現在の PostgreSQL、OIDC 通信は Resilience4j の対象にせず、Decision の呼び出しごとのタイムアウトを使う。
+- circuit breaker の要否は、#685 で外部システムを呼ぶリスナーの executor が分かれた後に見直す。
 - bulkhead と rate limiter は依存先の同時実行上限が判明した時点で、名前付き instance へ追加する。
 - JFR の pinning 検証は常時有効化せず、負荷スモークと障害調査で実行する。
 
@@ -114,6 +169,35 @@ maximum-pool-size × 最大アプリケーションタスク数
 - **Description**：共通の default retry を全 instance へ適用する。
 - **Pros**：一時的な障害を追加設定なしで吸収できる。
 - **Cons**：非冪等処理を重複実行し、複数層の retry が試行回数を乗算するため採用しない。
+
+### Client に即時の再試行の設定を残し、同期の経路ができたら使う
+
+- **Description**：`idempotent`（最大 3 回、200 ミリ秒から倍率 2 の待ち）の retry の設定と、試行 1 回の `default` を残す。
+- **Pros**：同期の経路を足したときに、設定を継承するだけで再試行できる。
+- **Cons**：継承する instance も経路もなく、誰も確かめない設定になる。
+  `default` を消すと Resilience4j の既定の 3 回が黙って効く。
+  `idempotent` にはジッターがなく、429 でも `Retry-After` を見ずに再試行するため、決め直すときの条件を満たさない。
+  このため採用しない。
+
+### circuit breaker も外す
+
+- **Description**：姉妹リポジトリの ADR 0023 と AWS の Builders' Library に従い、circuit breaker を入れない。
+- **Pros**：試験しにくい状態の切り替えがなくなり、回復が遅れることもない。
+- **Cons**：全モジュールのリスナーが 2 枠の executor を共有するため、半死の決済代行が呼び出しごとに枠を最大 3 秒持ち、ほかのリスナーを待たせる。
+  #685 で枠が分かれるまでは採用しない。
+
+### Spring Framework 7 の `@Retryable` で即時の再試行を持つ
+
+- **Description**：Resilience4j の `@Retry` の代わりに、Spring Framework の `@Retryable` を Client に付ける。
+- **Pros**：Resilience4j の retry の module が要らない。
+- **Cons**：`@EnableResilientMethods` がないと黙って無視され、有効にすると再投入と重なるため採用しない。
+
+### TimeLimiter で呼び出し全体を切る
+
+- **Description**：Resilience4j の TimeLimiter に、呼び出し全体の上限を持たせる。
+- **Pros**：HTTP クライアントの種類によらず、同じ設定で上限を置ける。
+- **Cons**：`CompletionStage` を返すメソッドにしか効かず、同期の Client には効かない。
+  HTTP クライアントのタイムアウトと上限が 2 か所になるため採用しない。
 
 ### Resilience4j のライブラリ既定値だけを使う
 
@@ -130,6 +214,12 @@ maximum-pool-size × 最大アプリケーションタスク数
 ## References
 
 - [Resilience4j documentation](https://resilience4j.readme.io/docs/getting-started-3)
+- [ADR 0023: 外部システムへの HTTP の呼び出しは ky でタイムアウトと再試行を持ち、AWS のサービスは SDK の再試行に任せて重ねない（yokozi-jp/agent-software-factory）](https://github.com/yokozi-jp/agent-software-factory/blob/main/docs/adr/0023-ky-for-external-http-and-sdk-retries-for-aws.md)
+- [AWS Builders' Library: Timeouts, retries, and backoff with jitter](https://aws.amazon.com/builders-library/timeouts-retries-and-backoff-with-jitter/)
+- [Spring Framework: Resilience Features](https://docs.spring.io/spring-framework/reference/core/resilience.html)
+- [ADR-072: 外部システムを本番のコードで偽らず、WireMock のコンテナで偽る](ADR-072-fake-external-systems-with-wiremock.md)
+- [ADR-079: 失敗したイベント出版を、ShedLock で 1 つのインスタンスに絞った定期のジョブで、リスナーごとの方針で再投入する](ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)
+- [ADR-125: メールを SES v2 の API で送り、ローカルとテストは接続先を WireMock に向ける](ADR-125-send-mail-with-ses-v2-api-and-fake-it-with-wiremock.md)
 - [HikariCP: About Pool Sizing](https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing)
 - [OpenJDK JEP 491: Synchronize Virtual Threads without Pinning](https://openjdk.org/jeps/491)
 - [backend/src/main/resources/application.yaml](../../backend/src/main/resources/application.yaml)

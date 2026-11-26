@@ -90,6 +90,10 @@ Proposed の間に、古い出版を `FAILED` に戻す処理を、`markStalePub
 Proposed の間に、`@Scheduled` を `EventPublicationResubmitter` から、`enabled` が真のときだけ作る構成へ移した（[#540](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/540)）。
 期限を過ぎた冪等性キーの掃除のジョブ（[ADR-126](ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）も `@EnableScheduling` を足し、`@EnableScheduling` はアプリのすべての `@Scheduled` を動かすので、ジョブのクラスに置いたままでは `enabled` を偽にしても再投入が動くためである。
 
+Proposed の間に、Client の即時の再試行を外し、外部の呼び出しを再試行する層を再投入の 1 つだけにした（[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md)、[#573](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/573)）。
+Client の retry は試行 1 回の `default` で何もしておらず、`idempotent` を継承する経路もなかったためである。
+これに合わせて、Neutral の外部の呼び出しの回数と、選択肢9 の Resilience4j の役割を書き直した。
+
 ## Decision
 
 失敗したイベント出版を、定期のジョブで自動で再投入する。
@@ -274,7 +278,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   Spring Modulith が比べる回数もその古い一覧の値なので、この出版は失敗しても `ABANDONED` にならずに `FAILED` に残りうる。
   その後は `isDue` が再投入せず、件数の ERROR が知らせる。
 - 時間の予算（`lock-at-most-for / 2`）は、最悪の時間の見積もりに基づく。
-  決済のリスナーの呼び出しは `payment-gateway` の retry が `base-config: default` で試行 1 回のため、1 件の最悪は connect 1 秒 + read 2 秒の約 3 秒である。
+  決済の Client は再試行せず 1 回だけ呼ぶため、1 件の最悪は connect 1 秒 + read 2 秒の約 3 秒である。
   `concurrency-limit` は 2 で、100 件では約 49 回分の処理を待ち、およそ 2.5 分になる。
   `lock-at-most-for` の 10 分に対して約 4 倍の余裕がある。
   リスナーを増やした利用先では、この余裕は成り立たないことがあり、予算が次の回へ回す。
@@ -340,9 +344,10 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   `modulith.shedlock` の `lock_until` は `timestamptz` の列であり、書くときと読むときに同じセッションの TimeZone で変換されるため、接続の TimeZone によらず正しく動く（PostgreSQL 17 で実測）。
   列を `timestamp` にすると壊れるため、変えない。
   `ShedLockSessionTimeZoneTest` がこれを守る。
-- ADR-019 の「retry は client adapter の一層だけ」は呼び出しの即時の再試行についての決定であり、分単位の間隔と回数の上限を持つ出版の再投入はそれと別の層である。
-  決済の client は試行 1 回なので、1 件の出版あたりの外部の呼び出しは最大 6 回（最初の 1 回と再投入 5 回）である（`PaymentGatewayClient.java:83-84`、`application.yaml:262-263`、`application.yaml:201-205`）。
-  `idempotent` の retry を継承すると 6 × 3 = 18 回になるが、再投入の間隔は 5 分から 1 時間なので、即時の連続した呼び出しにはならない。
+- 外部の呼び出しを再試行する層は、この再投入の 1 つだけである（ADR-019）。
+  Client は即時の再試行をしないので、1 件の出版あたりの外部の呼び出しは最大 6 回（最初の 1 回と再投入 5 回）である。
+  回数の上限は `spring.modulith.events.resubmission.abandon-after-attempts`（`application.yaml`）にある。
+  同期の要求から外部を呼ぶ経路を足して即時の再試行を決め直すときも、その経路の再試行と再投入を重ねない（ADR-019）。
 
 ## Alternatives Considered
 
@@ -403,7 +408,7 @@ shared の範囲は、ADR-048 の jOOQ の共通処理に加えて、Spring Modu
   circuit breaker は呼び出しを拒否するだけで、イベントを保持しない。
   時間の尺が違い、Resilience4j はミリ秒から秒、再投入は分から時間である。
 
-Resilience4j は再投入と補完関係にあり、ADR-019 のとおり client adapter に残す。
+Resilience4j は circuit breaker だけを Client に残し、即時の再試行には使わない（ADR-019）。
 
 ### 選択肢10: 自前の `AbandonPolicy` でリスナーごとの回数の上限を持つ（採用）
 

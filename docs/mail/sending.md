@@ -50,7 +50,7 @@ tags: [convention, mail, backend, ses, external-system]
 
 - SES の `SendEmail` には冪等キーがない。
   同じ引数で 2 回呼ぶと 2 通届く。
-- `MailSenderClient` は、SDK の再試行を止め、Resilience4j の `mail-sender` の retry も試行 1 回にしている。
+- `MailSenderClient` は、SDK の再試行を止め、Resilience4j の retry も使わない（[ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)）。
   呼び出し元は、自分で再試行しない。
 - 送ってから commit の前に落ちると、再投入で 2 通目が出る。
   呼び出し元は、送った時刻を業務の状態に記録し、記録があれば送らない。

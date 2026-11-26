@@ -36,9 +36,9 @@ tags: [architecture, integration, async, spring-modulith, resilience]
 
 ## Resilience4j との関係
 
-Resilience4j は client adapter の即時の再試行と遮断を担い、再投入は持続的な回復を担う。
-層が違うため、補完関係にある。
-外部呼び出しの retry と circuit breaker の位置づけは [ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md) に、event worker で使う案の却下は [ADR-079 の選択肢 9](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) にある。
+外部の呼び出しを再試行する層は、再投入の 1 つだけである。
+Resilience4j は Client の circuit breaker だけを担い、Client は即時の再試行をしない。
+再試行の層と circuit breaker を残す理由は [ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md) に、リスナーでその場の再試行に任せる案の却下は [ADR-079 の選択肢 9](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) にある。
 circuit breaker が open の間に回数を消費する限界は、ADR-079 の Consequences にある。
 
 ## どの文書を読むか
@@ -46,7 +46,7 @@ circuit breaker が open の間に回数を消費する限界は、ADR-079 の C
 | 場面                                                                            | 文書                                                                                                                                           |
 | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | 再投入を設計した理由と代替案を知りたい                                          | [ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)                                                     |
-| 外部呼び出しの retry と circuit breaker の値を知りたい                          | [ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)                                                                         |
+| 外部呼び出しのタイムアウトと circuit breaker の値を知りたい                     | [ADR-019](../adr/ADR-019-define-resilience-and-capacity-guardrails.md)                                                                         |
 | 出版の状態と再投入の規約を確かめたい                                            | [非同期処理の失敗時の再試行と回復](async-failure-recovery.md)                                                                                  |
 | 上限に達した出版の ERROR に対応したい、手で再投入したい、自動の再投入を止めたい | [イベント出版の再投入のログイベント](../observability/runbook-event-publication-resubmission.md)                                               |
 | 非同期のテストで待ちを書きたい                                                  | [ADR-080](../adr/ADR-080-wait-for-async-conditions-with-awaitility.md)、[バックエンドのテストコードの書き方](../backend/testing-code-style.md) |

@@ -37,6 +37,8 @@ Proposed
 [ADR-115](ADR-115-build-business-batches-with-spring-batch.md) は、機能モジュールに業務のバッチの層 `batch` を足し、`shared` に `shared.batch` を置いた。
 そこで、Context の層の数を書き直し、`shared` を使う層の決定に `shared.batch` を書き足した。
 
+[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md) が Client の即時の再試行を外したため（[#573](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/573)）、`charge` の再試行の決定を、Resilience4j の `retry` の試行の回数から、Client が再試行しないことへ書き直した。
+
 ## Decision
 
 機能モジュールのクラスを次の役割に分け、置き場所、命名、形を一つに決める。
@@ -85,7 +87,7 @@ Proposed
 - 外部システムを呼ぶ CommandHandler も、`@ApplicationModuleListener` が開くトランザクションの中で外部システムを呼ぶ。
   ただし、呼んでいる間は行をロックせず（行のロックは呼んだ後の `update` の UPDATE が取る）、画面の要求を待たせない。
   トランザクションの長さは Client のタイムアウト（[ADR-019](ADR-019-define-resilience-and-capacity-guardrails.md)）で抑え、ロールバックで戻らない請求は上の冪等性で二重にしない。
-  このため、`charge` の `retry` は一回のままにし、再試行は再投入に任せる。
+  このため、Client は `charge` を再試行せず、再試行は再投入に任せる。
 - 参照は機能ごとに一つの `<Feature>QueryService` が担う。QueryService はルートの `<Feature>Queries` を実装し、Repository で集約を読んでルートの record に変換する。参照専用の port は作らず、jOOQ で読み取りモデルへ直接射影しない。public メソッドには `@Transactional(readOnly = true)` を付ける。
 - 他モジュールのイベントと、外部システムを呼ぶための自モジュールのイベントは、受信側モジュールの `application` に置く `<Event>Listener` が `@ApplicationModuleListener` を付けた `on` メソッドで受ける。Listener はちょうど一つの CommandHandler を呼ぶ。
 - イベントは CommandHandler が `ApplicationEventPublisher` で発行する。`<Event>Publisher` クラス、`domain.model` の Domain Event、`infrastructure.messaging` は作らない。

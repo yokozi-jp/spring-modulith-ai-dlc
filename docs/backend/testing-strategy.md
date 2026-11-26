@@ -25,7 +25,7 @@ tags: [convention, backend, testing]
 | 通常のDBアクセス                                                    | `@DatabaseTest`                                                                      | jOOQとDB                                 |
 | コミット時にだけ起きるDB挙動                                        | `@CommittedDatabaseTest`                                                             | アプリケーション全体とDB                 |
 | モジュールの中の振る舞いとイベント                                  | `@ApplicationModuleTest`、`Scenario`、`PublishedEvents`、`AssertablePublishedEvents` | 対象のモジュールと、`mode`で選んだ依存先 |
-| 外部システムのClientのリトライ、circuit breaker、イベント出版の状態 | WireMockを使う`@ApplicationModuleTest`                                               | 対象のモジュールと依存先                 |
+| 外部システムのClientの試行回数、circuit breaker、イベント出版の状態 | WireMockを使う`@ApplicationModuleTest`                                               | 対象のモジュールと依存先                 |
 | アプリケーション全体の起動と横断的な配線、HTTP APIの契約            | フルの`@SpringBootTest`                                                              | アプリケーション全体                     |
 | 既存テストが業務コードの変化を検出できるか                          | PITミューテーションテスト                                                            | テストごとに異なる                       |
 
