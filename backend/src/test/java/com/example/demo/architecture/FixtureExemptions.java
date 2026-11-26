@@ -80,7 +80,6 @@ final class FixtureExemptions {
           entry("assertionsShouldHaveDetailMessage", TODO_LIBRARY_RULE),
           entry("deprecatedApiShouldNotBeUsed", TODO_LIBRARY_RULE),
           entry("oldDateAndTimeClassesShouldNotBeUsed", TODO_LIBRARY_RULE),
-          entry("autowiredMethodsAreNotUsed", TODO_PROJECT_RULE),
           entry("legacyDateTimeTypesAreNotUsed", TODO_PROJECT_RULE));
 
   private FixtureExemptions() {}

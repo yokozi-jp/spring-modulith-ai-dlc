@@ -697,6 +697,7 @@ class ArchitectureRuleFixtureTest {
         entry(
             "featureCodeUsesOnlySlf4jFacade",
             GeneralCodingRulesArchTest.featureCodeUsesOnlySlf4jFacade),
+        entry("autowiredMethodsAreNotUsed", GeneralCodingRulesArchTest.autowiredMethodsAreNotUsed),
         entry(
             "domainModelDependsOnlyOnAllowedTypes",
             PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(

@@ -134,6 +134,10 @@ final class ClassRoleFixtureRows {
             GeneralCodingRulesArchTest.featureCodeUsesOnlySlf4jFacade,
             "ordering.application.LogbackOrderAuditor"),
         row(
+            "autowiredMethodsAreNotUsed",
+            GeneralCodingRulesArchTest.autowiredMethodsAreNotUsed,
+            "ordering.application.SetterInjectedOrderMailer.setSender("),
+        row(
             "moduleApiDoesNotExposeInternalTypes",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),
