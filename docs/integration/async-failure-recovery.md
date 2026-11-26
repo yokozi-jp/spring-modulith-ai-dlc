@@ -1,15 +1,15 @@
 ---
 type: Convention
 title: 非同期処理の失敗時の再試行と回復
-description: 非同期処理が失敗したときの再試行、Spring Modulith のイベント出版の状態と再投入、DLQ の構成と退避の方式、DLQ からの再実行、失敗メッセージの保持、複数のシステムにまたがる整合性の回復方法を定める。コンシューマーのエラー処理を実装するとき、失敗時の運用を設計するときに読む。
+description: 非同期処理が失敗したときの再試行、Spring Modulith のイベント出版の状態と再投入、DLQ に当たる ABANDONED への退避の道、DLQ からの再実行、失敗メッセージの保持、複数のシステムにまたがる整合性の回復方法を定める。コンシューマーのエラー処理を実装するとき、失敗時の運用を設計するときに読む。
 tags: [convention, integration, async, resilience, future-arch-guidelines]
 ---
 
 # 非同期処理の失敗時の再試行と回復
 
-一時的なエラーは再試行し、回復不能なエラーは再試行を打ち切って DLQ へ退避する。
-DLQ はソースキューごとに置き、アプリケーションによる即時の退避と基盤の受信回数上限による退避を併用する。
-再実行はソースキューへの書き戻しに一本化し、複数のシステムにまたがる不整合は補償トランザクションより先に設計で減らす。
+一時的なエラーは再試行し、回復不能なエラーは業務の結果として記録して正常に終えるか、`ABANDONED` にして人の確認に回す。
+DLQ に当たるのは Spring Modulith の `ABANDONED` の出版で、アプリケーションが DLQ へ直接送るコードは書かず、諦める判断は `abandon-after-attempts`（方針ごとの値と全体の上限）に集める。
+再実行は Runbook の手順で `ABANDONED` の出版を `FAILED` に戻して手での 1 回の再投入に一本化し、複数のシステムにまたがる不整合は補償トランザクションより先に設計で減らす。
 
 用語は[メッセージングの設計](async-messaging-design.md)の定義に従う。
 
@@ -28,12 +28,21 @@ DLQ はソースキューごとに置き、アプリケーションによる即�
 client adapter の短期の再試行と、イベント出版の持続的な再投入は別の層である。
 層の関係と判断の理由は [ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md) の選択肢 9 に従う。
 
-回復不能なエラーは、資源の浪費と他の処理への影響を避けるため、再試行を打ち切って DLQ へ退避する。
+回復不能なエラーは、資源の浪費と他の処理への影響を避けるため、次の三つに分けて扱う。
+
+- **業務の結果として記録して正常に終えるもの**：業務上の拒否、契約の不備、リスナーが動く前に業務の状態が変わった場合。出版は `COMPLETED` になり、再投入しない。
+- **最初の失敗で `ABANDONED` にするもの**：冪等キーを持たない外部システムを呼ぶリスナー。方針の `abandon-after-attempts: 1` で、リスナー単位で諦める。例外の種類では分けない。
+- **上限まで再投入して `ABANDONED` にするもの**：上のどちらでもない予期しない例外。内部の不変条件の違反を含む。Spring Modulith 2.2 の `AbandonPolicy` は失敗の例外を受け取らないため、直らない例外も上限まで再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
+
+リスナーごとの失敗の原因と、戻すかどうかの判断は、Runbook の[リスナーごとの失敗の原因と直し方](../observability/runbook-event-publication-resubmission.md#リスナーごとの失敗の原因と直し方)にある。
 
 ## Spring Modulith のイベントの失敗
 
-外部ブローカーを導入するまでは、リスナーが失敗したイベント出版がレジストリに `FAILED` の状態で残る。
-回数の上限まで再投入しても失敗した出版は `ABANDONED` の状態で archive の表に移り、これが DLQ の役割を兼ねる。
+外部ブローカーを導入するまでは、リスナーが失敗したイベント出版を、レジストリが次の二つに分けて持つ。
+
+- **再投入を待つ `FAILED`**：回数の上限に達しておらず、定期のジョブが再投入する。
+- **DLQ に当たる `ABANDONED`**：回数の上限まで再投入しても失敗したか、方針の `abandon-after-attempts: 1` で最初の失敗で諦めた。archive の表に移り、人の確認を待つ。
+
 失敗した出版の再投入は `FailedEventPublications` を使い、落ちたまま残った出版は古い出版として `FAILED` に戻してから同じ再投入で扱う。
 
 Spring Modulith 2.2.0 のイベント出版は、次の状態を持つ（[Spring Modulith: Event Publication Lifecycle](https://docs.spring.io/spring-modulith/reference/events.html)）。
@@ -83,7 +92,7 @@ Spring Modulith 2.2.0 のイベント出版は、次の状態を持つ（[Spring
   この基準は、失敗の前に書いた行とイベントの出版を commit してよいかで決める、[例外と値の使い分け](../backend/class-roles/business-exception.md)と同じである。
 - 出版の `FAILED` に残すのは、再投入で回復できる失敗と、内部の不変条件の違反である。
   内部の不変条件の違反は、確定のイベントを受けたのに注文がないような、不具合でしか起きない状態である。
-  業務の状態に記録すると不具合が隠れるため、例外を投げてデッドレターとして意図して残す。
+  業務の状態に記録すると不具合が隠れるため、例外を投げ、上限まで再投入した後に `ABANDONED`（DLQ）へ意図して残す。
   出版はイベントを保ち、ERROR のログが運用者に届き、不具合を直したあとに再投入できる。
   定期の再投入は失敗の原因を見分けないため、この出版も回数の上限まで再投入する（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 - リスナーが動く前に業務の状態が変わったとき（確定のあとに取り消した注文）は、業務の結果として処理せずに正常終了させる。
@@ -99,39 +108,34 @@ n 回目の再投入の前に、最後の試行から `min(wait-age × multiplie
 再投入の検証は、決済の `PaymentGatewayClientIntegrationTest` が、本番の Client と手での 1 回の再投入で、一時障害の `FAILED` から試行の回数 2 の `COMPLETED` になり決済記録が 1 件になることを確かめる。
 `completion-mode: archive` で完了した出版を移す archive の表は、`COMPLETED` の行を 7 日で消し、`ABANDONED` の行を残す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)、[改廃の方法](../database/table-retention-and-personal-data.md#改廃の方法)）。
 
-## DLQ の構成
+## DLQ
 
-DLQ は、ソースキューごとに一つ置く。
-全キューで一つの DLQ を共有すると、再実行の際にどのキューから来たメッセージかを判別する処理が必要になる。
+DLQ に当たるのは `ABANDONED` の出版である。
+`completion-mode: archive` のため archive の表（`modulith.event_publication_archive`）に `status = 'ABANDONED'` で入り、イベントとリスナーの ID を保つ。
+外部ブローカーを導入するまで DLQ は一つで、ソースキューごとには分けない。リスナーは `listener_id` で見分ける。
 
-## DLQ への退避
+### DLQ への退避
 
-処理不能なメッセージが同じグループの後続を止める状態を避けるため、次の二段構えで DLQ へ退避する。
-ただし、厳密な順序が必要なキューには適用しない（[順序保証と冪等性](async-ordering-and-idempotency.md)）。
+アプリケーションが DLQ へ直接送るコードは書かない。
+退避は Spring Modulith の `AbandonPolicy`（`ResubmissionPolicies`）に集め、道は次の二つである（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
 
-- **アプリケーションによる退避**：コンシューマーが回復不能と判定したエラーは、アプリケーションから即時に DLQ へ送る。
-- **基盤による退避**：予期しない例外、メモリ不足、タイムアウトによるクラッシュは、基盤の受信回数の上限（Amazon SQS の `maxReceiveCount` など）を超えた時点で DLQ へ転送させる。
+- **リスナー単位の即時の退避**：方針の `abandon-after-attempts: 1`。最初の配信の失敗で `ABANDONED` にし、自動では再投入しない。冪等キーを持たない外部システムを呼ぶリスナーが、二重の呼び出しを避けるために使う。
+- **回数の上限での退避**：全体の `spring.modulith.events.resubmission.abandon-after-attempts`（main では 5）か、2 以上の方針の値。その回数目の再投入の失敗で `ABANDONED` にする。
 
-受信回数の上限は、無限の再実行を防ぐ安全網として、アプリケーションが行う最大の再試行回数より大きい値にする。
-大きすぎると、上限とメッセージロックのタイムアウトを掛けた時間だけ後続が止まる。
+どちらも失敗の例外の種類を見ない。
+厳密な順序が必要なキューには適用しない（[順序を守るキューの回復不能エラー](async-ordering-and-idempotency.md#順序を守るキューの回復不能エラー)）。
 
-二段構えには次の前提がある。
+### DLQ からの再実行
 
-- アプリケーションによる DLQ への送信とソースキューからの削除は原子的でないため、ステータス管理テーブルで重複実行を防ぐ。
-- アプリケーションから DLQ へ送るときは、順序制御のグループ ID とトレースコンテキストなどのメタデータを明示的に引き継ぐ。引き継がないと、再実行で順序と追跡が崩れる。
+`ABANDONED` の出版は、定期の再投入、手での 1 回の再投入、古い出版を `FAILED` に戻す処理のどれの対象にもならない。
+Spring Modulith 2.2.0 には `ABANDONED` を `FAILED` に戻す API がないため、Runbook の「上限に達した出版の戻し方」の SQL で `FAILED` に戻し、「手での再投入」で再投入する。
+戻す前に、原因ごとの直し方と、戻すと外部の呼び出しが繰り返されるかを、Runbook の[リスナーごとの失敗の原因と直し方](../observability/runbook-event-publication-resubmission.md#リスナーごとの失敗の原因と直し方)で確かめる。
+再実行の操作は手での 1 回の再投入に統一し、コンシューマーに DLQ を直接読ませない。
 
-## DLQ からの再実行
+### 失敗メッセージの保持
 
-DLQ のメッセージは、ソースキューへ書き戻して再実行する。
-コンシューマーに DLQ を直接読ませる方式は、二つの入力の考慮と再実行時の構成変更が必要になるため使わない。
-
-DLQ からソースキューへ転送する再実行専用のジョブを用意し、再実行の操作を統一する。
-
-## 失敗メッセージの保持
-
-原則として、DLQ の保持期間に依存し、保持期間は基盤の最大値にする。
-失敗の解決に数週間以上かかり得る機能に限り、失敗を検知した時点でメッセージの内容を DB やオブジェクトストレージへ永続化する。
-DLQ を定期的にアーカイブする仕組みは、別のジョブと調査の手間が増えるため第一候補にしない。
+`ABANDONED` の行は、archive の保持期限の対象にせず、戻すか消すまで残す（[ADR-120](../adr/ADR-120-keep-abandoned-event-publications-out-of-archive-retention.md)）。
+出版がイベントを保つため、メッセージの内容を別の場所へ複製しない。
 
 ## 複数のシステムにまたがる整合性
 

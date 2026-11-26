@@ -27,7 +27,7 @@ plugins {
 }
 
 group = 'com.example'
-version = '0.15.0' // x-release-please-version
+version = '0.16.0' // x-release-please-version
 
 java {
     toolchain {
@@ -147,6 +147,8 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-jooq-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
     testImplementation 'org.springframework.boot:spring-boot-starter-opentelemetry-test'
+    // 指標の resource を直接読む MetricsResourceContractTest が OtlpConfig を型で参照する。実行時には starter が入れている。版は Spring Boot が管理する。
+    testImplementation 'io.micrometer:micrometer-registry-otlp'
     testImplementation 'org.springframework.modulith:spring-modulith-starter-test'
     // 非同期の条件の待ち（ADR-080）。spring-modulith-starter-test の推移的な依存に頼らず明示する。版は Spring Boot が管理する。
     testImplementation 'org.awaitility:awaitility'

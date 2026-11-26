@@ -222,8 +222,8 @@ transform と filter の `error_mode` は `ignore` にする。
   fixture は、query と fragment、大文字の scheme、userinfo、path の ID、長すぎる origin、数値でない port、`@` を重ねた userinfo、`documentURL`、`sourceFile`、`lineNumber`、`columnNumber` の入力、`disposition` のない報告、CSP 以外の型（deprecation、intervention、crash）を含み、CSP 以外の型、不正な directive、`disposition` のない報告が捨てられることを確かめる。
   `webhook_event` の受け口が、`application/reports+json` 以外の `Content-Type`（旧形式、header なし、有効な本文の `text/plain`）に 401、正しい `Content-Type` の JSON でない本文に 200（出口には残さない）、64 KiB を超える本文と空の本文に 400、GET に 405、別のパスに 404 を返すことも確かめる。
   Collector の設定を変えたら実行する。
-- **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることを確かめる。
-  MDC の `tenant.id` と `user.id` がコンソールの JSON の入れ子の項目と LogRecord の属性に出ることと、テナントを選んだ要求の中のログと受信の span がその 2 つを持ち、`http.server.requests` の tag が持たないことも確かめる。
+- **`ObservabilityContractTest`**：key-value と例外が LogRecord の属性になることと、ログとトレースの resource が同じ `service.instance.id` を持つことを確かめる。
+  MDC の `tenant.id` と `user.id` がコンソールの JSON の入れ子の項目と LogRecord の属性に出ることと、テナントを選んだ要求の中のログと受信の span がその 2 つを持つことも確かめる（`http.server.request.duration` の tag が持たないことは[指標の名前と属性](metrics.md#検証)で確かめる）。
 - **`OrderConfirmedListenerTest`**：リスナーの中のログが、イベントのテナントの `tenant.id` を持ち、発行したスレッドの MDC の `user.id` を持たないことを確かめる。
 - **`TenantContextTest`**：MDC の `tenant.id` が、入れ子の束縛から戻ると外側のテナントに戻り、束縛を出ると消えることを確かめる。
 

@@ -132,4 +132,5 @@
 - [ADR-130: E2E のデータを各テストが作り、商品は本番の商品を登録する API で作る](ADR-130-create-e2e-data-per-test-with-product-registration-api.md)（Proposed, 2026-11-25）
 - [ADR-131: すべての子に履歴の表を宣言させ、削除する前の行を TableWriter が同じトランザクションで履歴の表へ写す](ADR-131-archive-removed-child-rows-in-table-writer.md)（Proposed, 2026-11-25）
 - [ADR-132: 配信するセキュリティヘッダーに CORP と COOP を足し、HSTS を ADR-014 に揃える](ADR-132-add-corp-and-coop-to-delivered-security-headers.md)（Proposed, 2026-11-25）
+- [ADR-133: OpenTelemetry の semantic conventions に指標の名前と属性を揃える](ADR-133-align-metrics-with-opentelemetry-semantic-conventions.md)（Proposed, 2026-11-26）
 - [ADR-134: 更新系の要求の Origin と Sec-Fetch-Site を CSRF のトークンの前に確かめる](ADR-134-reject-cross-origin-updates-by-origin-and-fetch-metadata.md)（Proposed, 2026-11-26）

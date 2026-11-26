@@ -355,6 +355,15 @@ server:
 # Actuator: 監視・ヘルスチェック用エンドポイント
 # ローカル・本番（ECS）共通。ECS/ALB のヘルスチェックは /actuator/health/readiness を使う。
 management:
+  observations:
+    # 同梱の Grafana のダッシュボードと他の計装が引く OpenTelemetry の名前と属性にする（ADR-133）。
+    conventions: open-telemetry
+  metrics:
+    distribution:
+      slo:
+        # bucket がないと OTLP は +Inf だけを送り、histogram_quantile が値を返さない。
+        # 境界は OpenTelemetry の semantic conventions が推奨する値にする（ADR-133）。
+        "[http.server.request.duration]": 5ms,10ms,25ms,50ms,75ms,100ms,250ms,500ms,750ms,1s,2500ms,5s,7500ms,10s
   endpoints:
     web:
       exposure:
@@ -375,6 +384,8 @@ management:
     metrics:
       export:
         url: ${OTEL_EXPORTER_OTLP_ENDPOINT}/v1/metrics
+        # semantic conventions の時間の単位は秒で、既定のミリ秒ではダッシュボードの名前と一致しない（ADR-133）。
+        base-time-unit: seconds
   opentelemetry:
     resource-attributes:
       "[service.name]": ${OTEL_SERVICE_NAME}
@@ -384,6 +395,9 @@ management:
       # 既定値は環境変数ではなく jar の版なので、環境変数に既定値を置かない方針の対象外である。
       "[service.version]": ${spring.application.version:unknown}
       "[deployment.environment.name]": ${OTEL_DEPLOYMENT_ENVIRONMENT_NAME}
+      # JVM の起動ごとに 1 つの UUID で、ログ、トレース、指標で同じ値になる（ADR-133）。
+      # ダッシュボードはこの値の instance のラベルで系列を絞る。
+      "[service.instance.id]": ${random.uuid}
     tracing:
       export:
         otlp:

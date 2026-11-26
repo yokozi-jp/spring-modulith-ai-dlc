@@ -1,6 +1,6 @@
 # バッチ
 
-- [バッチのジョブの入口と起動](job-entry.md)：業務のバッチを Spring Batch の Job で作るとき、依存、起動の Runner、終了コード、二重の起動、JobParameters と識別の引数と入力の検査を決めるとき
+- [バッチのジョブの入口と起動](job-entry.md)：業務のバッチを Spring Batch の Job で作るとき、依存、起動の Runner、終了コード、HTTP から起動しないこと、二重の起動、JobParameters と識別の引数と入力の検査を決めるとき
 - [バッチの JobRepository](job-repository.md)：Spring Batch のメタデータの表を作るとき、表の権限を変えるとき、Job の実行の記録やその時刻を読むとき
 - [バッチのトランザクション、ロール、テナント](transaction-and-tenant.md)：ItemWriter と Tasklet から CommandHandler を呼ぶとき、Step のトランザクション、スパン、テナントごとの partition、並列を決めるとき
 - [バッチの定時起動と追いつき](scheduling-and-catch-up.md)：定時に起動する Job の起動時刻や期間の区切りを決めるとき、期間の後に届く行や 0 件の扱いを決めるとき

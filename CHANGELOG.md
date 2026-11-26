@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.15.0...v0.16.0) (2026-11-26)
+
+
+### Features
+
+* **observability:** 指標の名前と属性を OpenTelemetry の semantic conventions に揃える ([#768](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/768)) ([6442849](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/6442849169c4f4b98cfedeaab659d1d250f423f6)), closes [#563](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/563)
+
 ## [0.15.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v0.14.0...v0.15.0) (2026-11-25)
 
 

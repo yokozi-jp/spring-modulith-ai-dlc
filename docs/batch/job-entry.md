@@ -1,7 +1,7 @@
 ---
 type: Convention
 title: バッチのジョブの入口と起動
-description: 業務のバッチの対象の範囲、Spring Batch の依存と構成、追いつきの Runner の起動と終わり方、終了コード、二重の起動、JobParameters と識別の引数と入力の検査を定める規約で、業務のバッチを作るときや起動のしかた、終了コード、識別の引数を決めるときに読む。
+description: 業務のバッチの対象の範囲、Spring Batch の依存と構成、追いつきの Runner の起動と終わり方、終了コード、HTTP の route から起動しないこと、二重の起動、JobParameters と識別の引数と入力の検査を定める規約で、業務のバッチを作るときや起動のしかた、終了コード、識別の引数を決めるときに読む。
 tags: [convention, batch, spring-batch, future-arch-guidelines]
 ---
 
@@ -10,6 +10,7 @@ tags: [convention, batch, spring-batch, future-arch-guidelines]
 業務のバッチは Spring Batch の Job にし、同じイメージを `spring.batch.job.name` に Job の名前を渡して 1 回だけ起動する。
 Job は `shared.batch` の追いつきの Runner が起動し、Runner はどの終わり方でも `System.exit` で終了コードを返す。
 識別の引数は、期間で区切る Job では期間の初日、期間で区切らない Job では処理する単位の業務のキーにする。
+業務のバッチを HTTP の route から起動しない。
 決定の理由は [ADR-115](../adr/ADR-115-build-business-batches-with-spring-batch.md) に示す。
 
 ## 対象
@@ -42,6 +43,18 @@ Job は `shared.batch` の追いつきの Runner が起動し、Runner はどの
 - `ExitCodeGenerator` の Bean を、Spring Boot の `JobExecutionExitCodeGenerator` のほかに作らない。
 - 起動元（EventBridge Scheduler、Step Functions など）に依存する処理を Job に書かない。
   どの起動元から何度起動されても、[冪等性と再開](idempotency-and-restart.md) の規則で正しく終わるように作る。
+
+## HTTP の route から起動しない
+
+業務のバッチを、Controller などの HTTP の route から起動しない。
+Spring Batch 6.0 のリファレンスは「Running Jobs from within a Web Container」で、Controller から非同期に Job を起動する形を載せているが、この形を採らない。
+理由は次の 3 つである。
+
+- 起動元（EventBridge Scheduler、Step Functions）との契約は終了コードである。Web から起動すると、終了コードを返せない。
+- Job が Web のプロセスのスレッドと DB の接続を使い、Web のタスクの停止やデプロイで止まる。
+- 起動の入口が増え、認証と CSRF を別に守る必要がある。未認証で許すのは health の probe だけである（[ADR-061](../adr/ADR-061-allow-only-health-probes-unauthenticated.md)）。
+
+画面から要求する非同期の処理は、Job にせず、イベントとリスナーとステータスの表で作る（[非同期処理のステータス管理](../integration/async-job-status.md)）。
 
 ## Job の名前を渡した起動
 
