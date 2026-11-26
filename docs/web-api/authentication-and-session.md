@@ -51,7 +51,10 @@ IdPがエラーを返したとき、認可リクエストを持つセッショ�
 この画面は戻り先を消さないので、もう一度ログインに成功すると、ログインの前に開いていた画面へ戻る。
 
 `LoginFailureHandler`は、失敗ごとに`OAuth2 login failed`をINFOで1件残し、OAuth2のerror codeを`error.type`に入れる。
-RFC 6749のerror codeに使える文字だけの64文字までの値を残し、それ以外は`_OTHER`にする（[可観測性データの規約](../observability/conventions.md)）。
+残すのは`LoginFailureHandler`が持つ既知のerror codeの閉じた集合の値だけで、それ以外は`_OTHER`にする。
+集合は、Spring Securityの`OAuth2ErrorCodes`の定数（RFC 6749の4.1.2.1と5.2のcodeを含む）、OpenID Connect Core 1.0の3.1.2.6が定めるcode、Spring Securityとこのアプリがログインの処理で投げるcodeである。
+error codeはコールバックのquery stringから来て、認可リクエストを持つセッションさえあれば誰でも任意の値を送れるが、ログに届くのは集合の値だけになる。
+このため、IdPが標準の外のcodeを返したときは、そのcodeは`_OTHER`としてしか残らない。
 IdPが書く`error_description`と例外のmessageは、ログ、URL、セッションのどれにも置かない。
 失敗の種類もURLに載せないので、履歴とRefererに残らない。
 

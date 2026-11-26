@@ -98,7 +98,7 @@ Controller の中の `@PreAuthorize` が拒否したときのログは、2 つ�
 
 ログの属性で許可するのは、例外の属性（`exception.type`、`exception.message`、`exception.stacktrace`）、HTTP status、409 の種類（`conflict.kind`）、403、404、409、422 の problem type（`problem.type`）、OIDC のログインの失敗の error code（`error.type`）、テナントと利用者の ID（`tenant.id`、`user.id`）、trace と span の相関情報、業務上必要な内部 ID である。
 イベント出版の定期の再投入と手での 1 回の再投入は、業務上必要な内部 ID として出版の ID、イベントの型とリスナーの完全修飾名、試行の回数（`event_publication.id`、`event_publication.event_type`、`event_publication.listener_id`、`event_publication.completion_attempts`）と、1 回の実行の件数と、回数の上限を超えて `FAILED` に残った出版の件数（`event_publication.resubmitted.count`、`event_publication.over_limit.count`）と、手での 1 回の再投入の結果の件数（`event_publication.completed.count`、`event_publication.incomplete.count`、`event_publication.remaining.count`）を出す（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)）。
-ログインの失敗の `error.type` には RFC 6749 の文字だけの 64 文字までの error code を入れ、それ以外は `_OTHER` にする。
+ログインの失敗の `error.type` に入る値は「[ログインの失敗](../web-api/authentication-and-session.md#ログインの失敗)」に書く。
 IdP が書く `error_description` はログへ渡さない。
 イベントの本文（`serialized_event`）は読まず、ログへ渡さない。
 内部 ID と氏名などの表示値を同じ event へ載せない。
