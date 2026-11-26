@@ -18,7 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** サンプル注文の HTTP API。OpenAPI の生成結果を検証するためだけに使い、固定値を返す。 */
 @RestController
-@RequestMapping("/api/sample-orders")
+@RequestMapping(path = "/api/v{version}/sample-orders", version = "1")
 @Tag(name = "sample-order", description = "サンプル注文の API（OpenAPI 生成の検証用）")
 class SampleOrderController {
 
@@ -41,7 +41,7 @@ class SampleOrderController {
   @ApiResponse(responseCode = "422", ref = "#/components/responses/UnprocessableContentProblem")
   @PostMapping
   /* package */ ResponseEntity<Void> place(@Valid @RequestBody final SampleOrderRequest request) {
-    return ResponseEntity.created(URI.create("/api/sample-orders/SO-0001")).build();
+    return ResponseEntity.created(URI.create("/api/v1/sample-orders/SO-0001")).build();
   }
 
   /**

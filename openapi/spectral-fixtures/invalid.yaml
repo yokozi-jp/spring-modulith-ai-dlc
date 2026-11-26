@@ -20,7 +20,7 @@ tags:
 # operation-security（文書の既定の security がない。全 operation が違反になるので、operation を足したら invalid.expected にも足す。
 # security を自分で持つ operation は違反にならない）
 paths:
-  /api/sample-orders:
+  /api/v1/sample-orders:
     get:
       # operation-singular-tag
       tags:
@@ -62,7 +62,7 @@ paths:
       responses:
         "201":
           description: サンプル注文を受け付けた
-  /api/sample-orders/{sampleOrderId}:
+  /api/v1/sample-orders/{sampleOrderId}:
     get:
       tags:
         - sample-order
@@ -98,7 +98,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
   # path-params（{sampleOrderId} と同じ形のパス。spectral:oas の検出で、固有の規則ではない）
-  /api/sample-orders/{code}:
+  /api/v1/sample-orders/{code}:
     delete:
       tags:
         - sample-order
@@ -129,7 +129,7 @@ paths:
       responses:
         "204":
           description: サンプル注文を取り消した
-  /api/orders:
+  /api/v1/orders:
     get:
       tags:
         - Orders
@@ -146,7 +146,7 @@ paths:
       responses:
         "200":
           description: 注文の一覧
-  /api/sample-payments:
+  /api/v1/sample-payments:
     get:
       # operation-tag-defined
       tags:
@@ -159,7 +159,7 @@ paths:
         "200":
           description: サンプル支払いの一覧
   # path-kebab-case（snake_case）、no-top-level-array-response
-  /api/sample_items:
+  /api/v1/sample_items:
     get:
       tags:
         - sample-order
@@ -176,7 +176,7 @@ paths:
                 items:
                   type: string
   # path-kebab-case-resource（末尾が camelCase の GET）
-  /api/sampleTags:
+  /api/v1/sampleTags:
     get:
       tags:
         - sample-order
@@ -186,7 +186,7 @@ paths:
       responses:
         "200":
           description: サンプルタグの一覧
-  /api/sample-notes:
+  /api/v1/sample-notes:
     post:
       tags:
         - sample-order
@@ -210,7 +210,7 @@ paths:
               schema:
                 type: string
                 format: uri-reference
-  /api/sample-labels:
+  /api/v1/sample-labels:
     get:
       # operation-tags（tags がない）と operation-operationId（operationId がない）
       summary: サンプルラベルを一覧する。
@@ -218,7 +218,7 @@ paths:
       responses:
         "200":
           description: サンプルラベルの一覧
-  /api/sample-memos:
+  /api/v1/sample-memos:
     get:
       tags:
         - sample-order
@@ -229,6 +229,17 @@ paths:
       responses:
         default:
           description: サンプルメモの一覧
+  # path-api-version（/api/ の次の区間がバージョンでない）。security は文書の既定がないので operation-security も報告される
+  /api/sample-unversioned:
+    get:
+      tags:
+        - sample-order
+      summary: バージョンのないサンプルを一覧する。
+      description: バージョンのないサンプルを一覧する。<p>新しい順に返す。
+      operationId: listSampleUnversioned
+      responses:
+        "200":
+          description: サンプルの一覧
 components:
   # common-problem-detail-schema（ValidationProblem を定義しない）
   schemas:

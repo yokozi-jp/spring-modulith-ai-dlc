@@ -24,12 +24,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** セッションで選んだテナントの HTTP API。 */
 @RestController
-@RequestMapping(CurrentTenantController.PATH)
+@RequestMapping(path = CurrentTenantController.PATH, version = "1")
 @Tag(name = "tenancy", description = "テナントと所属の API")
 class CurrentTenantController {
 
   /** 選んだテナントのパス。PUT だけは、テナントを選ぶ前にも呼べる。 */
-  /* package */ static final String PATH = "/api/current-tenant";
+  /* package */ static final String PATH = "/api/v{version}/current-tenant";
 
   /** 利用者の所属の参照。 */
   private final TenancyQueries tenancyQueries;

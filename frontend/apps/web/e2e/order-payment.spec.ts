@@ -171,18 +171,18 @@ test("参照の要求は CSRF の token なしで成功し、更新の要求は 
   productFactory,
 }) => {
   const product = await productFactory();
-  const products = await page.request.get("/api/products");
-  expect(products.status(), "GET /api/products").toBe(200);
+  const products = await page.request.get("/api/v1/products");
+  expect(products.status(), "GET /api/v1/products").toBe(200);
 
   // Playwright の request は X-XSRF-TOKEN を付けない。
   const code = uniqueCode("E2E-CSRF");
-  const rejected = await page.request.post("/api/orders", {
+  const rejected = await page.request.post("/api/v1/orders", {
     data: { customerOrderCode: code, lines: [{ productId: product.productId, quantity: 1 }] },
   });
-  expect(rejected.status(), "token のない POST /api/orders").toBe(403);
+  expect(rejected.status(), "token のない POST /api/v1/orders").toBe(403);
 
-  const orders = await page.request.get("/api/orders");
-  expect(orders.status(), "GET /api/orders").toBe(200);
+  const orders = await page.request.get("/api/v1/orders");
+  expect(orders.status(), "GET /api/v1/orders").toBe(200);
   const body = await readJson<{ items: { customerOrderCode: string }[] }>(orders);
   expect(body.items.map((item) => item.customerOrderCode)).not.toContain(code);
 });
@@ -194,7 +194,8 @@ test("画面の作成は、CSRF の Cookie の値を X-XSRF-TOKEN で送って�
 }) => {
   const product = await productFactory();
   const created = page.waitForResponse(
-    (response) => response.url().endsWith("/api/orders") && response.request().method() === "POST",
+    (response) =>
+      response.url().endsWith("/api/v1/orders") && response.request().method() === "POST",
   );
 
   await orderCreatePage.create({
@@ -204,7 +205,7 @@ test("画面の作成は、CSRF の Cookie の値を X-XSRF-TOKEN で送って�
   });
 
   const response = await created;
-  expect(response.status(), "画面からの POST /api/orders").toBe(201);
+  expect(response.status(), "画面からの POST /api/v1/orders").toBe(201);
   expect(await response.request().headerValue("x-xsrf-token")).toBeTruthy();
 });
 

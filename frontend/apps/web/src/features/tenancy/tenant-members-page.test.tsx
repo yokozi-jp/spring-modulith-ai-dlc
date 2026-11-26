@@ -22,7 +22,7 @@ const members: TenantMembersDetailsResponse = {
   ],
 };
 
-const memberPath = `*/api/current-tenant/members/${memberId}`;
+const memberPath = `*/api/v1/current-tenant/members/${memberId}`;
 
 describe("所属の管理の画面", () => {
   it("選んだテナントの利用者と役割を一覧にし、業務の画面から所属の管理へのリンクを出す", async () => {
@@ -127,7 +127,7 @@ describe("所属の管理の画面の失敗", () => {
         lockNo: 1,
         items: [{ userId: adminId, role: "ADMIN" }],
       }),
-      http.put(`*/api/current-tenant/members/${adminId}`, () =>
+      http.put(`*/api/v1/current-tenant/members/${adminId}`, () =>
         problemResponse(422, "テナントには管理者が必要です", {
           type: "/problems/tenancy/last-admin",
         }),
@@ -159,7 +159,7 @@ describe("所属の管理の画面の失敗", () => {
 
   it("管理者でない利用者の 403 は、管理者だけの画面だと伝え、再試行を出さない", async () => {
     server.use(
-      http.get("*/api/current-tenant/members", () =>
+      http.get("*/api/v1/current-tenant/members", () =>
         problemResponse(403, "アクセス権限がありません"),
       ),
     );
@@ -172,7 +172,7 @@ describe("所属の管理の画面の失敗", () => {
 
   it("一覧を読めない 403 以外の失敗は、再試行できる一般のエラーを出す", async () => {
     server.use(
-      http.get("*/api/current-tenant/members", () => problemResponse(500, "サーバー内部エラー")),
+      http.get("*/api/v1/current-tenant/members", () => problemResponse(500, "サーバー内部エラー")),
     );
     await renderRoute("/members");
 
@@ -181,7 +181,7 @@ describe("所属の管理の画面の失敗", () => {
   });
 
   it("テナントを選んでいない 403 は、管理者だけの画面ではなく、テナントを選び直す画面へ案内する", async () => {
-    server.use(http.get("*/api/current-tenant/members", () => tenantNotSelected()));
+    server.use(http.get("*/api/v1/current-tenant/members", () => tenantNotSelected()));
     await renderRoute("/members");
 
     await expect(screen.findByRole("link", { name: "テナントを選ぶ" })).resolves.toBeTruthy();
@@ -191,14 +191,14 @@ describe("所属の管理の画面の失敗", () => {
   it("自分の役割を下げて、その後の一覧の再取得が 403 になったら、操作を残さず管理者だけの画面を出す", async () => {
     let reads = 0;
     server.use(
-      http.get("*/api/current-tenant/members", () => {
+      http.get("*/api/v1/current-tenant/members", () => {
         reads += 1;
         return reads === 1
           ? HttpResponse.json(members)
           : problemResponse(403, "アクセス権限がありません");
       }),
       http.put(
-        `*/api/current-tenant/members/${adminId}`,
+        `*/api/v1/current-tenant/members/${adminId}`,
         () => new HttpResponse(undefined, { status: 204 }),
       ),
     );

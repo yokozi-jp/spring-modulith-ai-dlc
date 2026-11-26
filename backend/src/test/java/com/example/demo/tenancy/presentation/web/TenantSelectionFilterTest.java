@@ -42,7 +42,7 @@ class TenantSelectionFilterTest {
   private static final String GET = "GET";
 
   /** テナントを選んでいる必要がある API のパス。 */
-  private static final String ORDERS = "/api/orders";
+  private static final String ORDERS = "/api/v1/orders";
 
   /** 認証した利用者の、アプリの利用者の ID。 */
   private static final String USER = "user-1";
@@ -159,8 +159,7 @@ class TenantSelectionFilterTest {
     SecurityContextHolder.getContext()
         .setAuthentication(
             UsernamePasswordAuthenticationToken.authenticated(USER, "n/a", List.of()));
-    final MockHttpServletRequest request =
-        new MockHttpServletRequest(GET, MembershipController.PATH);
+    final MockHttpServletRequest request = new MockHttpServletRequest(GET, "/api/v1/memberships");
     final MockHttpServletResponse response = new MockHttpServletResponse();
     final ServerRequestObservationContext context = observe(request, response);
 

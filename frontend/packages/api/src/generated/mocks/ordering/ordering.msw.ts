@@ -26,7 +26,7 @@ export const getFindOrderByIdResponseMock = (overrideResponse: Partial<Extract<O
 
 
 export const getListOrdersMockHandler = (overrideResponse?: OrderSummaryListResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<OrderSummaryListResponse> | OrderSummaryListResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/api/orders', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+  return http.get('*/api/v1/orders', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -38,7 +38,7 @@ export const getListOrdersMockHandler = (overrideResponse?: OrderSummaryListResp
 }
 
 export const getDraftOrderMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
-  return http.post('*/api/orders', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+  return http.post('*/api/v1/orders', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,
@@ -48,7 +48,7 @@ export const getDraftOrderMockHandler = (overrideResponse?: void | ((info: Param
 }
 
 export const getFindOrderByIdMockHandler = (overrideResponse?: OrderDetailsResponse | ((info: Parameters<Parameters<typeof http.get>[1]>[0]) => Promise<OrderDetailsResponse> | OrderDetailsResponse), options?: RequestHandlerOptions) => {
-  return http.get('*/api/orders/:orderId', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
+  return http.get('*/api/v1/orders/:orderId', async (info: Parameters<Parameters<typeof http.get>[1]>[0]) => {
 
 
     return HttpResponse.json(overrideResponse !== undefined
@@ -60,7 +60,7 @@ export const getFindOrderByIdMockHandler = (overrideResponse?: OrderDetailsRespo
 }
 
 export const getCancelOrderMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
-  return http.post('*/api/orders/:orderId/cancel', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+  return http.post('*/api/v1/orders/:orderId/cancel', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,
@@ -70,7 +70,7 @@ export const getCancelOrderMockHandler = (overrideResponse?: void | ((info: Para
 }
 
 export const getConfirmOrderMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.post>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
-  return http.post('*/api/orders/:orderId/confirm', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
+  return http.post('*/api/v1/orders/:orderId/confirm', async (info: Parameters<Parameters<typeof http.post>[1]>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,
@@ -80,7 +80,7 @@ export const getConfirmOrderMockHandler = (overrideResponse?: void | ((info: Par
 }
 
 export const getChangeOrderLinesMockHandler = (overrideResponse?: void | ((info: Parameters<Parameters<typeof http.put>[1]>[0]) => Promise<void> | void), options?: RequestHandlerOptions) => {
-  return http.put('*/api/orders/:orderId/lines', async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
+  return http.put('*/api/v1/orders/:orderId/lines', async (info: Parameters<Parameters<typeof http.put>[1]>[0]) => {
   if (typeof overrideResponse === 'function') {await overrideResponse(info); }
 
     return new HttpResponse(null,

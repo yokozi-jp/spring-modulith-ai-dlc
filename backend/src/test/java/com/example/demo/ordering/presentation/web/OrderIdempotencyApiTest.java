@@ -200,7 +200,7 @@ class OrderIdempotencyApiTest {
   void missingKeyReturnsBadRequest(final String method, final String suffix) throws Exception {
     final String orderId = draftAndGetId(UniqueCodes.next("C"));
     final String before = detailsBody(orderId);
-    final String path = suffix.isEmpty() ? "/api/orders" : "/api/orders/" + orderId + suffix;
+    final String path = suffix.isEmpty() ? "/api/v1/orders" : "/api/v1/orders/" + orderId + suffix;
 
     // 本文は検証で 400 になる空の JSON にし、キーの検査が先に動くことを確かめる。
     expectIdempotencyProblem(
@@ -226,7 +226,7 @@ class OrderIdempotencyApiTest {
 
     expectIdempotencyProblem(
         mockMvc.perform(
-            write(HttpMethod.POST, "/api/orders/" + orderId + "/confirm", "{\"lockNo\":1}")
+            write(HttpMethod.POST, "/api/v1/orders/" + orderId + "/confirm", "{\"lockNo\":1}")
                 .header(IdempotencyKey.HEADER, value)),
         400,
         "idempotency-key-invalid");
@@ -282,7 +282,7 @@ class OrderIdempotencyApiTest {
     // 確定と取消の Command は同じ JSON になるので、操作の名前だけがペイロードを分ける。
     expectIdempotencyProblem(
         mockMvc.perform(
-            write(HttpMethod.POST, "/api/orders/" + orderId + "/cancel", "{\"lockNo\":1}")
+            write(HttpMethod.POST, "/api/v1/orders/" + orderId + "/cancel", "{\"lockNo\":1}")
                 .with(IdempotencyKeys.header(key))),
         400,
         "idempotency-key-payload-mismatch");
@@ -311,7 +311,7 @@ class OrderIdempotencyApiTest {
 
     expectIdempotencyProblem(
         mockMvc.perform(
-            write(HttpMethod.POST, "/api/orders/" + orderId + "/confirm", "{\"lockNo\":1}")
+            write(HttpMethod.POST, "/api/v1/orders/" + orderId + "/confirm", "{\"lockNo\":1}")
                 .with(IdempotencyKeys.header(key))
                 .with(IdempotencyKeys.header(key))),
         400,
@@ -419,7 +419,7 @@ class OrderIdempotencyApiTest {
 
   private ResultActions confirm(final String orderId, final IdempotencyKey key) throws Exception {
     return mockMvc.perform(
-        write(HttpMethod.POST, "/api/orders/" + orderId + "/confirm", "{\"lockNo\":1}")
+        write(HttpMethod.POST, "/api/v1/orders/" + orderId + "/confirm", "{\"lockNo\":1}")
             .with(IdempotencyKeys.header(key)));
   }
 
@@ -427,7 +427,7 @@ class OrderIdempotencyApiTest {
       final String customerOrderCode, final UUID productId, final RequestPostProcessor key)
       throws Exception {
     return mockMvc.perform(
-        post("/api/orders")
+        post("/api/v1/orders")
             .with(oidcLogin())
             .with(csrf())
             .with(key)
@@ -448,7 +448,7 @@ class OrderIdempotencyApiTest {
   private static String location(final ResultActions actions) throws Exception {
     return Objects.requireNonNull(
         actions.andExpect(status().isCreated()).andReturn().getResponse().getHeader("Location"),
-        "POST /api/orders の Location");
+        "POST /api/v1/orders の Location");
   }
 
   /** キーのない、ログインと CSRF token の付いた更新の要求を作る。 */
@@ -462,7 +462,7 @@ class OrderIdempotencyApiTest {
   }
 
   private ResultActions details(final String orderId) throws Exception {
-    return mockMvc.perform(get("/api/orders/" + orderId).with(oidcLogin()));
+    return mockMvc.perform(get("/api/v1/orders/" + orderId).with(oidcLogin()));
   }
 
   private String detailsBody(final String orderId) throws Exception {
@@ -474,6 +474,6 @@ class OrderIdempotencyApiTest {
   }
 
   private ResultActions orderCount() throws Exception {
-    return mockMvc.perform(get("/api/orders").with(oidcLogin()));
+    return mockMvc.perform(get("/api/v1/orders").with(oidcLogin()));
   }
 }

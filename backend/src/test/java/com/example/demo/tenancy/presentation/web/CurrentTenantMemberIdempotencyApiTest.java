@@ -53,7 +53,7 @@ import org.springframework.test.web.servlet.result.JsonPathResultMatchers;
 class CurrentTenantMemberIdempotencyApiTest {
 
   /** 選んだテナントの所属の API。 */
-  private static final String MEMBERS = "/api/current-tenant/members";
+  private static final String MEMBERS = "/api/v1/current-tenant/members";
 
   /** 実際の Spring MVC と Security filter chain を通すクライアント。 */
   @Autowired private MockMvc mockMvc;

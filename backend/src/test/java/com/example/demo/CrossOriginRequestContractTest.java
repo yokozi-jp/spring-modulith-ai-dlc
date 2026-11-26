@@ -75,7 +75,7 @@ class CrossOriginRequestContractTest {
   void sameOriginUpdateWithValidTokenReachesAuthentication() throws Exception {
     mockMvc
         .perform(
-            post("/api/orders")
+            post("/api/v1/orders")
                 .with(csrf())
                 .header(HttpHeaders.ORIGIN, "http://localhost")
                 .header("Sec-Fetch-Site", "same-origin"))
@@ -84,6 +84,6 @@ class CrossOriginRequestContractTest {
 
   /** ログインした利用者が {@code origin} から送る、注文の作成の要求。 */
   private static MockHttpServletRequestBuilder update(final String origin) {
-    return post("/api/orders").with(user("test-user")).header(HttpHeaders.ORIGIN, origin);
+    return post("/api/v1/orders").with(user("test-user")).header(HttpHeaders.ORIGIN, origin);
   }
 }

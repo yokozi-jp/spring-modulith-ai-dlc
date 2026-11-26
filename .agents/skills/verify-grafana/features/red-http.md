@@ -20,7 +20,7 @@ Explore の Prometheus で `check.sh` の PromQL を実行してもよい。
 
 ```bash
 end=$((SECONDS+300)); while [ $SECONDS -lt $end ]; do
-  for p in /api/orders /error /actuator/health/readiness; do curl -s -o /dev/null localhost:<SERVER_PORT>$p; done  # 401、500、200
+  for p in /api/v1/orders /error /actuator/health/readiness; do curl -s -o /dev/null localhost:<SERVER_PORT>$p; done  # 401、500、200
   sleep 1
 done
 ```

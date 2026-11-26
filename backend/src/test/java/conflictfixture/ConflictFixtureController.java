@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 /** 競合の例外を投げる HTTP API。例外の内容が応答に出ないことを確かめるためだけに使う。 */
 @RestController
-@RequestMapping("/api/conflict-fixture")
+@RequestMapping(path = "/api/v{version}/conflict-fixture", version = "1")
 class ConflictFixtureController {
 
   /** 版が違う場合の競合を投げる。 */

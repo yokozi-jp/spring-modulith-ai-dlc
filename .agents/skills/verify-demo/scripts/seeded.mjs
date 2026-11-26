@@ -5,8 +5,8 @@ export const seededOrderCodesByStatusLabel = {
 };
 
 export async function listProducts(request) {
-  const response = await request.get("/api/products");
-  if (response.status() !== 200) throw new Error(`GET /api/products が ${response.status()} を返しました`);
+  const response = await request.get("/api/v1/products");
+  if (response.status() !== 200) throw new Error(`GET /api/v1/products が ${response.status()} を返しました`);
   return (await response.json()).items;
 }
 

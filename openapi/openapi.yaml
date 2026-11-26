@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   description: Demo アプリケーションの HTTP API
   title: Demo API
-  version: 0.15.0
+  version: 1.0.0
 servers:
 - description: 現在のオリジン
   url: /
@@ -18,7 +18,7 @@ tags:
 - description: 商品の API
   name: product
 paths:
-  /api/current-tenant:
+  /api/v1/current-tenant:
     get:
       description: テナントを選ぶ前は、type が /problems/tenant-not-selected の 403 を返す。
       operationId: findCurrentTenant
@@ -66,7 +66,7 @@ paths:
       tags:
       - tenancy
       x-idempotency-key: none
-  /api/current-tenant/members:
+  /api/v1/current-tenant/members:
     get:
       description: 一覧は所属した順に items で包んで返す。lockNo は変更の操作で送り返す。管理者以外には 403 を返す。
       operationId: listTenantMembers
@@ -86,7 +86,7 @@ paths:
       summary: 選んだテナントに所属している利用者の一覧を返す。
       tags:
       - tenancy
-  /api/current-tenant/members/{userId}:
+  /api/v1/current-tenant/members/{userId}:
     delete:
       description: 外した利用者は、次のリクエストから業務の API を呼べない。管理者以外には 403、最後の管理者を外すと 422 を返す。
       operationId: removeTenantMember
@@ -166,7 +166,7 @@ paths:
       summary: 所属している利用者の役割を変える。
       tags:
       - tenancy
-  /api/memberships:
+  /api/v1/memberships:
     get:
       description: 一覧はテナントの名前の順に items で包んで返す。テナントを選ぶ前にも呼べる。所属がなければ空の items を返す。
       operationId: listMemberships
@@ -186,7 +186,7 @@ paths:
       summary: ログインした利用者の所属の一覧を返す。
       tags:
       - tenancy
-  /api/orders:
+  /api/v1/orders:
     get:
       description: 一覧は作成した時刻の新しい順に items で包んで返す。状態を指定すると、その状態の注文だけを返す。
       operationId: listOrders
@@ -256,7 +256,7 @@ paths:
       summary: 下書きの注文を作る。
       tags:
       - ordering
-  /api/orders/{orderId}:
+  /api/v1/orders/{orderId}:
     get:
       description: 注文がなければ 404 を返す。
       operationId: findOrderById
@@ -288,7 +288,7 @@ paths:
       summary: 注文の詳細を返す。
       tags:
       - ordering
-  /api/orders/{orderId}/cancel:
+  /api/v1/orders/{orderId}/cancel:
     post:
       description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでなければ 422 を返す。
       operationId: cancelOrder
@@ -328,7 +328,7 @@ paths:
       summary: 下書きの注文を取り消す。
       tags:
       - ordering
-  /api/orders/{orderId}/confirm:
+  /api/v1/orders/{orderId}/confirm:
     post:
       description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでなければ 422 を返す。
       operationId: confirmOrder
@@ -368,7 +368,7 @@ paths:
       summary: 下書きの注文を確定する。
       tags:
       - ordering
-  /api/orders/{orderId}/lines:
+  /api/v1/orders/{orderId}/lines:
     put:
       description: 注文がなければ 404、画面が読んだ後に注文が変わっていれば 409、下書きでないか、存在しないか販売終了の商品を指定すると
         422 を返す。
@@ -409,7 +409,7 @@ paths:
       summary: 下書きの注文の明細を置き換える。
       tags:
       - ordering
-  /api/payments:
+  /api/v1/payments:
     get:
       description: 決済記録は 1 注文につき 1 件までなので、items に 0 件か 1 件を入れて返す。決済記録がない注文と、存在しない注文では、空の
         items を返す。
@@ -440,7 +440,7 @@ paths:
       summary: 注文の決済記録を返す。
       tags:
       - payment
-  /api/products:
+  /api/v1/products:
     get:
       description: 一覧は商品コードの昇順で items で包んで返す。
       operationId: listProducts
@@ -495,7 +495,7 @@ paths:
       summary: 商品を登録する。
       tags:
       - product
-  /api/products/{productId}:
+  /api/v1/products/{productId}:
     get:
       description: 商品がなければ 404 を返す。
       operationId: findProductById

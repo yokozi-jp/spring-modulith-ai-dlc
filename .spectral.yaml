@@ -236,6 +236,16 @@ rules:
                             $ref:
                               pattern: "^#/components/schemas/(ProblemDetail|ValidationProblem)$"
 
+  # ponytail: 先頭の区間だけを見る。v2 を足すときは、同じ契約に /api/v1/ と /api/v2/ を並べてよいので、この規則を変えない。
+  path-api-version:
+    description: パスを /api/v<メジャー番号>/ で始める（docs/web-api/versioning.md）。
+    severity: error
+    given: "$.paths[*]~"
+    then:
+      function: pattern
+      functionOptions:
+        match: '^/api/v[0-9]+/'
+
   # ponytail: 区間は kebab-case かパスパラメータ。パスパラメータの名前は英字で始まる英数字に限る（camelCase を許す）。
   path-kebab-case:
     description: パスの各区間を kebab-case かパスパラメータにする。カスタムメソッドの camelCase は末尾に限る（docs/web-api/api-style.md）。

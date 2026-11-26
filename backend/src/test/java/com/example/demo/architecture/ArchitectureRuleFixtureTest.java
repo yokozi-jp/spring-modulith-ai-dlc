@@ -332,6 +332,10 @@ class ArchitectureRuleFixtureTest {
             IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(VIOLATING),
             "ordering.presentation.web.OrderKeyController.ship("),
         row(
+            "apiControllersDeclareVersion",
+            ApiVersionArchTest.apiControllersDeclareVersionRule(VIOLATING),
+            "ordering.presentation.web.OrderVersionController"),
+        row(
             "idempotentCommandHandlersExecuteThroughIdempotency",
             IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotencyRule(VIOLATING),
             "ordering.application.RedeliverOrderCommandHandler.handle("),
@@ -630,6 +634,7 @@ class ArchitectureRuleFixtureTest {
         TableWriterArchTest.expectedLockNoIsCreatedOnlyByRequestsRule(basePackage),
         IdempotencyArchTest.unsafeHandlersTakeIdempotencyKeyRule(basePackage),
         IdempotencyArchTest.idempotentCommandHandlersExecuteThroughIdempotencyRule(basePackage),
+        ApiVersionArchTest.apiControllersDeclareVersionRule(basePackage),
         PublicIdArchTest.numericIdsDoNotLeaveModulesRule(basePackage),
         DatabaseConventionsArchTest.ownGeneratedSchemaRule(
             basePackage, JOOQ_PACKAGE, FIXTURE_MODULES),

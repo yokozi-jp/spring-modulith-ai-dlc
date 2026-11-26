@@ -58,7 +58,7 @@ async function submitConflictingChange() {
 /** 確定と明細の変更の要求の Idempotency-Key を記録し、responses を順に返す（最後の応答を繰り返す）。 */
 function serveKeyed(method: "put" | "post", path: string, ...responses: (() => Response)[]) {
   const { keys, resolver } = recordKeysAndRespond(...responses);
-  server.use(http[method](`*/api/orders/:orderId/${path}`, resolver));
+  server.use(http[method](`*/api/v1/orders/:orderId/${path}`, resolver));
   return keys;
 }
 
@@ -273,7 +273,7 @@ describe("注文の詳細の画面の決済の失敗", () => {
 
   it("決済の参照が 500 なら決済の欄に失敗と読み直しのボタンを出し、注文の見出しと明細と操作を残す", async () => {
     serveDetail(draftOrder());
-    server.use(http.get("*/api/payments", () => problemResponse(500, "Internal Server Error")));
+    server.use(http.get("*/api/v1/payments", () => problemResponse(500, "Internal Server Error")));
 
     await renderRoute(detailPath);
 

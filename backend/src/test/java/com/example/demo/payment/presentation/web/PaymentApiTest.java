@@ -44,7 +44,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 class PaymentApiTest {
 
   /** 決済記録の一覧の API の path。 */
-  private static final String PAYMENTS_PATH = "/api/payments";
+  private static final String PAYMENTS_PATH = "/api/v1/payments";
 
   /** 請求の結果を記録した時刻の、API が返す形。 */
   private static final String RECORDED_AT_TEXT = "2026-10-06T01:02:03.123456Z";

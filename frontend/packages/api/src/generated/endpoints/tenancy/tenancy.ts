@@ -98,7 +98,7 @@ export const getFindCurrentTenantUrl = () => {
 
 
 
-  return `/api/current-tenant`
+  return `/api/v1/current-tenant`
 }
 
 /**
@@ -122,7 +122,7 @@ export const findCurrentTenant = async ( options?: Parameters<typeof apiFetch>[1
 
 export const getFindCurrentTenantQueryKey = () => {
     return [
-    `/api/current-tenant`
+    `/api/v1/current-tenant`
     ] as const;
     }
 
@@ -291,7 +291,7 @@ export const getSelectTenantUrl = () => {
 
 
 
-  return `/api/current-tenant`
+  return `/api/v1/current-tenant`
 }
 
 /**
@@ -406,7 +406,7 @@ export const getListTenantMembersUrl = () => {
 
 
 
-  return `/api/current-tenant/members`
+  return `/api/v1/current-tenant/members`
 }
 
 /**
@@ -430,7 +430,7 @@ export const listTenantMembers = async ( options?: Parameters<typeof apiFetch>[1
 
 export const getListTenantMembersQueryKey = () => {
     return [
-    `/api/current-tenant/members`
+    `/api/v1/current-tenant/members`
     ] as const;
     }
 
@@ -617,7 +617,7 @@ export const getRemoveTenantMemberUrl = (userId: string,
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/current-tenant/members/${userId}?${stringifiedParams}` : `/api/current-tenant/members/${userId}`
+  return stringifiedParams.length > 0 ? `/api/v1/current-tenant/members/${userId}?${stringifiedParams}` : `/api/v1/current-tenant/members/${userId}`
 }
 
 /**
@@ -754,7 +754,7 @@ export const getChangeTenantMemberRoleUrl = (userId: string,) => {
 
 
 
-  return `/api/current-tenant/members/${userId}`
+  return `/api/v1/current-tenant/members/${userId}`
 }
 
 /**
@@ -871,7 +871,7 @@ export const getListMembershipsUrl = () => {
 
 
 
-  return `/api/memberships`
+  return `/api/v1/memberships`
 }
 
 /**
@@ -895,7 +895,7 @@ export const listMemberships = async ( options?: Parameters<typeof apiFetch>[1])
 
 export const getListMembershipsQueryKey = () => {
     return [
-    `/api/memberships`
+    `/api/v1/memberships`
     ] as const;
     }
 
