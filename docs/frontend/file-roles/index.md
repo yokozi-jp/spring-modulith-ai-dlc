@@ -1,7 +1,7 @@
 # ファイルの役割
 
 - [ファイルの役割：route](route.md)：route のファイル、pathless layout、loader を作るとき、route の近くにテストを置くとき
-- [ファイルの役割：feature の画面](feature-page.md)：業務機能の画面（`*-page.tsx`）を作るとき、画面の責務を確かめるとき
+- [ファイルの役割：feature の画面](feature-page.md)：業務機能の画面（`pages/*-page.tsx`）を作るとき、画面の責務を確かめるとき
 - [ファイルの役割：feature の component](feature-component.md)：業務機能の component を作るとき、画面から component を分けるとき、form の入力欄を共有するとき
 - [ファイルの役割：feature の Hook](feature-hook.md)：業務機能の custom Hook を作るか判断するとき、mutation や form の Hook を書くとき
 - [ファイルの役割：feature の form の組み立て](feature-form.md)：複数の form が入力欄を共有するとき、`form.ts` を作るか判断するとき

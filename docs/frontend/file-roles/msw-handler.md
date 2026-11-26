@@ -15,7 +15,7 @@ HTTP の境界の置き換えの方針は[フロントエンドのテストと�
 
 API を使う component test は、HTTP の境界を MSW で置き換え、Orval の生成関数を module mock で差し替えない。
 **MSW の handler と fixture** は、その置き換えのために複数のテストが共有する server、応答の値、handler を足す関数である。
-1 つのテストファイルだけが使う handler は、そのテストファイルに書く（`features/orders/orders-page.test.tsx` の `serveOrders`）。
+1 つのテストファイルだけが使う handler は、そのテストファイルに書く（`features/orders/pages/orders-page.test.tsx` の `serveOrders`）。
 
 - `apps/web/src/testing/msw.ts`：`apps/web` の全テストが共有する server。選んだテナントの API（`GET /api/v1/current-tenant`）だけを既定で応える
 - `packages/api/src/testing/msw.ts`：`@frontend/api` の全テストが共有する server。既定の handler を持たない
@@ -136,7 +136,7 @@ export function serveDetail(initial: OrderDetailsResponse) {
 }
 ```
 
-テストは fixture を生成 handler に渡し、`renderRoute` で画面を描画する（`features/orders/order-detail-payment.test.tsx`）。
+テストは fixture を生成 handler に渡し、`renderRoute` で画面を描画する（`features/orders/pages/order-detail-payment.test.tsx`）。
 
 ```tsx
   it("決済記録の状態が知らない値なら、決済済みとせず不明を出す", async () => {

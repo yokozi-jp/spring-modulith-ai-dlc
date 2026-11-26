@@ -78,7 +78,7 @@ backend が返す Problem Details の `title` と `detail` は catalog に置か
 },
 ```
 
-`features/orders/order-new-page.tsx` は、`useTranslation` の `t` で key を引く（抜粋）。
+`features/orders/pages/order-new-page.tsx` は、`useTranslation` の `t` で key を引く（抜粋）。
 
 ```tsx
 export function OrderNewPage() {
@@ -136,7 +136,7 @@ describe("resolveLocale", () => {
 ```
 
 画面の文言は、component test で role と name から確かめる（[フロントエンドのテストと検証](../testing.md#書き方)）。
-既定の言語は `ja` であり、英語の表示は `renderRoute` に `locale: "en"` を渡して確かめる（`features/orders/orders-page.test.tsx`）。
+既定の言語は `ja` であり、英語の表示は `renderRoute` に `locale: "en"` を渡して確かめる（`features/orders/pages/orders-page.test.tsx`）。
 
 ```tsx
     await renderRoute("/orders", { locale: "en" });

@@ -173,12 +173,13 @@ frontend/apps/web/src/
 │
 ├── features/
 │   └── <business-feature>/
-│       ├── <feature>-page.tsx
+│       ├── pages/             # 画面（<screen>-page.tsx）とそのテスト
 │       ├── components/        # feature固有componentがある場合だけ追加
-│       ├── hooks/             # custom Hookがある場合だけ追加
+│       ├── hooks/             # custom Hook（use-*.ts）がある場合だけ追加
+│       ├── <関心>.ts          # Reactを使わない型、定数、純粋関数（module）
 │       ├── queries.ts         # queryの合成が必要な場合だけ追加
 │       ├── schemas.ts         # 手書き入力schemaがある場合だけ追加
-│       └── *.test.tsx
+│       └── *.test.ts          # moduleのテスト
 │
 ├── api/
 │   ├── query-client.ts
@@ -216,6 +217,9 @@ frontend/packages/api/
 この構成は完成形の雛形ではなく、ファイルの所属を決めるための上限である。
 
 空の `components`、`hooks`、`queries.ts`、`schemas.ts` は作らず、対応するコードが生じた時点で追加する。
+`pages/` は、画面が一つの feature にも作る。
+featureの直下には `.tsx` を置かず、`*-page.tsx` は `pages/` にだけ置く。
+この配置は `frontend/lint/feature-layout.test.js` が検査する。
 
 `app`、`services`、`stores`、トップレベル `hooks` は禁止しないが、現在はそれらが受け持つ独立した責務がないため追加しない。
 

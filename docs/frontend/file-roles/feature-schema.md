@@ -153,7 +153,7 @@ export function draftOrderFormSchema(t: TFunction) {
 ## 対応するテスト
 
 `schemas.ts` の条件は、form を持つ画面の component test で、送信時の誤りの文言と、要求を送らないことを確かめる。
-今は `features/orders/order-new-page.test.tsx` の「送信時の検証の誤りを入力欄の直下に出し、送信しない」が、必須の条件を確かめている（[feature の component](feature-component.md#対応するテスト)に引用がある）。
+今は `features/orders/pages/order-new-page.test.tsx` の「送信時の検証の誤りを入力欄の直下に出し、送信しない」が、必須の条件を確かめている（[feature の component](feature-component.md#対応するテスト)に引用がある）。
 手書きした条件が OpenAPI の制約と一致することは、レビューとこのテストで確かめる（[検証条件の同期](../form-validation.md#検証条件の同期)）。
 
 ## アンチパターン

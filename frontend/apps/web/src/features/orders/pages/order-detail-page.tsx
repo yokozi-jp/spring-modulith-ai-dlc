@@ -2,13 +2,12 @@ import { getRouteApi, Link } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 
 import { ProblemNotice } from "@/components/problem-notice";
-
-import { ConflictChoices } from "./components/conflict-choices";
-import { OrderLinesEditor } from "./components/order-lines-editor";
-import { OrderLinesTable } from "./components/order-lines-table";
-import { OrderStatusButtons } from "./components/order-status-buttons";
-import { OrderSummary } from "./components/order-summary";
-import { useOrderDetail } from "./hooks/use-order-detail";
+import { ConflictChoices } from "@/features/orders/components/conflict-choices";
+import { OrderLinesEditor } from "@/features/orders/components/order-lines-editor";
+import { OrderLinesTable } from "@/features/orders/components/order-lines-table";
+import { OrderStatusButtons } from "@/features/orders/components/order-status-buttons";
+import { OrderSummary } from "@/features/orders/components/order-summary";
+import { useOrderDetail } from "@/features/orders/hooks/use-order-detail";
 
 const routeApi = getRouteApi("/_authenticated/_tenant/orders/$orderId/");
 

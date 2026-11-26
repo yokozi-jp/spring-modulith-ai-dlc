@@ -115,6 +115,6 @@ form の組み立てだけを確かめるテストは書かない。
 - [ ] 入力欄の誤りを `firstErrorMessage` で取る。［自分で点検］
 - [ ] 文言が要る補助関数は `t` を引数で受け、Hook を呼ばない。［Oxlint で検査：react/rules-of-hooks］
 - [ ] 関数を関数宣言で書く。［Oxlint で検査：func-style］
-- [ ] 画面、component、Hook、`schemas.ts` を import しない。［自分で点検］
+- [ ] 画面、component、Hook、`schemas.ts` を import しない。［Oxlint で検査：no-restricted-imports（`schemas.ts` は自分で点検）］
 - [ ] 他の feature を import しない。［Oxlint で検査：feature-boundaries/no-cross-feature-import］
 - [ ] 補助関数の unit test を隣に置く。［自分で点検］

@@ -22,6 +22,7 @@ React の state を使わない処理を component や Hook に書くと、業�
 - **`features/orders/server-errors.ts`**：入力検証の 400 の `errors` を、入力欄の名前ごとの誤りに振り分ける関数。
 
 feature の直下の `.ts` でも、入力 schema の `schemas.ts` は [feature の入力 schema](feature-schema.md)、TanStack Form の `form.ts` は [feature の form の組み立て](feature-form.md)の役割である。
+query options を合成する `queries.ts` も module ではなく、`@tanstack/react-query` を使える。
 複数の feature が使う関数は feature の module にせず、`src/lib/` に置く（[共有コード](../architecture.md#共有コード)）。
 
 ## 置き場所と命名
@@ -45,7 +46,7 @@ feature の直下の `.ts` でも、入力 schema の `schemas.ts` は [feature 
 ## 依存してよいもの、してはいけないもの
 
 - **依存してよいもの**：`@frontend/api/models` の型、`@frontend/api/api-error` の `ApiProblemError`、i18next の `TFunction` の型、`@/lib/`、同じ feature の module。
-- **依存してはいけないもの**：`react` と `react-i18next`（Hook と JSX）、同じ feature の画面、component、Hook、`@/routes/**` と `@/routeTree.gen`、他の feature、テスト用の部品、テレメトリの SDK、global の `fetch` と `XMLHttpRequest`。
+- **依存してはいけないもの**：`react`、`react-i18next`、`@tanstack/react-*`、`@frontend/ui`、`lucide-react`（Hook と JSX）、同じ feature の画面、component、Hook、`@/routes/**` と `@/routeTree.gen`、他の feature、テスト用の部品、テレメトリの SDK、global の `fetch` と `XMLHttpRequest`。
 
 ## 最小の例と典型的な例
 
@@ -206,11 +207,11 @@ describe("注文の入力の失敗の通知", () => {
 
 ## 作成時のチェックリスト
 
-- [ ] `features/<feature>/` の直下に、関心を表す名詞の名前で置く。［自分で点検］
+- [ ] `features/<feature>/` の直下に、関心を表す名詞の名前の `.ts` で置く。直下に `.tsx` は置かない。［配置の検査：frontend/lint/feature-layout.test.js（名前は自分で点検）］
 - [ ] ファイル名を kebab-case にする。［Oxlint で検査：unicorn/filename-case］
 - [ ] 関数を関数宣言で書く。［Oxlint で検査：func-style］
 - [ ] Hook を呼ばず、文言が要る関数は `t` を引数で受ける。［Oxlint で検査：react/rules-of-hooks（`t` の受け方は自分で点検）］
-- [ ] `react` と `react-i18next`、同じ feature の画面、component、Hook に依存しない。［自分で点検］
+- [ ] `react`、`react-i18next`、`@tanstack/react-*`、`@frontend/ui`、`lucide-react`、同じ feature の画面、component、Hook に依存しない（alias と `./` の両方）。［Oxlint で検査：no-restricted-imports。React に依存する新しい package は自分で点検］
 - [ ] 区分値の表示名を `as const satisfies Record<区分値, string>` の対応で書き、対応にない値はコード値を返す。［自分で点検］
 - [ ] 失敗の判定を `status` と Problem Details の `type` で行う。［自分で点検］
 - [ ] catalog に存在する key だけを `t` に渡す。［型検査で検査：i18next.d.ts の CustomTypeOptions］
