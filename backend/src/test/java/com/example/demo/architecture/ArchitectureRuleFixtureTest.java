@@ -371,9 +371,13 @@ class ArchitectureRuleFixtureTest {
         .flatMap(rows -> rows);
   }
 
-  /** TableWriter の規則（H3、H6、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
+  /** TableWriter の規則（H1、H3、H6、R1 から R4）が、対応する違反フィクスチャを検出することを確かめる行を作る。 */
   private static Stream<FixtureRow> tableWriterRows() {
     return Stream.of(
+        row(
+            "tableWritesGoThroughTableWriter",
+            TableWriterArchTest.tableWritesGoThroughTableWriterRule(VIOLATING),
+            "ordering.infrastructure.persistence.DirectOrderWriter"),
         row(
             "repositoryUpdateCallsVersionedEntryPoint",
             TableWriterArchTest.repositoryUpdateCallsVersionedEntryPointRule(VIOLATING),

@@ -14,10 +14,6 @@ final class FixtureExemptions {
   private static final String TEST_CODE =
       "TestCodeOnly でテストコードを検査する規則で、プロダクションコードの形を模した archfixture には対象のクラスがないため";
 
-  /** {@code DirectWriteFixtureTest} が確かめる規則の理由。 */
-  private static final String DIRECT_WRITE_FIXTURE_TEST =
-      "DirectWriteFixtureTest が DirectOrderWriter のメソッドごとに、検出される禁止の呼び出しまで確かめるため";
-
   /** {@code SleepRuleFixtureTest} が確かめる規則の理由。 */
   private static final String SLEEP_RULE_FIXTURE_TEST =
       "テストコードを検査する規則で、SleepRuleFixtureTest が archfixture.sleep のクラスで確かめるため";
@@ -57,7 +53,6 @@ final class FixtureExemptions {
           entry("disabledTestMethodsRequireReason", TEST_CODE),
           entry("disabledTestClassesRequireReason", TEST_CODE),
           entry("sleepIsNotUsedInTests", SLEEP_RULE_FIXTURE_TEST),
-          entry("tableWritesGoThroughTableWriter", DIRECT_WRITE_FIXTURE_TEST),
           entry("transactionIsolationIsNotDeclared", DATABASE_CONVENTION_BYPASS),
           entry("plainSqlApisAreNotUsed", DATABASE_CONVENTION_BYPASS),
           entry("verbatimSqlApisAreNotUsed", DATABASE_CONVENTION_BYPASS),
