@@ -9,7 +9,6 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes;
 import org.springframework.security.web.DefaultRedirectStrategy;
-import org.springframework.security.web.RedirectStrategy;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
 /**
@@ -66,9 +65,6 @@ final class LoginFailureHandler implements AuthenticationFailureHandler {
   /** 失敗を伝える SPA の画面。 */
   private static final String FAILURE_PATH = "/login-failed";
 
-  /** {@code /login-failed} へ移す。 */
-  private final RedirectStrategy redirectStrategy = new DefaultRedirectStrategy();
-
   @Override
   public void onAuthenticationFailure(
       final HttpServletRequest request,
@@ -77,7 +73,7 @@ final class LoginFailureHandler implements AuthenticationFailureHandler {
       throws IOException {
     // error_description は IdP が書く文で、例外の message と toString() にも入るため、例外を渡さない。
     log.atInfo().addKeyValue("error.type", errorType(exception)).log("OAuth2 login failed");
-    redirectStrategy.sendRedirect(request, response, FAILURE_PATH);
+    new DefaultRedirectStrategy().sendRedirect(request, response, FAILURE_PATH);
   }
 
   /** ログに残す失敗の種類。OAuth2 の error code が既知の code なら、その code を返す。 */

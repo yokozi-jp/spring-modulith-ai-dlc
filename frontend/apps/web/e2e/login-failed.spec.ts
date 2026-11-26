@@ -17,5 +17,6 @@ test("認可リクエストのないログインのコールバックを開く�
   await expect(
     page.getByRole("heading", { level: 1, name: "ログインできませんでした" }),
   ).toBeVisible();
+  // Spring Security の既定のログイン画面へ落ちていないことを、その画面の見出しで確かめる。
   await expect(page.getByText("Please sign in")).toHaveCount(0);
 });

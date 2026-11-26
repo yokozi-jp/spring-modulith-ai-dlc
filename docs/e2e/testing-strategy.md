@@ -104,7 +104,6 @@ backend が送ったメールは、compose-test の WireMock（`.env.test` の `
 setup project は、`storageState` を持たない browser context で `/oauth2/authorization/web` を開き、Keycloak の画面で `test-user` としてログインする。
 `/` から始めると、SPA が API の 401 を受けて自分でログインへ遷移し、setup project の遷移と競合する。
 この遷移そのものは、ログアウト後に `/` を開く `logout.spec.ts` のテストと、未認証で認証必須の画面を開く `unauthenticated-redirect.spec.ts` が確かめる。
-ログインの失敗は、認可リクエストのないコールバックを直接開く `login-failed.spec.ts` が、配信点の proxy を通って `/login-failed` の画面に着くことで確かめる。
 `test-user` は `task e2e-up` が入れる所属で 2 つのテナントに属するため、戻り先はテナントを選ぶ画面（web の origin の `/tenants`）になる。
 認証の前後で `__Host-APP_SESSION` Cookie の値が変わったことで認証済みと判断し、サンプル商事を選ぶ。
 選んだ後に web の origin の `/` へ移り、`__Host-APP_SESSION` の値がもう一度変わったことを確かめてから、`frontend/apps/web/e2e/.auth/user.json` に保存する。
@@ -118,6 +117,8 @@ setup project は、`storageState` を持たない browser context で `/oauth2/
 - `storageState` のファイルは CI の artifact に入らない。
   ただし中身の Cookie は失敗時の trace に入る。
   その Cookie は後片付けで破棄した環境のものである。
+
+ログインの失敗は、認可リクエストのないコールバックを直接開く `login-failed.spec.ts` が、配信点の proxy を通って `/login-failed` の画面に着くことで確かめる。
 
 ## 書き方
 
