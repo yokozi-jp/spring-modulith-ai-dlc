@@ -60,6 +60,7 @@ tags: [convention, database, liquibase, security, credentials]
 - `idle_in_transaction_session_timeout`は、トランザクションの中で呼ぶ外部システムの最悪の時間より長くします。
   決済のListenerはトランザクションの中で決済代行を呼び、待つ間はトランザクションを開いたままです（[ADR-050](../adr/ADR-050-define-backend-class-roles-and-naming.md)）。
   今の最悪の時間は3秒で、計算と検査は[外部システムのClient](../backend/class-roles/external-client.md)と`DemoApplicationTest`にあります。
+  この間にListenerが持つ接続の数は、[基盤の品質特性シナリオ](../nfr/quality-attribute-scenarios.md#接続の予算)の接続の予算（`λ × L ≤ C`、`C ≤ P − R`）に収めます。
 
 `postgresql.conf`、RDSのパラメータグループ、`ALTER ROLE`では設定しません。
 1つのトランザクションだけ上限を変えるときは、`SET LOCAL`を使い、理由をコードに書きます。
