@@ -32,9 +32,6 @@ import org.xml.sax.SAXException;
  */
 class ArchitectureRuleMessageTest {
 
-  /** ArchUnit が規則の説明と because の文をつなぐ区切り。最後の区切りの後が、このプロジェクトで書いた because である。 */
-  private static final String BECAUSE = ", because ";
-
   /** because の形。理由、直し方、規約の文書のパスの順に取り出す。 */
   private static final Pattern FORMAT = Pattern.compile("(?s)(.*?)直し方：(.+)。規約：(docs/.+)");
 
@@ -106,13 +103,7 @@ class ArchitectureRuleMessageTest {
     return ArchTestFields.ruleFields().stream()
         .map(field ->
             Arguments.of(
-                field.owner() + "." + field.name(), lastBecause(field.rule().getDescription())));
-  }
-
-  /** ArchUnit の規則の説明から最後の because を取り出す。because がなければ空文字を返し、形の検査で失敗させる。 */
-  private static String lastBecause(final String description) {
-    final int index = description.lastIndexOf(BECAUSE);
-    return index < 0 ? "" : description.substring(index + BECAUSE.length());
+                field.owner() + "." + field.name(), ArchTestFields.lastBecause(field.rule())));
   }
 
   /**

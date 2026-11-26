@@ -13,6 +13,9 @@ import java.util.stream.Stream;
 /** このパッケージで {@link ArchTest} を付けた {@link ArchRule} のフィールドを、規則の一覧を確かめるテストで共有する。 */
 final class ArchTestFields {
 
+  /** ArchUnit が規則の説明と because の文をつなぐ区切り。最後の区切りの後が、このプロジェクトで書いた because である。 */
+  private static final String BECAUSE = ", because ";
+
   private ArchTestFields() {}
 
   /** このパッケージのクラスを import して返す。 */
@@ -36,6 +39,13 @@ final class ArchTestFields {
         .map(field ->
             new RuleField(field.getOwner().getSimpleName(), field.getName(), ruleOf(field)))
         .toList();
+  }
+
+  /** 規則の説明から最後の because を取り出す。because がなければ空文字を返す。 */
+  /* package */ static String lastBecause(final ArchRule rule) {
+    final String description = rule.getDescription();
+    final int index = description.lastIndexOf(BECAUSE);
+    return index < 0 ? "" : description.substring(index + BECAUSE.length());
   }
 
   private static ArchRule ruleOf(final JavaField field) {
