@@ -2,16 +2,12 @@ package com.example.demo.architecture;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.tngtech.archunit.core.domain.JavaClass;
-import com.tngtech.archunit.core.domain.JavaField;
 import com.tngtech.archunit.core.domain.JavaMember;
-import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -83,10 +79,10 @@ class ArchitectureRuleMessageTest {
   @DisplayName("@ArchTest は ArchRule のフィールドにだけ付ける")
   void archTestsAreArchRuleFields() {
     final List<String> others =
-        architectureClasses()
+        ArchTestFields.architectureClasses()
             .flatMap(javaClass -> javaClass.getMembers().stream())
             .filter(member -> member.isAnnotatedWith(ArchTest.class))
-            .filter(member -> !isArchRuleField(member))
+            .filter(member -> !ArchTestFields.isArchRuleField(member))
             .map(JavaMember::getFullName)
             .toList();
 
@@ -107,15 +103,10 @@ class ArchitectureRuleMessageTest {
 
   /** このパッケージで {@link ArchTest} を付けた {@link ArchRule} のフィールドを、名前と最後の because の組で返す。 */
   private static Stream<Arguments> archRuleBecauses() {
-    return architectureClasses()
-        .flatMap(javaClass -> javaClass.getFields().stream())
-        .filter(ArchitectureRuleMessageTest::isArchRuleField)
-        .sorted(Comparator.comparing(JavaField::getFullName))
-        .map(
-            field ->
-                Arguments.of(
-                    field.getOwner().getSimpleName() + "." + field.getName(),
-                    lastBecause(ruleOf(field).getDescription())));
+    return ArchTestFields.ruleFields().stream()
+        .map(field ->
+            Arguments.of(
+                field.owner() + "." + field.name(), lastBecause(field.rule().getDescription())));
   }
 
   /** ArchUnit の規則の説明から最後の because を取り出す。because がなければ空文字を返し、形の検査で失敗させる。 */
@@ -152,25 +143,6 @@ class ArchitectureRuleMessageTest {
       throw new IllegalStateException("PMD のカスタム規則を読めない: " + path);
     }
     return rules.stream();
-  }
-
-  private static Stream<JavaClass> architectureClasses() {
-    return new ClassFileImporter()
-        .importPackages(ArchitectureRuleMessageTest.class.getPackageName()).stream();
-  }
-
-  private static boolean isArchRuleField(final JavaMember member) {
-    return member instanceof JavaField field
-        && field.isAnnotatedWith(ArchTest.class)
-        && field.getRawType().isEquivalentTo(ArchRule.class);
-  }
-
-  private static ArchRule ruleOf(final JavaField field) {
-    try {
-      return (ArchRule) field.reflect().get(null);
-    } catch (IllegalAccessException exception) {
-      throw new IllegalStateException("規則のフィールドを読めない: " + field.getFullName(), exception);
-    }
   }
 
   /** because か message が形に合うことを確かめてから、理由、直し方、規約の組を返す。 */
