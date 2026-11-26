@@ -1400,6 +1400,11 @@ tasks:
             ([.attributes[]?.key] | sort) == ["event_publication.completed.count", "event_publication.incomplete.count", "event_publication.remaining.count", "event_publication.resubmitted.count"]
               and (first(.attributes[]? | select(.key == "event_publication.remaining.count") | .value.intValue) == "5")
           )
+          and any(
+            .resourceLogs[]?.scopeLogs[]?.logRecords[]?;
+            ([.attributes[]?.key] | sort) == ["error.type"]
+              and value("error.type") == "access_denied"
+          )
         ' "$out/backend.json" >/dev/null; then
           echo "ログ属性が allowlist または期待値と一致しません。" >&2
           exit 1
