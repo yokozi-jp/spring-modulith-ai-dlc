@@ -51,6 +51,11 @@ SLO がある場合も、基盤のメトリクスだけで対応できないか�
 DLQ の滞留時間は、検知の方式にかかわらず監視する。
 例として、1日以上残っているメッセージがあれば通知する。
 
+現在の DLQ は `ABANDONED` のイベント出版である。
+諦めた出版は、出版ごとの `ERROR` のログ（「Event publication resubmission exhausted」、方針の `abandon-after-attempts: 1` では「Event publication abandoned on first delivery」）で知らせ、滞留時間は `event.publication.failed.oldest.age{state=exhausted}` の警報で見る。
+ログとメトリクスの意味と警報の置き方は、Runbook の[メトリクスの見方](../observability/runbook-event-publication-resubmission.md#メトリクスの見方)に従う。
+以下は、外部ブローカーの DLQ を導入するときの一般の方式である。
+
 DLQ への退避の検知には、次の二つの方式がある。
 
 - **DLQ のメトリクス**：DLQ のメッセージ数が1以上になったら通知する。アプリケーションがクラッシュしても検知できるが、原因の分析には追加の調査が要る。

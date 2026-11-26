@@ -272,6 +272,8 @@ private ResponseEntity<ChargeReply> post(final String key, final Money amount) {
 - [ ] 呼ぶ CommandHandler は、重複を DB が直列にする操作（`INSERT ... ON CONFLICT DO NOTHING`、`lock_no` を WHERE に書く `TableWriter.update`、`SELECT ... FOR UPDATE` の後の判定）で判定し、重複を処理済みとして正常に終える（`TableWriter.update` の 0 件の更新は、種類 `version` の `ConflictException` だけを catch して読み直す）。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] 同じイベントの 2 回目の配信は、外部システムを呼ばないか、1 回目と同じ引数で呼ぶ。［結合テストで検査：ListenerIdempotencyTest］
 - [ ] Listener の入力例を足す。［結合テストで検査：ListenerIdempotencyTest］
+- [ ] Runbook の[リスナーごとの失敗の原因と直し方](../../observability/runbook-event-publication-resubmission.md#リスナーごとの失敗の原因と直し方)の表に、このリスナーの行を足す。［自分で点検］
+- [ ] 冪等キーを持たない外部システムを呼ぶなら、`@ResubmissionPolicy` の方針に `abandon-after-attempts: 1` を書くか決める。［自分で点検］
 - [ ] 入力例の前提が、Listener の業務の本筋の処理を通る（脇の道で 1 行だけ変えて通していない）。［自分で点検］
 - [ ] PMD の抑止を理由のコメントと一緒に付ける。［自分で点検］
 - [ ] クラス、フィールド、コンストラクタ、`on` に Javadoc を書く。［自分で点検］
