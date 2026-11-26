@@ -1,8 +1,6 @@
 package com.example.demo;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -11,6 +9,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import com.example.demo.testkit.CapturedSpans;
 import com.example.demo.testkit.SharedTestConfiguration;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.trace.SpanKind;
 import io.opentelemetry.api.trace.StatusCode;
@@ -94,6 +93,20 @@ class ClientSpanContractTest {
         .toList();
   }
 
+  private List<SpanData> failedClientSpans() {
+    return capturedSpans.all().stream()
+        .filter(span -> span.getKind() == SpanKind.CLIENT)
+        .filter(span -> span.getStatus().getStatusCode() == StatusCode.ERROR)
+        .toList();
+  }
+
+  /** クエリなしの uri の tag を持つ timer の件数。 */
+  private long queryFreeTimerCount() {
+    final Timer timer =
+        meterRegistry.find("http.client.requests").tag("uri", "/v1/charges").timer();
+    return timer == null ? 0 : timer.count();
+  }
+
   @Test
   @DisplayName("送信の span の http.url と uri は、クエリと fragment を持たない")
   void clientSpanUrlHasNoQueryOrFragment() {
@@ -111,15 +124,11 @@ class ClientSpanContractTest {
   @DisplayName("どの span も、名前、属性、event、status の説明に秘密を持たない")
   void noSpanCarriesSecret() {
     final String secret = "S3CRET" + UUID.randomUUID();
+    final int failedBefore = failedClientSpans().size();
 
     callWithSecret(secret);
 
-    final List<SpanData> failed =
-        capturedSpans.all().stream()
-            .filter(span -> span.getStatus().getStatusCode() == StatusCode.ERROR)
-            .filter(span -> span.getKind() == SpanKind.CLIENT)
-            .toList();
-    assertFalse(failed.isEmpty(), "401 の例外を記録した送信の span がない");
+    assertEquals(failedBefore + 1, failedClientSpans().size(), "401 の例外を記録した送信の span の増え方");
     assertEquals(
         List.of(),
         capturedSpans.all().stream().filter(span -> span.toString().contains(secret)).toList(),
@@ -130,12 +139,11 @@ class ClientSpanContractTest {
   @DisplayName("http.client.requests の uri の tag は、クエリを持たない")
   void clientMetricUriTagHasNoQuery() {
     final String secret = "S3CRET" + UUID.randomUUID();
+    final long before = queryFreeTimerCount();
 
     callWithSecret(secret);
 
-    assertNotNull(
-        meterRegistry.find("http.client.requests").tag("uri", "/v1/charges").timer(),
-        "クエリなしの uri の tag を持つ timer がない");
+    assertEquals(before + 1, queryFreeTimerCount(), "クエリなしの uri の tag を持つ timer の増え方");
     assertTrue(
         meterRegistry.find("http.client.requests").timers().stream()
             .noneMatch(timer -> timer.getId().getTag("uri").contains("?")),
