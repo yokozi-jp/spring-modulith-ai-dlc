@@ -88,15 +88,12 @@ chainの`SecurityContextRepository`は`HttpSecurity`のbuildで作られ、`Tena
 ## セッションの期間
 
 セッションは、無操作の30分と、作成からの8時間のどちらか早いほうで切れる。
-理由は[ADR-135](../adr/ADR-135-add-absolute-session-lifetime-and-explicit-idle-timeout.md)にある。
 
-- 無操作の期間は、[application.yaml](../../backend/src/main/resources/application.yaml)の`server.servlet.session.timeout`（`30m`）に書く。Spring Bootは、この値をSpring Session JDBCの期間にも使う。`spring.session.timeout`は書かない。
+- 無操作の期間は、[application.yaml](../../backend/src/main/resources/application.yaml)の`server.servlet.session.timeout`（`30m`）に書く。`spring.session.timeout`は書かない。
 - 最長の期間は、`app.session.max-lifetime`（`8h`）に書く。
-- `SecurityConfig`は、`AbsoluteSessionTimeoutFilter`を`SecurityContextHolderFilter`の前に置く。このfilterは、セッションの作成時刻（`getCreationTime()`、`modulith.spring_session.creation_time`）に最長の期間を足した時刻を`Clock`の現在時刻と比べ、過ぎていればセッションを`invalidate()`する。
-- 期限を過ぎたセッションのリクエストは未認証になり、401になる（[ブラウザからの認証](#ブラウザからの認証)）。セッションの行は消えるので、次のログインのセッションは新しい作成時刻から数える。
-- 最長の期間は、ログインではなく、認可の開始でセッションを作った時刻から数える。ログインの時刻との差は数秒から数分である。
-- ログインとテナントの選択はセッションのIDを作り直すが、`creation_time`を変えないので、最長の期間は延びない。
-- IdPのSSOセッションが残っていれば、期限の後のログインで資格情報を求められない。資格情報なしで使い続けられる上限は、IdPのSSOセッションの最長の期間（Keycloakのrealm、Cognitoの設定）になる。
+- 期間を過ぎたセッションのリクエストは未認証になり、401になる（[ブラウザからの認証](#ブラウザからの認証)）。
+
+最長の期間を切る仕組みと、IdPのSSOセッションが残るときの扱いは[ADR-135](../adr/ADR-135-add-absolute-session-lifetime-and-explicit-idle-timeout.md)にある。
 
 ## ログアウト
 
