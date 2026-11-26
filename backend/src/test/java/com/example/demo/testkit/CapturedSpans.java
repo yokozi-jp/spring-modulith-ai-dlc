@@ -36,6 +36,11 @@ public final class CapturedSpans implements SpanProcessor {
     return true;
   }
 
+  /** 終えた span をすべて返す。 */
+  public List<SpanData> all() {
+    return List.copyOf(spans);
+  }
+
   /** 指定した文字列の属性を持つ span を返す。 */
   public List<SpanData> withAttribute(final String key, final String value) {
     final AttributeKey<String> attribute = AttributeKey.stringKey(key);

@@ -370,6 +370,10 @@ management:
   observations:
     # 同梱の Grafana のダッシュボードと他の計装が引く OpenTelemetry の名前と属性にする（ADR-133）。
     conventions: open-telemetry
+    enable:
+      # 要求ごとに security filterchain before と after の span が 2 本でき、それぞれがフィルターの数の event を持つ。
+      # 時間を持たず数だけ増えるので切る。認可の span（authorize request）は残す。
+      "[spring.security.filterchains]": false
   metrics:
     distribution:
       slo:

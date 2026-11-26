@@ -13,6 +13,7 @@ Accepted
 
 Amended by [ADR-110](ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)：ログと span の属性に、アプリが採番したテナントの `public_id`（`tenant.id`）と利用者の ID（`user.id`）を許すこと。
 Amended by [ADR-110](ADR-110-add-tenant-and-user-ids-to-logs-and-traces.md)：Alternative 4 の「appender の属性 allowlist は使っている版に存在しない」が 2.33.0-alpha で成り立たなくなったこと（判断は変えない）。
+Amended by [ADR-140](ADR-140-drop-query-from-outbound-http-spans-at-source-and-collector.md)：span の属性に禁止値が入る経路は、Collector だけでなく発生源でも消すこと。バックエンドの `traces` pipeline を Collector で加工すること。
 
 ## Date
 
