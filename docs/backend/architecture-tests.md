@@ -231,6 +231,12 @@ MapStruct、ModelMapper、Dozerはテストのクラスパスにないため、`
 
 規則を追加するときは、違反フィクスチャのクラスを一つ追加し、`eachRuleDetectsItsViolatingFixture`の行と`rulesFor()`に規則を加える。
 この手順で、新しい規則が違反を検出し、規約どおりのコードを誤検出しないことを確かめる。
+行の名前と`rulesFor()`のキーには、`@ArchTest`のフィールドの名前を使う。
+違反の種類ごとに行を分けるときは、`moduleCodeDoesNotUseJdbc: DataSource`のように名前の後に種類を足す。
+片方にだけ加えると、`everyRuleIsRegisteredOrExempted`が規則の名前を出して失敗する。
+テストコードを検査する規則と、別のテストが違反を確かめる規則は、`FixtureExemptions`に理由を付けて載せる。
+理由が`TODO(#608):`で始まる規則には、まだ違反フィクスチャがない。
+違反フィクスチャと行を足したら、`FixtureExemptions`から消す。
 注釈の属性の値で判定する規則では、属性を省いて既定値のままにした注釈も違反フィクスチャに置く。
 たとえば値を省いた`@Order`は`Ordered.LOWEST_PRECEDENCE`になり、明示した値だけを見る規則を通ってしまう。
 
