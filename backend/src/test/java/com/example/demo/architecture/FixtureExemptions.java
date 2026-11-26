@@ -44,9 +44,6 @@ final class FixtureExemptions {
   private static final String TODO_LIBRARY_RULE =
       "TODO(#608): 違反フィクスチャがない。ArchUnit の GeneralCodingRules の定数に because を付けた規則である";
 
-  /** このプロジェクトで書いた、違反フィクスチャがない規則の理由。 */
-  private static final String TODO_PROJECT_RULE = "TODO(#608): 違反フィクスチャがない";
-
   /** 規則の名前（{@code @ArchTest} のフィールドの名前）から、フィクスチャで確かめない理由への対応。 */
   /* package */ static final Map<String, String> REASONS =
       Map.ofEntries(
@@ -79,8 +76,7 @@ final class FixtureExemptions {
           entry("noClassesShouldUseFieldInjection", TODO_LIBRARY_RULE),
           entry("assertionsShouldHaveDetailMessage", TODO_LIBRARY_RULE),
           entry("deprecatedApiShouldNotBeUsed", TODO_LIBRARY_RULE),
-          entry("oldDateAndTimeClassesShouldNotBeUsed", TODO_LIBRARY_RULE),
-          entry("legacyDateTimeTypesAreNotUsed", TODO_PROJECT_RULE));
+          entry("oldDateAndTimeClassesShouldNotBeUsed", TODO_LIBRARY_RULE));
 
   private FixtureExemptions() {}
 }

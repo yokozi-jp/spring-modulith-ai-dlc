@@ -138,6 +138,10 @@ final class ClassRoleFixtureRows {
             GeneralCodingRulesArchTest.autowiredMethodsAreNotUsed,
             "ordering.application.SetterInjectedOrderMailer.setSender("),
         row(
+            "legacyDateTimeTypesAreNotUsed",
+            DateTimeConventionsArchTest.legacyDateTimeTypesAreNotUsed,
+            "ordering.application.LegacyOrderTimestamp"),
+        row(
             "moduleApiDoesNotExposeInternalTypes",
             PackageByFeatureOnionArchitectureTest.moduleApiDoesNotExposeInternalTypesRule(
                 VIOLATING),

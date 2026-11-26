@@ -699,6 +699,9 @@ class ArchitectureRuleFixtureTest {
             GeneralCodingRulesArchTest.featureCodeUsesOnlySlf4jFacade),
         entry("autowiredMethodsAreNotUsed", GeneralCodingRulesArchTest.autowiredMethodsAreNotUsed),
         entry(
+            "legacyDateTimeTypesAreNotUsed",
+            DateTimeConventionsArchTest.legacyDateTimeTypesAreNotUsed),
+        entry(
             "domainModelDependsOnlyOnAllowedTypes",
             PackageByFeatureOnionArchitectureTest.domainModelDependsOnlyOnAllowedTypesRule(
                 basePackage)),
