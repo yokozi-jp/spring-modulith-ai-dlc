@@ -2,9 +2,15 @@ package com.example.demo;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
+import java.time.Clock;
+import java.time.Duration;
 import lombok.extern.slf4j.Slf4j;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.health.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
@@ -17,12 +23,14 @@ import org.springframework.security.oauth2.client.web.DefaultOAuth2Authorization
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
@@ -38,6 +46,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  */
 @Slf4j
 @Configuration
+@EnableConfigurationProperties(SecurityConfig.SessionLifetimeProperties.class)
 public class SecurityConfig {
 
   /**
@@ -75,13 +84,19 @@ public class SecurityConfig {
       final HttpSecurity http,
       final ClientRegistrationRepository clientRegistrationRepository,
       final OAuth2AuthorizationRequestResolver authorizationRequestResolver,
-      @Qualifier("handlerExceptionResolver") final HandlerExceptionResolver handlerExceptionResolver)
+      @Qualifier("handlerExceptionResolver") final HandlerExceptionResolver handlerExceptionResolver,
+      final Clock clock,
+      final SessionLifetimeProperties sessionLifetime)
       throws Exception {
     final OidcClientInitiatedLogoutSuccessHandler logoutSuccessHandler =
         new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
     final RequestMatcher apiRequests = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
     logoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}/logged-out");
 
+    // 期限を過ぎたセッションの認証を、後の filter（テナントの選択、MDC の利用者の ID）に見せないため、認証を読む前に無効にする。
+    http.addFilterBefore(
+        new AbsoluteSessionTimeoutFilter(clock, sessionLifetime.maxLifetime()),
+        SecurityContextHolderFilter.class);
     http.authorizeHttpRequests(auth ->
             auth
                 // ALB、ECS、コンテナの healthcheck が未認証で叩く probe だけを許可する。
@@ -191,4 +206,13 @@ public class SecurityConfig {
       response.sendError(status.value());
     }
   }
+
+  /**
+   * セッションの期間の設定値。
+   *
+   * @param maxLifetime セッションを作ってから使える最長の期間。操作を続けても、この期間を過ぎたら再ログインを求める
+   */
+  /* package */ @ConfigurationProperties("app.session")
+  @Validated
+  record SessionLifetimeProperties(@NotNull @DurationMin(minutes = 1) Duration maxLifetime) {}
 }

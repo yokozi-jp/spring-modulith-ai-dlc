@@ -340,6 +340,9 @@ server:
         strategy: framework
   servlet:
     session:
+      # 無操作の期間（ADR-135）。
+      # spring.session.timeout は書かない（両方に書くと、どちらが効くか読み取りにくい）。
+      timeout: 30m
       # URL rewriting を無効化し、セッション ID は Cookie だけで送受信する。
       tracking-modes: cookie
       cookie:
@@ -351,6 +354,13 @@ server:
         secure: true
         # クロスサイトでの Cookie 送信を制限する（CSRF 対策）
         same-site: lax
+
+# アプリのセッション
+app:
+  session:
+    # 操作を続けても、作ってから 8 時間たったセッションは切り、再ログインを求める。
+    # 無操作の期間（server.servlet.session.timeout）だけでは、盗まれたセッションを使い続けられるため。
+    max-lifetime: 8h
 
 # Actuator: 監視・ヘルスチェック用エンドポイント
 # ローカル・本番（ECS）共通。ECS/ALB のヘルスチェックは /actuator/health/readiness を使う。
