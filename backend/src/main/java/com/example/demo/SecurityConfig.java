@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.client.web.DefaultOAuth2Authorization
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestCustomizers;
 import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.header.writers.CrossOriginResourcePolicyHeaderWriter.CrossOriginResourcePolicy;
@@ -81,6 +82,10 @@ public class SecurityConfig {
     final OidcClientInitiatedLogoutSuccessHandler logoutSuccessHandler =
         new OidcClientInitiatedLogoutSuccessHandler(clientRegistrationRepository);
     final RequestMatcher apiRequests = PathPatternRequestMatcher.withDefaults().matcher("/api/**");
+    final AccessDeniedHandler apiAccessDenied =
+        (request, response, exception) ->
+            resolveOrSendError(
+                handlerExceptionResolver, request, response, exception, HttpStatus.FORBIDDEN);
     logoutSuccessHandler.setPostLogoutRedirectUri("{baseUrl}/logged-out");
 
     http.authorizeHttpRequests(auth ->
@@ -118,15 +123,7 @@ public class SecurityConfig {
                             exception,
                             HttpStatus.UNAUTHORIZED),
                     apiRequests)
-                .defaultAccessDeniedHandlerFor(
-                    (request, response, exception) ->
-                        resolveOrSendError(
-                            handlerExceptionResolver,
-                            request,
-                            response,
-                            exception,
-                            HttpStatus.FORBIDDEN),
-                    apiRequests))
+                .defaultAccessDeniedHandlerFor(apiAccessDenied, apiRequests))
         .headers(headers ->
             headers
                 .referrerPolicy(
@@ -147,8 +144,9 @@ public class SecurityConfig {
         // SPA が __Host-XSRF-TOKEN Cookie を読み、更新系リクエストの X-XSRF-TOKEN Header で送り返す。
         // spa() も repository を設定するため、その後で差し替える（逆の順では spa() が上書きする）。
         .csrf(csrf -> csrf.spa().csrfTokenRepository(csrfTokenRepository()))
-        // 別のオリジンから来た更新系の要求は、token を確かめる前に専用の type の 403 にする（ADR-134）。
-        .addFilterBefore(new CrossOriginRequestFilter(handlerExceptionResolver), CsrfFilter.class)
+        // 別のオリジンから来た更新系の要求は、CSRF のトークンを確かめる前に専用の type の 403 にする（ADR-134）。
+        .addFilterBefore(
+            new CrossOriginRequestFilter(apiRequests, apiAccessDenied), CsrfFilter.class)
         .oauth2Login(oauth2 ->
             oauth2.authorizationEndpoint(authorization ->
                 authorization.authorizationRequestResolver(authorizationRequestResolver)))

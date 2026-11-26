@@ -8,43 +8,36 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.HttpStatus;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 import org.springframework.web.cors.CorsUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.servlet.HandlerExceptionResolver;
 import org.springframework.web.util.InvalidUrlException;
 
-/**
- * 別のオリジンから来た {@code /api/**} と {@code /logout} の更新系の要求を、CSRF の token を確かめる前に 403 にする（ADR-134）。
- *
- * <p>{@code Origin} が別のオリジン（{@code Origin: null} を含む）か、{@code Sec-Fetch-Site} が {@code same-origin}
- * と {@code none} 以外なら拒否する。どちらの header もない要求は通し、CSRF の token の検査に任せる。オリジンが同じかは {@link
- * CorsUtils#isCorsRequest} が、X-Forwarded-* を反映した scheme、host、port と比べて決める。
- */
+/** 別のオリジンから来た更新系の要求を、CSRF のトークンを確かめる前に拒否する（ADR-134）。 */
 final class CrossOriginRequestFilter extends OncePerRequestFilter {
 
-  /** CSRF の token を求めない method。frontend の apiFetch と同じ集合にする。 */
+  /** CSRF のトークンを求めない method。frontend の apiFetch と同じ集合にする。 */
   private static final Set<String> SAFE_METHODS = Set.of("GET", "HEAD", "OPTIONS");
 
   /** 通す {@code Sec-Fetch-Site} の値。{@code none} は利用者が直接開いた要求である。 */
   private static final Set<String> ALLOWED_FETCH_SITES = Set.of("same-origin", "none");
 
-  /** 検査する path。CSRF の token を求める path のうち、ブラウザのセッションで使うものである。 */
-  private static final RequestMatcher TARGETS =
-      new OrRequestMatcher(
-          PathPatternRequestMatcher.withDefaults().matcher("/api/**"),
-          PathPatternRequestMatcher.withDefaults().matcher("/logout"));
+  /** 検査する path。{@code /api/**} と {@code /logout} である。 */
+  private final RequestMatcher targets;
 
   /** 拒否を {@code /api/**} の CSRF の失敗と同じ Problem Details の変換へ渡す。 */
-  private final HandlerExceptionResolver handlerExceptionResolver;
+  private final AccessDeniedHandler accessDeniedHandler;
 
-  /** 拒否を渡す resolver を受け取る。 */
-  /* package */ CrossOriginRequestFilter(final HandlerExceptionResolver handlerExceptionResolver) {
+  /* package */ CrossOriginRequestFilter(
+      final RequestMatcher apiRequests, final AccessDeniedHandler accessDeniedHandler) {
     super();
-    this.handlerExceptionResolver = handlerExceptionResolver;
+    this.targets =
+        new OrRequestMatcher(
+            apiRequests, PathPatternRequestMatcher.withDefaults().matcher("/logout"));
+    this.accessDeniedHandler = accessDeniedHandler;
   }
 
   @Override
@@ -54,20 +47,17 @@ final class CrossOriginRequestFilter extends OncePerRequestFilter {
       final FilterChain filterChain)
       throws ServletException, IOException {
     if (SAFE_METHODS.contains(request.getMethod())
-        || !TARGETS.matches(request)
+        || !targets.matches(request)
         || !isCrossOrigin(request)) {
       filterChain.doFilter(request, response);
       return;
     }
-    SecurityConfig.resolveOrSendError(
-        handlerExceptionResolver,
+    accessDeniedHandler.handle(
         request,
         response,
-        new CrossOriginRequestRejectedException("Cross-origin request rejected"),
-        HttpStatus.FORBIDDEN);
+        new CrossOriginRequestRejectedException("Cross-origin request rejected"));
   }
 
-  /** {@code Origin} か {@code Sec-Fetch-Site} が別のオリジンを示せば true を返す。どちらもなければ false にする。 */
   private static boolean isCrossOrigin(final HttpServletRequest request) {
     final @Nullable String fetchSite = request.getHeader("Sec-Fetch-Site");
     if (fetchSite != null && !ALLOWED_FETCH_SITES.contains(fetchSite)) {
