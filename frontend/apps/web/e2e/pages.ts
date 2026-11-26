@@ -11,6 +11,26 @@ export function homeHeading(page: Page): Locator {
   return page.getByRole("main").getByRole("heading", { level: 1, name: "はじめる" });
 }
 
+export function notFoundHeading(page: Page): Locator {
+  return page.getByRole("heading", { level: 1, name: "ページが見つかりません" });
+}
+
+export function tenantsHeading(page: Page): Locator {
+  return page.getByRole("heading", { level: 1, name: "テナントを選んでください" });
+}
+
+export function membersForbiddenHeading(page: Page): Locator {
+  return page.getByRole("heading", { level: 1, name: "管理者だけが使える画面です" });
+}
+
+export function loginFailedHeading(page: Page): Locator {
+  return page.getByRole("heading", { level: 1, name: "ログインできませんでした" });
+}
+
+export function sessionExpiredHeading(page: Page): Locator {
+  return page.getByRole("heading", { level: 1, name: "ログインの有効期限が切れました" });
+}
+
 // 見出しは読み込み時の認証の結果にすぎない。今もセッションが有効なことは、/api/missing が 404（401 でない）で確かめる。
 export async function expectAuthenticatedHome(page: Page): Promise<void> {
   await expect(page).toHaveURL(`${webOrigin}/`);

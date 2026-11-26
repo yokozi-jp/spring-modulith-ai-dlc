@@ -210,23 +210,6 @@ test("画面の作成は、CSRF の Cookie の値を X-XSRF-TOKEN で送って�
   expect(await response.request().headerValue("x-xsrf-token")).toBeTruthy();
 });
 
-async function createInStatus(
-  { orderCreatePage, orderDetailPage }: Pick<OrderScreens, "orderCreatePage" | "orderDetailPage">,
-  product: Product,
-  label: OrderStatusLabel,
-): Promise<string> {
-  const code = uniqueCode("E2E-LIST");
-  await orderCreatePage.create({ code, productName: product.productName, quantity: 1 });
-  if (label === "確定済み") {
-    await orderDetailPage.confirmButton.click();
-    await expect(orderDetailPage.confirmedNotice).toBeVisible();
-  } else if (label === "取消済み") {
-    await orderDetailPage.cancelButton.click();
-    await expect(orderDetailPage.cancelledNotice).toBeVisible();
-  }
-  return code;
-}
-
 async function expectBucket(
   orderListPage: OrderListPage,
   codes: Readonly<Record<OrderStatusLabel, string>>,
@@ -243,18 +226,15 @@ async function expectBucket(
 
 test.describe("一覧と詳細と作成の画面で、注文と商品の状態を表示する", () => {
   test("一覧の状態の絞り込みは、注文を状態ごとに分ける", async ({
-    orderCreatePage,
-    orderDetailPage,
     orderListPage,
     productFactory,
+    createOrder,
   }) => {
     const product = await productFactory();
-    const screens = { orderCreatePage, orderDetailPage };
-    const codes = {
-      下書き: await createInStatus(screens, product, "下書き"),
-      確定済み: await createInStatus(screens, product, "確定済み"),
-      取消済み: await createInStatus(screens, product, "取消済み"),
-    };
+    const draft = await createOrder({ status: "下書き", prefix: "E2E-LIST", product });
+    const confirmed = await createOrder({ status: "確定済み", prefix: "E2E-LIST", product });
+    const cancelled = await createOrder({ status: "取消済み", prefix: "E2E-LIST", product });
+    const codes = { 下書き: draft.code, 確定済み: confirmed.code, 取消済み: cancelled.code };
 
     await orderListPage.goto();
     await expectBucket(orderListPage, codes, "下書き");
@@ -263,17 +243,12 @@ test.describe("一覧と詳細と作成の画面で、注文と商品の状態�
   });
 
   test("取消済みの注文の詳細は、決済の対象でないことを表示する", async ({
-    orderCreatePage,
     orderDetailPage,
     orderListPage,
-    productFactory,
+    createOrder,
     expectNoA11yViolations,
   }) => {
-    const code = await createInStatus(
-      { orderCreatePage, orderDetailPage },
-      await productFactory(),
-      "取消済み",
-    );
+    const { code } = await createOrder({ status: "取消済み", prefix: "E2E-LIST" });
 
     await orderListPage.openDetail(code);
 

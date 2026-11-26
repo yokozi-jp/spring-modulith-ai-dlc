@@ -1,5 +1,6 @@
 import { webOrigin } from "./environment";
 import { expect, test } from "./fixtures";
+import { loginFailedHeading } from "./pages";
 
 test.use({ storageState: { cookies: [], origins: [] } });
 
@@ -14,9 +15,7 @@ test("認可リクエストのないログインのコールバックを開く�
   // vite preview は X-Forwarded-* を付けないので、ForwardedHeaderFilter の 303 にならない。
   expect(callback?.status()).toBe(302);
   await expect(page).toHaveURL(`${webOrigin}/login-failed`);
-  await expect(
-    page.getByRole("heading", { level: 1, name: "ログインできませんでした" }),
-  ).toBeVisible();
+  await expect(loginFailedHeading(page)).toBeVisible();
   // Spring Security の既定のログイン画面へ落ちていないことを、その画面の見出しで確かめる。
   await expect(page.getByText("Please sign in")).toHaveCount(0);
 });
