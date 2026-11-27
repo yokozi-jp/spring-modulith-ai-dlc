@@ -72,7 +72,7 @@ VS Code Server は環境を `bash -i -l -c` で作るので、公式のインス
 - Kiro Web の `kiro-web.sh` は、sandbox の `MISE_STATE_DIR` が空なので `mise trust` を実行する。サンドボックスは自分の `kiro-cli` を持ち、LSP の機能も無いので、`http:kiro-cli`、`http:jdtls`、`http:lombok` は入れない。
 - `task lint-actions-security` と Lefthook の zizmor のジョブは、Docker の image でなく mise の zizmor を使う。`zizmor.yml` の `zizmor-action` の `version` には `mise.toml` と同じ版を書く。版を書く場所はこの2か所だけである。action の SHA が持つ版の一覧に無い版は動かないので、zizmor を上げるときは SHA も確かめる。
 - ローカルでは apt で入れた mise が `mise install --locked` を実行する。
-- PATH は mise の shims で通す。`04-setup-shell.sh` が `~/.bashrc` と `~/.profile` に `eval "$(mise activate bash --shims)"` を足す。`~/.profile` の末尾の行は、`~/.profile` が先頭へ足した `~/.local/bin` の前へ shims を戻す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
+- PATH は mise の shims で通す。`02-setup-shell.sh` が `~/.bashrc` と `~/.profile` に `eval "$(mise activate bash --shims)"` を足す。`~/.profile` の末尾の行は、`~/.profile` が先頭へ足した `~/.local/bin` の前へ shims を戻す。Taskfile と Lefthook は `betterleaks` と `iwe` をそのまま呼ぶ。
 - CI は composite action `.github/actions/setup-mise` を使う。この action だけが `jdx/mise-action` の SHA と mise の版を持ち、入力 `tools` でジョブが使う道具だけを入れる。
 - composite action は `MISE_LOCKED=1` をジョブの環境変数にし、install と後の step の shims に lock に無い版を拒ませる。
 - Java は実行用のイメージ（`backend/Dockerfile` の `amazoncorretto:25-*`）と同じ Corretto の 25 系にする。
@@ -167,7 +167,7 @@ shims は決まったディレクトリなので、受け継いだ PATH のま�
 
 ### 選択肢6: `/home/projects` を `trusted_config_paths` に入れる
 
-- **Description**：`04-setup-shell.sh` が mise のグローバル設定に `/home/projects` を足し、その下の `mise.toml` をすべて信頼する。
+- **Description**：`02-setup-shell.sh` が mise のグローバル設定に `/home/projects` を足し、その下の `mise.toml` をすべて信頼する。
 - **Pros**：新しい worktree でも `mise trust` が要らない。
 - **Cons**：同じディレクトリの別のリポジトリや取り込んだ第三者のコードの `mise.toml` も、確かめずに信頼する。`mise.toml` は URL やタスクを書けるので、信頼の範囲は最小にする。
 

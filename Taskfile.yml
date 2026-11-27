@@ -611,8 +611,8 @@ tasks:
     dir: docs/local-env-setup
     cmds:
       - |
-        ./02-setup-viteplus.sh
-        ./04-setup-shell.sh
+        ./01-setup-viteplus.sh
+        ./02-setup-shell.sh
         # エージェントは ~/.kiro/settings/ に書けないので、人が実行するこの Task で置く（docs/agents/skill-sources.md）。
         mkdir -p ~/.kiro/settings
         if [ ! -e ~/.kiro/settings/permissions.yaml ] && [ ! -e ~/.kiro/settings/permissions.json ]; then
