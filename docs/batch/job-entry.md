@@ -33,7 +33,7 @@ Job は `shared.batch` の追いつきの Runner が起動し、Runner はどの
   Runner は Spring Boot の `JobLauncherApplicationRunner` を継承した 1 つのクラスで、すべての Job を扱う。
   置き場所は [共有モジュール shared](../backend/shared-module.md) に従う。
 - Runner の Bean は、`spring.batch.job.name` が空白でないときだけ作る。
-  条件は `@ConditionalOnProperty` で書かず、`EventPublicationResubmissionConfig.isResubmitOnceRequested` と同じく値の空白を調べる `Condition` で書く。
+  条件は `@ConditionalOnProperty` で書かず、`ResubmitOnceConfig.isResubmitOnceRequested` と同じく値の空白を調べる `Condition` で書く。
   `@ConditionalOnProperty` は、値が空白でも `false` でなければ一致する。
 - Runner は `BatchProperties` から Job の名前を読み、`setJobName` に渡す。
 - 期間で区切る Job は、Runner が [定時起動と追いつき](scheduling-and-catch-up.md#追いつきの-runner) の順で期間を流す。
@@ -62,11 +62,11 @@ Job の名前を渡した起動は、手での 1 回の再投入（[失敗した
 
 - Web のサーバーを動かさない（`spring.main.web-application-type=none`）。
 - 失敗したイベント出版の定期の再投入（古い出版を `FAILED` に戻す処理を含む）を動かさない（`event-publication.resubmission.enabled=false`）。
-  `EventPublicationResubmissionConfig.ResubmitOnceEnvironment` は再投入の対象だけを見てこの 2 つを設定するので、Job の名前でも同じ設定を入れる。
+  `ResubmitOnceConfig.ResubmitOnceEnvironment` は再投入の対象だけを見てこの 2 つを設定するので、Job の名前でも同じ設定を入れる。
 - Job の名前と手での再投入の対象（`event-publication.resubmit-once.target`）を両方渡した起動は、どちらも流さずに終了コード 1 で終える。
   2 つの Runner がそれぞれ `System.exit` を呼ぶと、先に呼んだ側がもう一方の処理を途中で止める。
 - Runner は、期間を流し終えるか止まったら、処理中のリスナーの完了を待ってから `System.exit(SpringApplication.exit(context))` を呼ぶ。
-  待ち方は `EventPublicationResubmissionConfig.awaitRunningListeners` と同じにする。
+  待ち方は `ResubmitOnceConfig.awaitRunningListeners` と同じにする。
   このメソッドは `shared.eventresubmission` の package-private なので、`shared.batch` からも呼べる置き場所へ移して使う。
 - Runner は、Job を流す前と流している間に出たすべての例外（`RuntimeException` と `Error`）を受け、ERROR で記録して、`SpringApplication.exit` に終了コード 1 を渡してから `System.exit` を呼ぶ。
   Spring Batch 6.0.6 の `AbstractJob.execute` は `Exception` を受けて JobExecution を FAILED にするが、`Error` と JobRepository の更新の失敗は外へ出る。

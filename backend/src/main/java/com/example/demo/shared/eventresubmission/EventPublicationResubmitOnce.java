@@ -51,14 +51,14 @@ public class EventPublicationResubmitOnce {
   private final EventPublicationResubmissionConfig.Properties properties;
 
   /** 手での 1 回の再投入の設定値。 */
-  private final EventPublicationResubmissionConfig.ResubmitOnceProperties onceProperties;
+  private final ResubmitOnceProperties onceProperties;
 
   /* package */ EventPublicationResubmitOnce(
       final DSLContext dsl,
       final FailedPublicationSweep sweep,
       final ResubmissionPolicies policies,
       final EventPublicationResubmissionConfig.Properties properties,
-      final EventPublicationResubmissionConfig.ResubmitOnceProperties onceProperties) {
+      final ResubmitOnceProperties onceProperties) {
     this.dsl = dsl;
     this.sweep = sweep;
     this.policies = policies;

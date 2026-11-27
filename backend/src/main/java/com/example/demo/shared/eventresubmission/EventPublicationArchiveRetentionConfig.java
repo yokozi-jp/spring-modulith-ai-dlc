@@ -57,7 +57,7 @@ class EventPublicationArchiveRetentionConfig {
         final CompletedEventPublications completed,
         final Properties properties,
         final EventPublicationResubmissionConfig.Properties resubmission) {
-      final Duration readBack = ResubmissionTracker.lifetimeOf(resubmission);
+      final Duration readBack = resubmission.resubmissionLifetime();
       if (properties.retention().compareTo(readBack) <= 0) {
         throw new IllegalStateException(
             "event-publication.archive-retention.retention ("

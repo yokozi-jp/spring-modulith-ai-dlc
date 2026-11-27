@@ -62,13 +62,13 @@ final class FailedPublicationSweep {
   /* package */ FailedPublicationSweep(
       final DSLContext dsl,
       final FailedEventPublications failedEventPublications,
-      final LockingTaskExecutor eventPublicationLockingTaskExecutor,
+      final LockingTaskExecutor lockingTaskExecutor,
       final Clock clock,
       final EventPublicationResubmissionConfig.Properties properties,
       final StalePublications stalePublications) {
     this.dsl = dsl;
     this.failedEventPublications = failedEventPublications;
-    this.lockingTaskExecutor = eventPublicationLockingTaskExecutor;
+    this.lockingTaskExecutor = lockingTaskExecutor;
     this.clock = clock;
     this.properties = properties;
     this.stalePublications = stalePublications;

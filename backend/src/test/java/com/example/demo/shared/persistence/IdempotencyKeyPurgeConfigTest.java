@@ -70,6 +70,14 @@ class IdempotencyKeyPurgeConfigTest {
         .withPropertyValues(
             "idempotency-key.purge.enabled=false", "idempotency-key.purge.lock-at-most-for=PT1H")
         .run(context ->
-            assertThat(context).getFailure().hasRootCauseInstanceOf(BindValidationException.class));
+            assertThat(context)
+                .getFailure()
+                .rootCause()
+                .isInstanceOfSatisfying(
+                    BindValidationException.class,
+                    failure ->
+                        assertThat(failure.getValidationErrors().getName())
+                            .as("利用者が見る失敗の対象")
+                            .hasToString("idempotency-key.purge")));
   }
 }

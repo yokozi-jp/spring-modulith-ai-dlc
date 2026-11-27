@@ -39,9 +39,10 @@ CONSTANTS
 Instances == {1, 2}
 None == 0
 
-\* EventPublicationResubmissionConfig.Properties.lockAtLeastFor
+\* shared.locking.PeriodicLockTiming.lockAtLeastFor
 LockAtLeastFor == Interval \div 2
-\* EventPublicationResubmitter.dueAt: budget = lockAtMostFor / 2
+\* EventPublicationResubmissionConfig.Properties.runBudget: lockAtMostFor / 2
+\* (EventPublicationResubmitter.dueAt reads it)
 Budget == LockAtMostFor \div 2
 
 Min(a, b) == IF a < b THEN a ELSE b
@@ -57,7 +58,8 @@ MaxDue == IF PolicyAbandon = 1 THEN 0 ELSE PolicyAbandon
 \* EventPublicationResubmissionConfig.Policy.waitBefore(waitAge, attempts)
 WaitBefore(attempts) == Min(WaitAge * Pow(Multiplier, attempts - 1), MaxWait)
 
-\* The startup checks on EventPublicationResubmissionConfig.Properties.
+\* The startup checks on EventPublicationResubmissionConfig.Properties and
+\* shared.locking.PeriodicLockTiming (isLockAtMostForLongerThanInterval).
 \* The model only covers settings the app accepts.
 ASSUME /\ LockAtMostFor > Interval            \* isLockAtMostForLongerThanInterval
        /\ MaxWait >= WaitAge                  \* isMaxWaitNotShorterThanWaitAge

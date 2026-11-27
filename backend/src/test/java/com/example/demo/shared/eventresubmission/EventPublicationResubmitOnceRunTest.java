@@ -25,11 +25,10 @@ class EventPublicationResubmitOnceRunTest {
             sweep,
             Mockito.mock(ResubmissionPolicies.class),
             Mockito.mock(EventPublicationResubmissionConfig.Properties.class),
-            new EventPublicationResubmissionConfig.ResubmitOnceProperties(
-                "all", Duration.ofSeconds(1)));
+            new ResubmitOnceProperties("all", Duration.ofSeconds(1)));
 
     assertThat(job.run(new Target.All()))
         .isEqualTo(new EventPublicationResubmitOnce.Outcome(0, 0, 0, 0));
-    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "all")).isZero();
+    assertThat(ResubmitOnceConfig.resubmitOnceExitCode(job, "all")).isZero();
   }
 }

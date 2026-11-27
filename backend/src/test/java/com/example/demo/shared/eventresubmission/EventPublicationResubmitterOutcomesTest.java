@@ -251,7 +251,7 @@ class EventPublicationResubmitterOutcomesTest {
       "未完了のまま覚える期間（max(3 × lock-at-most-for, in-flight-staleness + lock-at-most-for + 2 ×"
           + " interval)）ちょうどでは覚え、1 マイクロ秒過ぎると捨てる")
   void unfinishedPublicationExpiresAfterLifetime() {
-    final Duration lifetime = ResubmissionTracker.lifetimeOf(properties);
+    final Duration lifetime = properties.resubmissionLifetime();
     assertThat(lifetime)
         .as("in-flight-staleness + lock-at-most-for + 2 × interval が lock-at-most-for × 3 より長い")
         .isEqualTo(

@@ -51,10 +51,11 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 規則名は`@ArchTest`のフィールド名であり、テスト結果にもこの名前で出る。
 
 - `dependenciesPointInward`：`domain.model`、`domain.service`、モジュールルートと`application`、`presentation`、`infrastructure.persistence`、`infrastructure.client`のオニオン構造で依存を内向きに限り、どの層にも属さないパッケージのクラスを拒否する。
-  ベースパッケージ直下と`shared`は、所属検査から除く。`shared.persistence`と`shared.eventresubmission`は、`infrastructure.persistence`と同じ層として検査される。
+  ベースパッケージ直下と`shared`は、所属検査から除く。`shared.persistence`、`shared.eventresubmission`、`shared.locking`は、`infrastructure.persistence`と同じ層として検査される。
 - `infrastructureDependsOnlyOnDomainModel`：`infrastructure`は`application`、`domain.service`、モジュールルートの型に依存せず、機能モジュールの型のうち`domain.model`だけを使う。
-- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で、`shared.persistence`と`shared.eventresubmission`の型に依存するクラスは、`infrastructure.persistence`に置く。
-  この規則が使う場所を限るのは、この2つである。使う場所を限る`shared`のパッケージの方針は[共有モジュール shared](shared-module.md)に従い、`shared.batch`の制限は[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)で足す。
+- `sharedModuleIsUsedOnlyByPersistenceAdapters`：`shared`の外で、`shared.persistence`、`shared.eventresubmission`、`shared.locking`の型に依存するクラスは、`infrastructure.persistence`に置く。
+  この規則が使う場所を限るのは、この3つである。
+  使う場所を限る`shared`のパッケージの方針は[共有モジュール shared](shared-module.md)に従い、`shared.batch`の制限は[#667](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/667)で足す。
   `shared`の中の依存は対象にしない（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）。
 - `httpTypesAreNotUsedByInnerLayers`：`shared`と各モジュールの`domain`、`application`、`infrastructure.persistence`は、Spring Web、Springの HTTP、Servletの型に依存しない。HTTPの型を使うのは`presentation.web`、`infrastructure.client`、ベースパッケージ直下の設定に限る意図だが、規則が検査するのは上の4つのパッケージである。
 - `httpErrorsAreMappedOnlyInErrorPresentationWeb`：`error.presentation.web`の外のクラスは、`ProblemDetail`、`ErrorResponse`（入れ子の`Builder`と`Interceptor`を含む）、`ErrorResponseException`、`ResponseStatusException`、`@ExceptionHandler`、`@ControllerAdvice`、`@RestControllerAdvice`、`@ResponseStatus`に依存せず、`HttpStatus.CONFLICT`と`HttpStatus.UNPROCESSABLE_CONTENT`を読まない（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
@@ -65,7 +66,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 - `moduleApiDoesNotExposeInternalTypes`：モジュールルートの型は、`java..`、`org.jspecify..`、同じルートパッケージの型、イベントが運ぶテナントの`shared.tenancy.TenantId`と`shared.tenancy.TenantScoped`だけに依存する。
   `package-info`は`@ApplicationModule`の宣言を持つため対象から除く。
   違反フィクスチャの`OrderPlacedReadingTenantContext`（`TenantContext`への依存）で確かめる。
-- `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`と、同じ層に入る`shared.persistence`と`shared.eventresubmission`だけで使う。
+- `databaseTechnologyApisAreOnlyUsedByPersistenceAdapters`：jOOQ APIと生成型は`infrastructure.persistence`と、同じ層に入る`shared.persistence`、`shared.eventresubmission`、`shared.locking`だけで使う。
 - `domainModelDependsOnlyOnAllowedTypes`：`domain.model`は、`java.lang..`、`java.util..`、`java.math..`、`java.time..`、`org.jspecify..`、`lombok..`、各モジュールの`domain.model`、`shared.concurrency`、`shared.failure`、`shared.tenancy.TenantId`だけに依存する。`shared.tenancy.TenantContext`は、ScopedValueの暗黙の文脈で引数に現れない入力になるため許さない。
   許可の一覧で止めるため、外部システムのSDKや生成型も、Spring、jOOQ、JPA、Jacksonの型と同じく落ちる。
   Lombokは`lombok..`を許す。
@@ -89,7 +90,7 @@ jOOQの生成物の`com.example.demo.jooq`はOPENのモジュールであり、`
 `batch`を層に足すまでは、`<module>.batch`のクラスは`dependenciesPointInward`の所属検査で失敗する。
 
 共有モジュール`shared`（[ADR-048](../adr/ADR-048-add-shared-module-for-jooq-common-code.md)）のために、ほかの規則へ例外を足していない。
-`shared.persistence`と`shared.eventresubmission`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
+`shared.persistence`、`shared.eventresubmission`、`shared.locking`はオニオン規則の`persistence`の層に入るため、機能モジュールの`infrastructure.persistence`からの依存は同じ層の中の依存になる。
 `infrastructureDependsOnlyOnDomainModel`が拒否するモジュールルートは`com.example.demo.<feature>`の直下だけであり、`shared`のパッケージは含まれない。`shared`が機能モジュールの型に依存しないことは、Spring Modulithの`@ApplicationModule(allowedDependencies = "jooq")`と`ApplicationModuleArchitectureTest`が検査する。
 `shared.concurrency`の`VersionedCommand`は`Command`で終わるインタフェースなので、`ClassRoleArchTest`の`commandsAndResultsAreApplicationRecords`の対象から、`VersionedCommand`の完全修飾型名だけを除く。
 `shared.concurrency`に置いたほかの`*Command`は、この規則の対象のままである。

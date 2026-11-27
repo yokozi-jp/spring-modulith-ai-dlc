@@ -3,7 +3,6 @@ package com.example.demo.shared.eventresubmission;
 import static com.example.demo.testkit.ScheduledTasks.fixedDelayTasks;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.example.demo.shared.eventresubmission.EventPublicationResubmitOnce.Target;
 import com.example.demo.shared.events.ResubmissionPolicy;
 import com.example.demo.testkit.ScheduledTasks.AnotherScheduledJob;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -14,46 +13,32 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
-import org.awaitility.Awaitility;
 import org.jooq.DSLContext;
-import org.jooq.SQLDialect;
-import org.jooq.impl.DSL;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Answers;
 import org.mockito.Mockito;
-import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.EnvironmentPostProcessor;
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBooleanProperty;
 import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
 import org.springframework.boot.context.properties.bind.validation.BindValidationException;
 import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.validation.autoconfigure.ValidationAutoConfiguration;
-import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.SystemEnvironmentPropertySource;
-import org.springframework.core.io.support.SpringFactoriesLoader;
-import org.springframework.core.task.TaskExecutor;
-import org.springframework.mock.env.MockEnvironment;
 import org.springframework.modulith.events.ApplicationModuleListener;
 import org.springframework.modulith.events.config.EventPublicationAutoConfiguration;
 import org.springframework.modulith.events.core.EventPublicationRepository;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.AsyncConfigurer;
 import org.springframework.scheduling.config.FixedDelayTask;
-import org.springframework.transaction.PlatformTransactionManager;
 
 /**
- * {@link EventPublicationResubmissionConfig} の有効と無効の条件、設定値の検証、方針の待ち時間、ロックの表の描画、手での 1
- * 回の再投入の起動、{@code @Async} の executor を検証する。
+ * {@link EventPublicationResubmissionConfig} の有効と無効の条件、設定値の検証、方針の待ち時間、{@code @Async} の executor
+ * を検証する。
  */
 // ApplicationContextRunner の run に渡す callback の中で assert するため、PMD はテストメソッドの assert を検出できない。
 @SuppressWarnings({"PMD.UnitTestShouldIncludeAssert", "PMD.TooManyMethods"})
@@ -68,18 +53,6 @@ class EventPublicationResubmissionConfigTest {
   /** 定期の実行を無効にする設定。 */
   private static final String DISABLED = ENABLED + "=false";
 
-  /** 手での 1 回の再投入の対象のキー。 */
-  private static final String RESUBMIT_ONCE_TARGET =
-      EventPublicationResubmissionConfig.RESUBMIT_ONCE_TARGET;
-
-  /** 終了の前に executor のタスクの完了を待つかのキー。 */
-  private static final String AWAIT_TERMINATION =
-      "spring.task.execution.shutdown.await-termination";
-
-  /** 終了の前に executor のタスクの完了を待つ上限のキー。 */
-  private static final String AWAIT_TERMINATION_PERIOD =
-      "spring.task.execution.shutdown.await-termination-period";
-
   /** 妥当な設定値。 */
   private static final String[] VALID = {
     "event-publication.resubmission.wait-age=PT5M",
@@ -89,23 +62,17 @@ class EventPublicationResubmissionConfigTest {
     "event-publication.resubmission.lock-at-most-for=PT10M",
     "spring.modulith.events.resubmission.abandon-after-attempts=5",
     "event-publication.resubmission.policies.default.multiplier=2",
-    "event-publication.resubmission.policies.default.max-wait=PT1H",
-    "event-publication.resubmit-once.completion-timeout=PT10M"
+    "event-publication.resubmission.policies.default.max-wait=PT1H"
   };
 
-  /** 検証対象の設定だけを読み込み、妥当な設定値と、ロックの bean が受け取る依存の mock を与える runner。 */
+  /** 検証対象の設定だけを読み込み、妥当な設定値を与える runner。 */
   private final ApplicationContextRunner runner = bareRunner().withPropertyValues(VALID);
 
-  /** 検証対象の設定とロックの bean が受け取る依存の mock だけを与え、設定値を与えない runner。 */
+  /** 検証対象の設定だけを与え、設定値を与えない runner。 */
   private static ApplicationContextRunner bareRunner() {
     return new ApplicationContextRunner()
         .withConfiguration(AutoConfigurations.of(ValidationAutoConfiguration.class))
-        .withUserConfiguration(EventPublicationResubmissionConfig.class)
-        // ロックの provider は作るだけで DB に触れないため、依存は mock で足りる。
-        .withBean(
-            DSLContext.class, () -> Mockito.mock(DSLContext.class, Answers.RETURNS_DEEP_STUBS))
-        .withBean(
-            PlatformTransactionManager.class, () -> Mockito.mock(PlatformTransactionManager.class));
+        .withUserConfiguration(EventPublicationResubmissionConfig.class);
   }
 
   @Test
@@ -224,22 +191,12 @@ class EventPublicationResubmissionConfigTest {
         .withUserConfiguration(EventPublicationResubmitter.class, ResubmissionPolicies.class)
         .withBean(FailedPublicationSweep.class, () -> Mockito.mock(FailedPublicationSweep.class))
         .withBean(
+            DSLContext.class, () -> Mockito.mock(DSLContext.class, Answers.RETURNS_DEEP_STUBS))
+        .withBean(
             Clock.class,
             () -> Clock.fixed(Instant.parse("2026-01-01T00:00:00.000000Z"), ZoneOffset.UTC))
         .withBean(MeterRegistry.class, SimpleMeterRegistry::new)
         .withPropertyValues(ENABLE_SCHEDULING);
-  }
-
-  /** 期限を過ぎた冪等性キーの掃除を有効にする設定のキー。掃除の構成の条件から読み、キーを変えても、このテストが古い文字列を確かめ続けないようにする。 */
-  private static String purgeEnabledKey() {
-    try {
-      return Class.forName(
-              "com.example.demo.shared.persistence.IdempotencyKeyPurgeConfig$Scheduling")
-          .getAnnotation(ConditionalOnBooleanProperty.class)
-          .value()[0];
-    } catch (ClassNotFoundException e) {
-      throw new IllegalStateException("掃除の構成が見つからない", e);
-    }
   }
 
   @Test
@@ -325,8 +282,7 @@ class EventPublicationResubmissionConfigTest {
             "event-publication.resubmission.lock-at-most-for=PT10M",
             "spring.modulith.events.resubmission.abandon-after-attempts=5",
             "event-publication.resubmission.policies.other.multiplier=2",
-            "event-publication.resubmission.policies.other.max-wait=PT1H",
-            "event-publication.resubmit-once.completion-timeout=PT10M")
+            "event-publication.resubmission.policies.other.max-wait=PT1H")
         .run(context ->
             assertThat(context)
                 .getFailure()
@@ -344,7 +300,18 @@ class EventPublicationResubmissionConfigTest {
   @Test
   @DisplayName("ロックを持つ上限が間隔以下だと起動に失敗する")
   void lockAtMostForNotLongerThanIntervalFailsStartup() {
-    assertBindFailure("event-publication.resubmission.lock-at-most-for=PT1M");
+    runner
+        .withPropertyValues(DISABLED, "event-publication.resubmission.lock-at-most-for=PT1M")
+        .run(context ->
+            assertThat(context)
+                .getFailure()
+                .rootCause()
+                .isInstanceOfSatisfying(
+                    BindValidationException.class,
+                    failure ->
+                        assertThat(failure.getValidationErrors().getName())
+                            .as("利用者が見る失敗の対象")
+                            .hasToString("event-publication.resubmission")));
   }
 
   @Test
@@ -390,166 +357,15 @@ class EventPublicationResubmissionConfigTest {
   }
 
   @Test
-  @DisplayName("ロックの表は search_path に頼らず modulith スキーマで描画する")
-  void lockTableIsRenderedWithModulithSchema() {
-    final DSLContext lockDsl =
-        EventPublicationResubmissionConfig.lockDsl(DSL.using(SQLDialect.POSTGRES));
+  @DisplayName("1 回の実行の予算は lock-at-most-for の半分である")
+  void runBudgetIsHalfOfLockAtMostFor() {
+    final EventPublicationResubmissionConfig.Properties properties =
+        ResubmissionTestSupport.properties(
+            Map.of(
+                "default",
+                new EventPublicationResubmissionConfig.Policy(2, Duration.ofHours(1), null)));
 
-    assertThat(lockDsl.render(lockDsl.selectFrom(DSL.table(DSL.name("shedlock")))))
-        .contains("\"modulith\".\"shedlock\"");
-  }
-
-  @Test
-  @DisplayName("手での 1 回の再投入の対象があると、Web のサーバーと定期の実行（再投入、冪等性キーの掃除、archive の保持期限の削除）を止め、なければ何もしない")
-  void resubmitOnceEnvironmentDisablesWebAndScheduling() {
-    final EventPublicationResubmissionConfig.ResubmitOnceEnvironment postProcessor =
-        new EventPublicationResubmissionConfig.ResubmitOnceEnvironment();
-    final MockEnvironment once =
-        new MockEnvironment()
-            .withProperty("event-publication.resubmit-once.target", "policy:payment")
-            .withProperty(ENABLED, "true");
-    final MockEnvironment normal =
-        new MockEnvironment().withProperty(ENABLED, Boolean.TRUE.toString());
-
-    postProcessor.postProcessEnvironment(once, new SpringApplication());
-    postProcessor.postProcessEnvironment(normal, new SpringApplication());
-
-    assertThat(once.getProperty("spring.main.web-application-type")).isEqualTo("none");
-    assertThat(once.getProperty(ENABLED)).isEqualTo("false");
-    assertThat(once.getProperty(purgeEnabledKey())).isEqualTo("false");
-    assertThat(
-            once.getProperty(
-                EventPublicationArchiveRetentionConfig.Scheduling.class.getAnnotation(
-                        ConditionalOnBooleanProperty.class)
-                    .value()[0]))
-        .isEqualTo("false");
-    assertThat(once.getProperty(AWAIT_TERMINATION)).isEqualTo("true");
-    assertThat(once.getProperty(AWAIT_TERMINATION_PERIOD)).isEqualTo("20s");
-    assertThat(normal.getProperty("spring.main.web-application-type")).isNull();
-    assertThat(normal.getProperty(ENABLED)).isEqualTo("true");
-    assertThat(normal.getProperty(AWAIT_TERMINATION)).isNull();
-    assertThat(normal.getProperty(AWAIT_TERMINATION_PERIOD)).isNull();
-  }
-
-  @Test
-  @DisplayName("手での 1 回の再投入の終了の設定では、文脈を閉じる前に applicationTaskExecutor の処理中のリスナーの完了を待つ")
-  void resubmitOnceShutdownWaitsForRunningListener() {
-    final AtomicBoolean running = new AtomicBoolean();
-    final AtomicBoolean exiting = new AtomicBoolean();
-    final AtomicBoolean done = new AtomicBoolean();
-    new ApplicationContextRunner()
-        .withConfiguration(AutoConfigurations.of(TaskExecutionAutoConfiguration.class))
-        .withPropertyValues(
-            "spring.threads.virtual.enabled=true",
-            "spring.task.execution.shutdown.await-termination=true",
-            "spring.task.execution.shutdown.await-termination-period=20s")
-        .run(context -> {
-          // 終了を始めてから終わるタスクで、処理中のリスナーを表す。
-          context
-              .getBean("applicationTaskExecutor", TaskExecutor.class)
-              .execute(() -> {
-                running.set(true);
-                Awaitility.await("終了を始める").atMost(Duration.ofSeconds(10)).untilTrue(exiting);
-                done.set(true);
-              });
-
-          Awaitility.await("リスナーが動き始める").atMost(Duration.ofSeconds(10)).untilTrue(running);
-          exiting.set(true);
-          EventPublicationResubmissionConfig.awaitRunningListeners(context);
-
-          assertThat(done).as("文脈を閉じる前のリスナーの完了").isTrue();
-        });
-  }
-
-  @Test
-  @DisplayName("手での 1 回の再投入の起動は、spring.factories から読まれる")
-  void resubmitOnceEnvironmentIsRegistered() {
-    // 他の EnvironmentPostProcessor は Spring Boot が渡す引数を要るため、作れないものは飛ばす。
-    assertThat(
-            SpringFactoriesLoader.forDefaultResourceLocation()
-                .load(
-                    EnvironmentPostProcessor.class,
-                    SpringFactoriesLoader.ArgumentResolver.none(),
-                    SpringFactoriesLoader.FailureHandler.handleMessage((message, failure) -> {})))
-        .hasAtLeastOneElementOfType(
-            EventPublicationResubmissionConfig.ResubmitOnceEnvironment.class);
-  }
-
-  @ParameterizedTest(name = "[{0}] 通常の起動: {1}")
-  @CsvSource(
-      value = {
-        "'', true",
-        "' ', true",
-        "false, false",
-        "FALSE, false",
-        "all, false",
-        "policy:payment, false"
-      },
-      quoteCharacter = '\'')
-  @DisplayName("手での 1 回の再投入の対象が空白でなければ、Web と定期の実行を止め、runner も作る（false も同じ）")
-  void resubmitOnceGatesAgree(final String target, final boolean normalStartup) {
-    final MockEnvironment environment =
-        new MockEnvironment()
-            .withProperty(RESUBMIT_ONCE_TARGET, target)
-            .withProperty(ENABLED, Boolean.TRUE.toString());
-    new EventPublicationResubmissionConfig.ResubmitOnceEnvironment()
-        .postProcessEnvironment(environment, new SpringApplication());
-
-    assertThat(environment.getProperty("spring.main.web-application-type") == null)
-        .as("Web を止めない")
-        .isEqualTo(normalStartup);
-    assertThat(environment.getProperty(ENABLED)).isEqualTo(Boolean.toString(normalStartup));
-    assertThat(EventPublicationResubmissionConfig.isResubmitOnceRequested(environment))
-        .isEqualTo(!normalStartup);
-    runner
-        .withBean(
-            EventPublicationResubmitOnce.class,
-            () -> Mockito.mock(EventPublicationResubmitOnce.class))
-        .withInitializer(context ->
-            context
-                .getEnvironment()
-                .getPropertySources()
-                .addFirst(new MapPropertySource("target", Map.of(RESUBMIT_ONCE_TARGET, target))))
-        .run(context -> {
-          assertThat(context).hasNotFailed();
-          assertThat(
-                  context.getBeansOfType(ApplicationRunner.class).containsKey("resubmitOnceRunner"))
-              .as("runner の bean")
-              .isEqualTo(!normalStartup);
-        });
-  }
-
-  @Test
-  @DisplayName("手での 1 回の再投入の対象が設定されていなければ、runner を作らず、Web と定期の実行を止めない")
-  void unsetTargetIsNormalStartup() {
-    final MockEnvironment environment =
-        new MockEnvironment().withProperty(ENABLED, Boolean.TRUE.toString());
-
-    assertThat(EventPublicationResubmissionConfig.isResubmitOnceRequested(environment)).isFalse();
-    runner.run(context -> assertThat(context).doesNotHaveBean("resubmitOnceRunner"));
-  }
-
-  @Test
-  @DisplayName("手での 1 回の再投入の終了コードは、すべて完了なら 0、未完了や例外なら 1 である")
-  void resubmitOnceExitCode() {
-    final EventPublicationResubmitOnce job = Mockito.mock(EventPublicationResubmitOnce.class);
-    Mockito.when(job.run(Target.parse("all")))
-        .thenReturn(new EventPublicationResubmitOnce.Outcome(2, 2, 0, 0));
-    Mockito.when(job.run(Target.parse("policy:payment")))
-        .thenReturn(new EventPublicationResubmitOnce.Outcome(2, 1, 1, 0));
-    Mockito.when(job.run(Target.parse("policy:missing")))
-        .thenThrow(new IllegalArgumentException("unknown"));
-
-    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "all")).isZero();
-    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "policy:payment"))
-        .isEqualTo(1);
-    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "policy:missing"))
-        .isEqualTo(1);
-    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, "OrderConfirmed"))
-        .as("読めない対象は、job を呼ばずに 1 を返す")
-        .isEqualTo(1);
-    assertThat(EventPublicationResubmissionConfig.resubmitOnceExitCode(job, null)).isEqualTo(1);
-    Mockito.verify(job, Mockito.times(3)).run(Mockito.any());
+    assertThat(properties.runBudget()).isEqualTo(properties.lockAtMostFor().dividedBy(2));
   }
 
   @Test
