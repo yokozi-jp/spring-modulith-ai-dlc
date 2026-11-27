@@ -138,7 +138,7 @@ class EventPublicationResubmitter {
    * でロックは切れるため、KeepAliveLockProvider で延長しない。
    */
   private Predicate<EventPublication> dueAt(final Instant now) {
-    final Duration budget = properties.lockAtMostFor().dividedBy(2);
+    final Duration budget = properties.runBudget();
     return publication ->
         Duration.between(now, Instant.now(clock)).compareTo(budget) <= 0
             && policies.isDue(publication, now);

@@ -1,6 +1,6 @@
 package com.example.demo.shared.persistence;
 
-import jakarta.validation.constraints.AssertTrue;
+import com.example.demo.shared.locking.PeriodicLockTiming;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import java.time.Duration;
@@ -61,17 +61,6 @@ class IdempotencyKeyPurgeConfig {
   record Properties(
       @NotNull @DurationMin(seconds = 1) Duration interval,
       @NotNull @DurationMin(seconds = 1) Duration lockAtMostFor,
-      @Min(1) int batchSize) {
-
-    /** ロックを持つ下限。再投入のジョブ（ADR-079）と同じく、間隔の半分にする。 */
-    /* package */ Duration lockAtLeastFor() {
-      return interval.dividedBy(2);
-    }
-
-    /** ロックを持つ上限が間隔より長いか。短いと、ロックを持つ下限（間隔の半分）が上限を超えうる。 */
-    @AssertTrue(message = "idempotency-key.purge.lock-at-most-for must be longer than interval")
-    /* package */ boolean isLockAtMostForLongerThanInterval() {
-      return lockAtMostFor == null || interval == null || lockAtMostFor.compareTo(interval) > 0;
-    }
-  }
+      @Min(1) int batchSize)
+      implements PeriodicLockTiming {}
 }

@@ -1,4 +1,4 @@
-package com.example.demo.shared.eventresubmission;
+package com.example.demo.shared.locking;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -147,7 +147,7 @@ class ShedLockSessionTimeZoneTest {
     configuration.set(new DefaultExecuteListenerProvider(recorder));
     final DSLContext otherDsl = DSL.using(configuration);
     assertThat(otherDsl.fetchValue("SHOW TIME ZONE")).as("セッションの TimeZone").isEqualTo(zone);
-    return new JooqLockProvider(EventPublicationResubmissionConfig.lockDsl(otherDsl));
+    return new JooqLockProvider(LockConfig.lockDsl(otherDsl));
   }
 
   private String required(final String key) {

@@ -27,3 +27,5 @@ check_frontend_traces	-
 TracingInstrumentation	^docs/adr/ADR-068-
 SESSION_COOKIE_SECURE	^docs/adr/ADR-(008|119)-
 redirectToLoginOnUnauthorized	-
+eventPublicationLockProvider	-
+eventPublicationLockingTaskExecutor	-

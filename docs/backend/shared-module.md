@@ -17,6 +17,10 @@ tags: [architecture, backend, spring-modulith, shared-module]
   レジストリは全モジュールが共有する基盤で業務の概念を持たず、jOOQ を使う処理は Persistence Adapter の層に置く規則があり、`shared.eventresubmission` はその層に入るためである。
   `EventPublicationResubmitOnce` 以外のクラスは package-private にし、他のモジュールから使えないようにする。
   `EventPublicationResubmitOnce` は、他のモジュールの結合テストがリスナーの回復を確かめるため public にする。
+- ロックを取って定期に動くジョブの、時間の規則（`PeriodicLockTiming`）とロックの構成（`LockConfig`）を `shared.locking` に置く（[ADR-079](../adr/ADR-079-resubmit-failed-event-publications-periodically-with-shedlock.md)、[ADR-126](../adr/ADR-126-require-idempotency-key-on-all-non-safe-business-apis.md)）。
+  ロックの実体は ShedLock で、使う側は ShedLock の型をそのまま使う。
+  jOOQ を使うため、`shared.persistence` と同じ層として扱う。
+  `PeriodicLockTiming` は、ジョブの設定の `record` が別のパッケージから実装するため public にし、`LockConfig` は package-private にする。
 - 楽観的ロックの語彙（`ConflictException`、`ExpectedLockNo`、`VersionedCommand`）を `shared.concurrency` に置き、このパッケージも `@NamedInterface("concurrency")` で公開する。
 - 業務上の失敗の例外（`NotFoundException`、`BusinessRuleViolationException`）と、422 の理由の interface `FailureReason` を `shared.failure` に置き、このパッケージも `@NamedInterface("failure")` で公開する（[ADR-062](../adr/ADR-062-map-business-exceptions-to-404-409-422.md)）。
   `shared` は Spring Web、Spring の HTTP、Servlet の型に依存しない。
@@ -45,9 +49,10 @@ tags: [architecture, backend, spring-modulith, shared-module]
   ヘッダーから `IdempotencyKey` の引数を作る resolver は、HTTP の型を使うため、ベースパッケージ直下の `IdempotencyKeyConfig` に置く。
 - 業務の概念を置かない。
   ルートのパッケージには `package-info.java` だけを置く。
-- 使う場所を限る `shared` のパッケージは、次の 3 つだけである。
+- 使う場所を限る `shared` のパッケージは、次の 4 つだけである。
   - `shared.persistence`：他のモジュールの `infrastructure.persistence` だけが使ってよい。
   - `shared.eventresubmission`：`shared.persistence` と同じ層として扱う。`shared` に `infrastructure` のパッケージは置かない。
+  - `shared.locking`：`shared.persistence` と同じ層として扱う。
   - `shared.batch`：機能モジュールの `batch` だけが使ってよい。
 - ほかの `shared` のパッケージ（`concurrency`、`failure`、`events`、`idempotency`、`security`、`tenancy`、`validation`）は、どの層からも使える。
   使う場所を限る必要が出たときだけ、パッケージを ArchUnit の規則へ足す。

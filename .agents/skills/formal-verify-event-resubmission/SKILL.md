@@ -63,6 +63,8 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
   backend/src/main/java/com/example/demo/shared/eventresubmission/FailedPublicationSweep.java \
   backend/src/main/java/com/example/demo/shared/eventresubmission/StalePublications.java \
   backend/src/main/java/com/example/demo/shared/eventresubmission/EventPublicationResubmissionConfig.java \
+  backend/src/main/java/com/example/demo/shared/eventresubmission/ResubmitOnceConfig.java \
+  backend/src/main/java/com/example/demo/shared/locking \
   backend/src/main/java/com/example/demo/shared/eventresubmission/ResubmissionPolicies.java \
   backend/src/test/java/com/example/demo/shared/eventresubmission/ResubmissionOptionsLearningTest.java \
   backend/src/main/resources/application.yaml \
@@ -93,7 +95,7 @@ git diff --stat "$(sed -n 's/^同期コミット：`\([0-9a-f]*\)`.*/\1/p' "$ski
 | `Restart`     | 再起動。再投入の最初の回は `initialDelay` = `interval` の後                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `Tick`        | 時間を 1 進める。定期の実行の時刻と、実行（古い出版を `FAILED` に戻す処理を含む）と配信の期限に来た操作が先に動く                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 
-定数のうち、`Interval`、`LockAtMostFor`、`WaitAge`、`Multiplier`、`MaxWait`、`MaxResubmissions`（全体の `abandon-after-attempts`）、`PolicyAbandon`（リスナーの方針の `abandon-after-attempts`。指定がなければ全体の値）、`InFlightStaleness` は設定値で、モデルの `ASSUME` が起動時の検査（`Properties` の `@AssertTrue`、`AbandonProperties` の `@Min(2)`、`Policy` の `@Min(1)`、方針の値を全体の値より小さくする `ResubmissionPolicies` の検査）と同じ条件を課す。
+定数のうち、`Interval`、`LockAtMostFor`、`WaitAge`、`Multiplier`、`MaxWait`、`MaxResubmissions`（全体の `abandon-after-attempts`）、`PolicyAbandon`（リスナーの方針の `abandon-after-attempts`。指定がなければ全体の値）、`InFlightStaleness` は設定値で、モデルの `ASSUME` が起動時の検査（`Properties` の `@AssertTrue`、`PeriodicLockTiming` の `@AssertTrue`、`AbandonProperties` の `@Min(2)`、`Policy` の `@Min(1)`、方針の値を全体の値より小さくする `ResubmissionPolicies` の検査）と同じ条件を課す。
 `MaxDue` は `ResubmissionPolicies.maxResubmissions` で、`isDue` が再投入する回数の上限である。
 Spring Modulith が最初の配信と 1 回目の再投入の失敗に同じ 1 を渡すため、`PolicyAbandon` が 1 なら 0、2 以上なら同じ値になる。
 `QueueMax <= LockAtMostFor` と `ListenerMax <= LockAtMostFor` は検査でなく前提で、ADR-079 が置いている。

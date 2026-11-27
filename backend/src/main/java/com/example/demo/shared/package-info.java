@@ -9,6 +9,8 @@
  * <p>Spring Modulith のイベント出版のレジストリの、失敗した出版の再投入は {@code eventresubmission} に置き、リスナーが再投入の方針を選ぶ注釈
  * （{@code ResubmissionPolicy}）は {@code events} に置いてどの層からも使う（ADR-079）。
  *
+ * <p>ロックを取って定期に動くジョブの時間の規則とロックの構成は {@code locking} に置く（ADR-079）。
+ *
  * <p>共通カラムの {@code *_by} に登録するアプリの利用者を表す認証の principal（{@code AppUserPrincipal}）は {@code security}
  * に置き、どの層からも使う（ADR-096）。テナントを選ぶ前の拒否（{@code TenantNotSelectedException}）は、テナントの ID
  * も役割も持たずログインの状態だけを表すので、認証の語彙として {@code security} に置く（ADR-101）。
