@@ -17,13 +17,5 @@ for rc in ~/.bashrc ~/.profile; do
   fi
 done
 
-# 起動時に作業ディレクトリへ移動する（任意）。重複追記を避ける。
-if ! grep -qxF 'cd /home' ~/.bashrc; then
-  {
-    echo ''
-    echo 'cd /home'
-  } >> ~/.bashrc
-fi
-
 echo ""
 echo "=== 完了 ==="

@@ -92,7 +92,7 @@ _kw_setup() (
 
   if [ ! -x "$VP_HOME/bin/vp" ]; then
     echo "kiro-web: Vite+ を入れます" >&2
-    VP_NODE_MANAGER=no bash "$_kw_repo/docs/local-env-setup/02-setup-viteplus.sh" >"$KIRO_WEB_HOME/vp-install.log" 2>&1 \
+    VP_NODE_MANAGER=no bash "$_kw_repo/docs/local-env-setup/01-setup-viteplus.sh" >"$KIRO_WEB_HOME/vp-install.log" 2>&1 \
       || { cat "$KIRO_WEB_HOME/vp-install.log" >&2; exit 1; }
   fi
 

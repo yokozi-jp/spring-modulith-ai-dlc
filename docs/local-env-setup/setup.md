@@ -1,269 +1,197 @@
 ---
 type: Runbook
 title: 開発環境構築
-description: WSL2 と Docker Desktop を前提にしたローカル開発環境の構築手順。
+description: Windows 11 の WSL2 (Ubuntu 26.04) と Docker Desktop に、clone してから task setup、依存の導入、動作確認が通るまでのローカル開発環境を作る手順。新しく開発に参加するとき、マシンを作り直したときに読む。
 tags: [runbook, setup, wsl, docker, mise]
 ---
 
 # 開発環境構築
 
-Kiro Web のサンドボックスで作業する場合は、この文書ではなく [Kiro Web の開発環境](kiro-web.md)を読む。
+Windows 側で WSL2 のメモリ上限を設定して Ubuntu を作り、Ubuntu 側で2つのブロックを貼り付けて実行します。
+ブロック1が apt のパッケージ、GitHub CLI、mise、Git の設定を入れます。
+ブロック2が GitHub の認証、clone、道具と依存の導入、動作確認までを行います。
 
-## 前提条件
+Kiro Web のサンドボックスで作業する場合は、この文書ではなく [Kiro Web の開発環境](kiro-web.md)を読みます。
+
+## 前提
 
 - Windows 11（物理メモリ 32GB を想定）
 - Docker Desktop
-- Visual Studio Code
+- Visual Studio Code とその WSL 拡張機能
 
-> **推奨**: WSL2 のメモリ上限を `.wslconfig` で引き上げることをおすすめします。
-> デフォルトでは以下の制限が適用されています：
->
-> | 設定       | デフォルト値                               |
-> | ---------- | ------------------------------------------ |
-> | メモリ     | 物理メモリの 50% または 8GB のうち小さい方 |
-> | プロセッサ | Windows の論理プロセッサ数と同じ           |
->
-> Windows 側で `%USERPROFILE%\.wslconfig` を作成または編集し、以下を記述してください：
->
-> ``` ini
-> [wsl2]
-> memory=24GB   # 物理メモリ 32GB の場合。16GB なら 12GB 程度に調整
-> ```
->
-> `processors` はデフォルトでホストの全論理プロセッサが使えるため、明示指定は不要です。
->
-> ⚠️ このファイルは **UTF-8（BOM なし）** で保存してください。
-> UTF-16 や BOM 付きで保存すると設定が無視されます。
-> メモ帳で保存する場合は「名前を付けて保存」でエンコードを「UTF-8」に指定してください。
->
-> 保存後、WSL を再起動すると反映されます。
+hook のスクリプトは POSIX sh で書いているので、Windows では WSL2 上で開発します。
 
-## 手順
+## 1. WSL2 のメモリ上限と Ubuntu（Windows 側）
 
-### 1. WSL インスタンス作成
+WSL2 の VM の既定のメモリ上限は、Windows の物理メモリより小さい値です。
+Docker Desktop のコンテナも同じ VM で動き、この上限を分け合うので、`%USERPROFILE%\.wslconfig` で引き上げます。
+`processors` は既定で全部使えるので、指定しません。
 
-コマンドプロンプトを実行し、以下を入力：
+Docker Desktop を終了してから、PowerShell で次を実行します。
 
-``` cmd
-wsl --install Ubuntu-26.04 --name <任意の名前>
+``` powershell
+$memory = '24GB'   # 物理メモリ 32GB の場合。16GB なら 12GB 程度
+$distro = 'dev'    # WSL のインスタンス名。用途に合わせて変えてよい
+$config = "$env:USERPROFILE\.wslconfig"
+if (Test-Path $config) {
+  Write-Warning "$config は既にあります。[wsl2] の memory を手で $memory にしてください。"
+} else {
+  [IO.File]::WriteAllText($config, "[wsl2]`r`nmemory=$memory`r`n")   # UTF-8 (BOM なし) で書く
+}
+wsl --shutdown   # 設定は VM の起動時に読まれるため、動いている VM を止める
+wsl --install Ubuntu-26.04 --name $distro
 ```
 
-`--name` はプロジェクトや用途に合わせて自由に付けてください（例: `dev` など）。
+`.wslconfig` は UTF-8（BOM なし）で保存します。
+UTF-16 や BOM 付きで保存すると、設定が無視されます。
+Windows PowerShell 5.1 の `Out-File` は UTF-16、`Set-Content -Encoding UTF8` は BOM 付きで書くので、上のコマンドは `[IO.File]::WriteAllText` を使っています。
+既にあるファイルをメモ帳で直すときは、「名前を付けて保存」でエンコードに「UTF-8」を選びます。
 
-インストール完了後、ユーザー名とパスワードを設定してください。
+インストールが終わると Ubuntu が起動するので、ユーザー名とパスワードを設定します。
+この Ubuntu のターミナルは 3 で使うので、開いたままにします。
 
-### 2. Docker Desktop の WSL Integration 設定
+## 2. Docker Desktop の WSL Integration
 
-1. Docker Desktop を起動
-2. **Settings > Resources > WSL Integration** を開く
-3. 作成したインスタンス名を有効化
-4. **Apply & Restart** をクリック
+1. Docker Desktop を起動します。
+2. **Settings > Resources > WSL Integration** を開きます。
+3. 1 で作ったインスタンス（`dev`）を有効にします。
+4. **Apply & Restart** をクリックします。
 
-### 3. WSL インスタンスへの接続
+## 3. Ubuntu の初期セットアップ（ブロック1）
 
-``` cmd
-wsl -d <インスタンス名>
-```
-
-### 4. 初期セットアップ
+Ubuntu のターミナルに次のブロックを貼り付けます。
+Git の user.name と user.email が未設定のときだけ、その値を聞かれます。
+sudo のパスワードは1回聞かれます。
 
 ``` bash
-# 共通ワークスペース作成
-sudo mkdir -p /home/projects
-sudo chown -R $USER:$USER /home/projects
-sudo chmod -R 755 /home/projects
+(
+set -euo pipefail
 
-# 基本パッケージインストール
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y curl git wget unzip jq vim tree gnupg2 software-properties-common extrepo
+# Git の名前とメールアドレス。設定済みなら聞かない
+git_name=$(git config --global --get user.name || true)
+git_email=$(git config --global --get user.email || true)
+[ -n "$git_name" ] || read -rp 'Git の user.name: ' git_name
+[ -n "$git_email" ] || read -rp 'Git の user.email: ' git_email
 
-# mise（Task、betterleaks、iwe、jq、Java、zizmor、Kiro CLI を mise.lock の版で入れる）の apt リポジトリ
-sudo extrepo enable mise
-sudo apt update && sudo apt install -y mise
+# 共通ワークスペース
+sudo install -d -o "$(id -un)" -g "$(id -gn)" -m 755 /home/projects
 
-# Git基本設定（⚠️ 以下2行は自分の名前・メールアドレスに書き換えてから実行してください）
-# git config --global user.name "Your Name"
-# git config --global user.email "you@example.com"
+# 基本パッケージ。extrepo は mise の apt リポジトリの登録が使う
+sudo apt update
+sudo apt upgrade -y
+sudo apt install -y curl git wget unzip vim tree gnupg2 software-properties-common extrepo
 
+# GitHub CLI の apt リポジトリ（公式の手順と同じ鍵と URL）
+out=$(mktemp)
+wget -nv -O"$out" https://cli.github.com/packages/githubcli-archive-keyring.gpg
+sudo install -D -m 644 "$out" /etc/apt/keyrings/githubcli-archive-keyring.gpg
+rm -f "$out"
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+  | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+# mise の apt リポジトリ
+compgen -G '/etc/apt/sources.list.d/*mise.sources' > /dev/null || sudo extrepo enable mise
+
+sudo apt update
+sudo apt install -y gh mise
+
+# Git
+git config --global user.name "$git_name"
+git config --global user.email "$git_email"
 git config --global core.autocrlf input
 git config --global core.fileMode true
 git config --global core.symlinks true
 git config --global alias.logs "log --pretty='format:%C(yellow)%h %C(green)%cd %C(cyan)%an %C(reset)%s %C(magenta)%d' --date=format:'%Y-%m-%d %H:%M:%S' --graph"
+)
 ```
 
-### 5. GitHub CLI のインストールと認証
+各ツールを入れる理由は次のとおりです。
 
-``` bash
-(type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
-  && sudo mkdir -p -m 755 /etc/apt/keyrings \
-  && out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-  && cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
-  && sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-  && sudo mkdir -p -m 755 /etc/apt/sources.list.d \
-  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-  && sudo apt update \
-  && sudo apt install gh -y
-```
+- **mise**：Task、betterleaks、iwe、jq、Java（Amazon Corretto）、zizmor、Kiro CLI を、`mise.toml` と `mise.lock` で固定した版で入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。これらは apt では入れません。
+- **GitHub CLI（`gh`）**：Git の HTTPS の認証と、Issue や Pull Request の操作に使います。
 
-認証を行います：
+途中で失敗すると、そこでブロックが止まります。
+原因を直してから、同じブロックをもう一度貼り付けます（何度実行しても同じ結果になります）。
 
-``` bash
-gh auth login
-```
+## 4. リポジトリのセットアップ（ブロック2）
 
-以下のように選択してください：
+Ubuntu のターミナルに次のブロックを貼り付けます。
+`gh auth login` はワンタイムコードと URL を表示するので、ブラウザで開いてコードを入力します。
+ブラウザが開かないときは、表示された URL を Windows のブラウザで開きます。
+「Authenticate Git with your GitHub credentials?」と聞かれたら Yes を選びます。
 
-``` text
-? Where do you use GitHub? GitHub.com
-? What is your preferred protocol for Git operations on this host? HTTPS
-? Authenticate Git with your GitHub credentials? Yes
-? How would you like to authenticate GitHub CLI? Login with a web browser
-```
-
-ブラウザが開くので、画面の指示に従って認証を完了してください。
-
-認証完了後、Git の認証を GitHub CLI に委任します：
-
-``` bash
-gh auth setup-git
-```
-
-### 6. リポジトリのクローン
-
-``` bash
-cd /home/projects
-gh repo clone yokozi-jp/spring-modulith-ai-dlc
-cd spring-modulith-ai-dlc
-```
-
-### 7. セットアップスクリプトの実行
-
-最初に mise で Task を入れ、その後のセットアップを`task setup`で実行します。
-
-``` bash
-cd /home/projects/spring-modulith-ai-dlc
-mise trust
-mise install --locked
-eval "$(mise activate bash --shims)"
-task setup
-source ~/.bashrc
-```
-
-`mise trust` は、この `mise.toml` を読んでよいと mise に伝えます。
+実行する前に、`mise trust` が読む `mise.toml` の内容を確かめます。
 `mise.toml` の `http:kiro-cli` が option を持つので、trust するまで mise は設定を読みません。
 trust はパスごとに記録され、中身が変わっても取り消されません。
-実行する前に `mise.toml` を読んで確かめてください。
-worktree を作ったときも、そこで `mise trust` を実行します。
 
-`mise install --locked` は、`mise.toml` の Task、betterleaks、iwe、jq、Java（Amazon Corretto）、zizmor、Kiro CLI、手順 11 の jdtls と Lombok を、`mise.lock` と `.mise/locks/` に記録した版と checksum で検証して入れます（[ADR-090](../adr/ADR-090-pin-cli-tools-with-mise-lock.md)）。
-`--locked` を付けると、lock に無い版を入れずに止まります。
-`task setup` は `04-setup-shell.sh` で、mise の shims を PATH の先頭に通す行を `~/.bashrc` と `~/.profile` に足します。
-ログインシェルでは `~/.profile` が `~/.bashrc` の後で `~/.local/bin` を先頭へ足すので、`~/.profile` の末尾でも shims を先頭へ足し直します。
-VS Code Server は、ログインシェルで作った PATH を拡張とターミナルに渡します。
-`task setup` は最後に、Kiro の権限の雛形を `~/.kiro/settings/permissions.yaml` に置きます（`permissions.yaml` か `permissions.json` がすでにあれば置かず、雛形との差分を表示します）。
+``` bash
+(
+set -euo pipefail
+gh auth status > /dev/null 2>&1 || gh auth login --hostname github.com --git-protocol https --web
+gh auth setup-git   # Git の HTTPS の認証を gh に任せる
 
-以前の手順で作った環境は、`bash -lic 'type -a task kiro-cli'` を実行し、どちらも先頭が `~/.local/share/mise/shims` になることを確かめます。
-ならなければ、`bash docs/local-env-setup/04-setup-shell.sh` を実行し、新しいターミナルで Kiro CLI を起動し直します。
-VS Code の拡張にも新しい PATH を渡すには、VS Code を閉じ、Windows で `wsl --shutdown` を実行してから接続し直します（Docker Desktop の WSL も止まります）。
-`mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
-Kiro CLI の固定を入れる前から使っているチェックアウトでは、pull の後に一度だけ `mise trust` を実行します。
-実行しないと、shims と、`task` を呼ぶ Git フックが `not trusted` で止まります。
+cd /home/projects
+[ -d spring-modulith-ai-dlc ] || gh repo clone yokozi-jp/spring-modulith-ai-dlc
+cd spring-modulith-ai-dlc
+
+mise trust
+mise install --locked                  # mise.toml の道具を、mise.lock の版と checksum で検証して入れる
+eval "$(mise activate bash --shims)"   # このブロックの中で task などを使えるようにする
+task setup                             # Vite+、shims の PATH、Kiro の権限の雛形
+. ~/.config/vite-plus/env              # task setup が入れた vp を、このブロックの PATH に足す
+npm ci                                 # Lefthook と commitlint
+task fe-install                        # フロントエンドの依存
+
+# 確認。どれかが失敗するとブロックが止まる
+[ -z "$(mise ls --current --missing)" ]   # mise.toml の道具がすべて入っている
+docker info > /dev/null                   # Docker Desktop の WSL Integration が有効
+java -version
+node -v
+task --version
+kiro-cli --version
+gh auth status
+)
+```
+
+ブロックが終わったら、`exec bash -l` を実行するか、ターミナルを開き直します。
+`task setup` が `~/.bashrc` と `~/.profile` に足した PATH の設定を、自分のシェルに反映するためです。
+`task setup` の内容は次のとおりです。
+
+- Vite+（`vp`）を入れます。Node.js と pnpm は Vite+ が用意するので、別に入れません。
+- mise の shims を PATH の先頭に通す行を、`~/.bashrc` と `~/.profile` に足します。`~/.profile` は、`~/.bashrc` の後で `~/.local/bin` を先頭へ足すので、末尾でも shims を先頭へ足し直します。VS Code Server は、ログインシェルで作った PATH を拡張とターミナルに渡します。
+- Kiro の権限の雛形を `~/.kiro/settings/permissions.yaml` に置きます。`permissions.yaml` か `permissions.json` がすでにあれば置かず、雛形との差分を表示します。
 
 shims は、今いるディレクトリから上にたどって見つけた `mise.toml` の版を選びます。
 そのため `task`、`betterleaks`、`iwe`、`java` は、`mise.toml` のあるチェックアウトの中でだけ動きます。
 Gradle は `JAVA_HOME` が無ければ PATH の `java` を使うので、`JAVA_HOME` は設定しません。
 VS Code の Java 拡張も、`JAVA_HOME` か PATH の `java` を使います。
 
-#### 公式のインストーラーの Kiro CLI から移るとき
-
-以前は `curl -fsSL https://cli.kiro.dev/install | bash` で `~/.local/bin/kiro-cli` を入れていました。
-`~/.profile` に shims の行が無いと、Ubuntu の `~/.profile` が `~/.bashrc` の後で `~/.local/bin` を PATH の先頭へ足すので、ログインシェルでは公式のインストーラーの版が shims より先に使われます。
-`~/.local/bin/kiro-cli` を消します（`kiro-cli-chat` があればそれも消します）。
-`type -a kiro-cli` の先頭が mise の shims になることを確かめてください。
-
 Kiro CLI は起動時に自己更新を確かめます。
 `kiro-cli settings app.disableAutoupdates true` で止めます。
 版は `mise.toml` を書き換えて上げます。
+`mise.toml` か `mise.lock` が変わったときは、`mise install --locked` だけを実行します。
 
-#### apt の Corretto から移るとき
+## 5. VS Code で開く
 
-`~/.bashrc` に `export JAVA_HOME=/usr/lib/jvm/java-25-amazon-corretto` がある環境では、その行と `export JAVA_TOOL_OPTIONS="-Dfile.encoding=UTF-8"` の行を消し、`source ~/.bashrc` を実行します。
-`JAVA_HOME` が残ると、Gradle は mise の Java でなく apt の Java を使います。
-`file.encoding` は Java 18 から既定で UTF-8 なので、設定は要りません。
-
-`mise.toml` に Java がないブランチや worktree（この変更より前に切ったもの）では、shims の `java` が版を選べず、`./gradlew` が失敗します。
-そうしたブランチを使い終えるまでは、apt の `java-25-amazon-corretto-jdk` を残します。
-使い終えたら、`sudo apt remove java-25-amazon-corretto-jdk` で消せます。
-
-### 8. Git hooks のセットアップ
+Ubuntu のターミナルで、リポジトリの root から VS Code を開きます。
+左下のステータスバーに `WSL: dev` と表示されれば、WSL に接続できています。
+推奨拡張機能（`.vscode/extensions.json`）のインストールを促されたら、すべて入れます。
 
 ``` bash
 cd /home/projects/spring-modulith-ai-dlc
-npm ci
+code .
 ```
 
-これにより Lefthook が有効化されます。
+## 完了の目安
 
-### 9. VSCode から WSL への接続
-
-1. Windows 側で VSCode を起動
-2. `F1` キーを押してコマンドパレットを開く
-3. `WSL: Connect to WSL using Distro...` を選択
-4. 手順 1 で作成したインスタンス名を選択
-
-VSCode が WSL モードで再起動し、左下のステータスバーに `WSL: <インスタンス名>` と表示されれば接続完了です。
-
-### 10. iwe（ナレッジ管理）
-
-[iwe](https://github.com/iwe-org/iwe) は markdown ベースのナレッジ管理ツールです（CLI、LSP サーバー、MCP サーバー）。
-このプロジェクトでは `docs/` 配下のドキュメント（ADR など）を対象に、リンク補完、バックリンク、定義ジャンプや AI エージェント連携に使い、`task okf-check` で OKF バンドルの適合を検証します。
-
-iwe は手順 7 の `mise install --locked` で導入済みです。
-バージョンは `mise.toml` に固定し、チームと CI で揃えます。
-
-`iwe`（CLI）、`iwes`（LSP サーバー）、`iwec`（MCP サーバー）の 3 コマンドが入ります。
-
-`docs/` は OKF v0.2 バンドルとして初期化済みで、その設定 `docs/.iwe/` はリポジトリにコミットされています。
-クローンした時点で使える状態なので、`iwe init` を実行する必要はありません。
-
-> **なぜ `docs/` を対象にするのか**: iwe は人が育てる markdown のナレッジグラフを扱うツールです。
-> `.kiro/` 配下の markdown は Kiro の設定や生成物なので対象にせず、リポジトリルートではなく `docs/` に絞ります。
-
-エディタ連携（LSP）と AI エージェント連携（MCP）は設定済みで、追加作業は要りません。
-
-- **エディタ連携（LSP）**: 手順 12 の推奨拡張に含まれる `iwe.iwe` 拡張が、mise の shims から `iwes` を LSP サーバーとして利用します。
-  定義ジャンプ、バックリンク、リンク補完などが markdown で使えます（詳細は [VS Code 向けドキュメント](https://iwe.md/docs/editors/vscode/)）。
-- **AI エージェント連携（MCP）**: MCP サーバー `iwec` の設定は `.kiro/settings/mcp.json` にコミット済みです（`docs/local-env-setup/iwe-mcp.sh` が作業ディレクトリを `docs/` に固定して起動）。
-  Kiro を再起動すれば利用できます（CLI と IDE の場合）。
-  Kiro Web は `.kiro/settings/mcp.json` を読まないので、[Kiro Web の開発環境](kiro-web.md)で Agent Config を設定します。
-
-### 11. Kiro の code intelligence（LSP）
-
-Kiro CLI の `code` ツール（diagnostics、hover、参照の検索）が使う LSP サーバーの設定は、`.kiro/settings/lsp.json` にコミット済みです。
-TypeScript は、`task fe-install` で入る `frontend/apps/web/node_modules` の `tsc` を使います。
-`task fe-install` の前は、TypeScript の LSP が起動しません。
-Java は、手順 7 で入る jdtls と、jdtls に `@Slf4j` を解釈させる Lombok を使います。
-リポジトリのルートで Kiro CLI を起動し直すと使えます。
-jdtls は起動のたびに Gradle のプロジェクトを読み込むため、使えるまで数秒から数十秒かかります。
-
-jdtls と Lombok は Renovate（[#389](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/389)）が追わないので、版は `mise.toml` で手で上げます。
-
-### 12. VSCode 拡張機能のインストール
-
-`.vscode/extensions.json` に記載されている推奨拡張機能をインストールしてください。
-
-### 13. 動作確認
+ブロック2が最後の `gh auth status` までエラーなしで終われば、道具と依存は入っています。
+コードまで通ることを確かめたいときは、次を実行します。
 
 ``` bash
-cd /home/projects/spring-modulith-ai-dlc
-docker info
-java -version
-node -v
-gh auth status
-task --version
-kiro-cli --version
-betterleaks version
-iwe --version
+task check    # バックエンドの静的解析
+task verify   # 静的解析と、隔離したテスト
 ```
 
-エラーなく各ツールの情報が表示されれば環境構築完了です。
+## トラブルシューティング
+
+ブロックが途中で失敗したら、原因を直してから、同じブロックをもう一度貼り付けます。
