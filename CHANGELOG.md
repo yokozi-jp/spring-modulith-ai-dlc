@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v1.1.0...v1.1.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **deps:** frontendの推移的依存の脆弱性をロックの更新で解消する ([#807](https://github.com/yokozi-jp/spring-modulith-ai-dlc/issues/807)) ([feb9ffc](https://github.com/yokozi-jp/spring-modulith-ai-dlc/commit/feb9ffc9ad41801c7c9ee92dd314a0fde8788c62))
+
 ## [1.1.0](https://github.com/yokozi-jp/spring-modulith-ai-dlc/compare/v1.0.0...v1.1.0) (2026-11-26)
 
 
